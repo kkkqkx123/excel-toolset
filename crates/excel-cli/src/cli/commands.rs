@@ -308,6 +308,7 @@ pub enum DiffSub {
         range: String,
     },
     InstallGitDriver {},
+    UninstallGitDriver {},
 }
 
 #[derive(clap::Args)]
@@ -748,6 +749,10 @@ fn run_diff(args: &DiffArgs) -> Result<serde_json::Value> {
         DiffSub::InstallGitDriver {} => {
             git_driver::install_git_driver().map_err(AppError::Custom)?;
             Ok(serde_json::json!({ "success": true, "message": "Git diff driver installed" }))
+        }
+        DiffSub::UninstallGitDriver {} => {
+            git_driver::uninstall_git_driver().map_err(AppError::Custom)?;
+            Ok(serde_json::json!({ "success": true, "message": "Git diff driver uninstalled" }))
         }
     }
 }

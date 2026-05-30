@@ -1,0 +1,2 @@
+*.xml diff=xml-diff
+*.json diff=json-diff
