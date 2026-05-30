@@ -28,7 +28,7 @@ pub fn list_sheets(path: &str) -> Result<Vec<String>> {
     Ok(workbook.sheet_names().to_vec())
 }
 
-pub fn read_cell(path: &str, sheet: &str, row: u32, col: u32) -> Result<CellData> {
+pub fn read_cell(path: &str, sheet: &str, row: u32, col: u16) -> Result<CellData> {
     let mut workbook: Xlsx<_> =
         open_workbook(path).map_err(|e: calamine::XlsxError| AppError::Calamine(e.to_string()))?;
 
@@ -39,12 +39,12 @@ pub fn read_cell(path: &str, sheet: &str, row: u32, col: u32) -> Result<CellData
     let ws_formulas = workbook.worksheet_formula(sheet).ok();
 
     let cell = range
-        .get_value((row, col))
+        .get_value((row, col as u32))
         .ok_or_else(|| AppError::Custom(format!("Cell ({},{}) not found", row, col)))?;
 
     let formula = ws_formulas
         .as_ref()
-        .and_then(|f| f.get_value((row, col)).map(|s| s.to_string()));
+        .and_then(|f| f.get_value((row, col as u32)).map(|s| s.to_string()));
 
     Ok(data_to_cell_data(cell, formula))
 }
