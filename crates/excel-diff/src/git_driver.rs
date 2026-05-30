@@ -81,8 +81,11 @@ pub fn uninstall_git_driver() -> Result<(), String> {
         .map_err(|e| format!("Failed to unset git config: {}", e))?;
 
     if !output.status.success() {
+        let exit_code = output.status.code().unwrap_or(-1);
         let stderr = String::from_utf8_lossy(&output.stderr);
-        if !stderr.contains("entry does not exist") {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let combined = format!("{}{}", stdout, stderr);
+        if exit_code != 5 && !combined.contains("entry does not exist") {
             return Err(format!("git config --unset failed: {}", stderr));
         }
     }
@@ -114,5 +117,87 @@ fn get_invocation_command() -> Result<String, String> {
         Ok(format!("\"{}\" diff file", exe_str))
     } else {
         Ok(format!("{} diff file", exe_str))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_gitattributes_line_pattern() {
+        assert!(GITATTR_PATTERN.contains("*.xlsx"));
+        assert!(GITATTR_PATTERN.contains("diff=excel-diff"));
+    }
+
+    #[test]
+    fn test_gitattributes_format() {
+        let entry = GITATTR_ENTRY.trim();
+        assert!(entry.starts_with("*.xlsx"));
+        assert!(entry.contains("diff=excel-diff"));
+    }
+
+    #[test]
+    fn test_get_invocation_command_contains_diff_file_suffix() {
+        let cmd = get_invocation_command().unwrap();
+        assert!(
+            cmd.contains("diff file"),
+            "command should end with 'diff file', got: {}",
+            cmd
+        );
+    }
+
+    #[test]
+    fn test_filter_line_removes_excel_diff() {
+        let lines = vec![
+            "*.xml diff=xml-diff",
+            "*.xlsx diff=excel-diff",
+            "*.json diff=json-diff",
+        ];
+        let remaining: Vec<&str> = lines
+            .iter()
+            .filter(|line| !line.contains(GITATTR_PATTERN))
+            .copied()
+            .collect();
+        assert_eq!(remaining.len(), 2);
+        assert!(remaining[0].contains("xml"));
+        assert!(remaining[1].contains("json"));
+    }
+
+    #[test]
+    fn test_gitattributes_excel_only_is_empty_after_filter() {
+        let content = "*.xlsx diff=excel-diff\n";
+        let remaining: String = content
+            .lines()
+            .filter(|line| !line.contains(GITATTR_PATTERN))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(remaining.trim().is_empty());
+    }
+
+    #[test]
+    fn test_gitattributes_no_excel_entry_stays_unchanged() {
+        let content = "*.xml diff=xml-diff\n*.json diff=json-diff\n";
+        let remaining: String = content
+            .lines()
+            .filter(|line| !line.contains(GITATTR_PATTERN))
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert_eq!(remaining, "*.xml diff=xml-diff\n*.json diff=json-diff");
+    }
+
+    #[test]
+    fn test_gitattributes_trailing_newline_is_preserved() {
+        let content = "*.xml diff=xml-diff\n";
+        let mut need_write = true;
+        if content.contains(GITATTR_PATTERN) {
+            need_write = false;
+        }
+        assert!(need_write);
+
+        let new_content = content.to_string() + GITATTR_ENTRY;
+        assert!(new_content.ends_with('\n'));
+        assert!(new_content.contains("*.xlsx"));
+        assert!(new_content.contains("*.xml"));
     }
 }
