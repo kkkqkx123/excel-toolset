@@ -17,3 +17,42 @@ use excel_core::types::{CellDiff, SheetData};
 pub fn compute_diffs(old_data: &SheetData, new_data: &SheetData) -> Vec<CellDiff> {
     engine::compute_cell_diffs(old_data, new_data)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use excel_core::types::{CellData, CellDataType};
+
+    #[test]
+    fn test_compute_diffs_delegates_to_engine() {
+        let old = SheetData {
+            name: "S".into(),
+            rows: vec![vec![CellData {
+                value: Some("old".into()),
+                data_type: CellDataType::String,
+                formula: None,
+            }]],
+        };
+        let new = SheetData {
+            name: "S".into(),
+            rows: vec![vec![CellData {
+                value: Some("new".into()),
+                data_type: CellDataType::String,
+                formula: None,
+            }]],
+        };
+        let diffs = compute_diffs(&old, &new);
+        assert_eq!(diffs.len(), 1);
+        assert_eq!(diffs[0].diff_type, excel_core::types::DiffType::Modify);
+    }
+
+    #[test]
+    fn test_compute_diffs_identical() {
+        let data = SheetData {
+            name: "S".into(),
+            rows: vec![],
+        };
+        let diffs = compute_diffs(&data, &data);
+        assert!(diffs.is_empty());
+    }
+}
