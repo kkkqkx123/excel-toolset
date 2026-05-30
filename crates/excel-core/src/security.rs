@@ -1,5 +1,5 @@
 use std::fs;
-use std::io;
+use std::io::{self, Read};
 use std::path::Path;
 
 use sha2::{Digest, Sha256};
@@ -10,9 +10,16 @@ use crate::types::BackupInfo;
 pub fn compute_file_hash(path: &str) -> io::Result<String> {
     let mut file = fs::File::open(path)?;
     let mut hasher = Sha256::new();
-    io::copy(&mut file, &mut hasher)?;
+    let mut buf = [0u8; 8192];
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
     let hash = hasher.finalize();
-    Ok(format!("{:x}", hash))
+    Ok(hash.iter().map(|b| format!("{:02x}", b)).collect())
 }
 
 pub fn create_backup(path: &str, operation: &str) -> io::Result<BackupInfo> {
