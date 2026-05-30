@@ -324,7 +324,7 @@ pub async fn data_filter(Json(req): Json<FilterReq>) -> Json<ApiResponse<Vec<Vec
         operator: filter_op,
         value: req.value,
     }];
-    match excel_data::filter_rows(&req.path, &req.sheet, &conditions) {
+    match filter_rows_dispatch(&req.path, &req.sheet, &conditions) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
     }
@@ -351,7 +351,7 @@ pub async fn data_sort(Json(req): Json<SortReq>) -> Json<ApiResponse<WriteResult
         create_backup: true,
         file_path: req.path.clone(),
     };
-    match excel_data::sort_sheet(&req.path, &params, &req.sheet, &sort_cols) {
+    match sort_sheet_dispatch(&req.path, &params, &req.sheet, &sort_cols) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
     }
@@ -373,7 +373,7 @@ pub async fn data_dedup(Json(req): Json<DedupReq>) -> Json<ApiResponse<WriteResu
         create_backup: true,
         file_path: req.path.clone(),
     };
-    match excel_data::dedup_sheet(&req.path, &params, &req.sheet, &cols) {
+    match dedup_sheet_dispatch(&req.path, &params, &req.sheet, &cols) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
     }
@@ -387,7 +387,7 @@ pub struct SqlReq {
 }
 
 pub async fn data_sql(Json(req): Json<SqlReq>) -> Json<ApiResponse<Vec<Vec<CellData>>>> {
-    match excel_data::sql_query(&req.path, &req.sheet, &req.query) {
+    match sql_query_dispatch(&req.path, &req.sheet, &req.query) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
     }
@@ -636,6 +636,80 @@ pub async fn handle_diff_range(
 
 pub async fn health() -> Json<serde_json::Value> {
     Json(serde_json::json!({ "status": "ok", "version": "0.1.0" }))
+}
+
+// ---------------------------------------------------------------------------
+// Feature-gated dispatch: Rust fallback vs DuckDB SQL engine
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "sql")]
+fn filter_rows_dispatch(
+    path: &str,
+    sheet: &str,
+    conditions: &[FilterCondition],
+) -> Result<Vec<Vec<CellData>>> {
+    excel_sql::filter_rows(path, sheet, conditions)
+}
+
+#[cfg(not(feature = "sql"))]
+fn filter_rows_dispatch(
+    path: &str,
+    sheet: &str,
+    conditions: &[FilterCondition],
+) -> Result<Vec<Vec<CellData>>> {
+    excel_data::filter_rows(path, sheet, conditions)
+}
+
+#[cfg(feature = "sql")]
+fn sort_sheet_dispatch(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    sort_columns: &[SortColumn],
+) -> Result<WriteResult> {
+    excel_sql::sort_sheet(path, params, sheet, sort_columns)
+}
+
+#[cfg(not(feature = "sql"))]
+fn sort_sheet_dispatch(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    sort_columns: &[SortColumn],
+) -> Result<WriteResult> {
+    excel_data::sort_sheet(path, params, sheet, sort_columns)
+}
+
+#[cfg(feature = "sql")]
+fn dedup_sheet_dispatch(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    columns: &[u16],
+) -> Result<WriteResult> {
+    excel_sql::dedup_sheet(path, params, sheet, columns)
+}
+
+#[cfg(not(feature = "sql"))]
+fn dedup_sheet_dispatch(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    columns: &[u16],
+) -> Result<WriteResult> {
+    excel_data::dedup_sheet(path, params, sheet, columns)
+}
+
+#[cfg(feature = "sql")]
+fn sql_query_dispatch(path: &str, sheet: &str, query: &str) -> Result<Vec<Vec<CellData>>> {
+    excel_sql::sql_query(path, query)
+}
+
+#[cfg(not(feature = "sql"))]
+fn sql_query_dispatch(_path: &str, _sheet: &str, _query: &str) -> Result<Vec<Vec<CellData>>> {
+    Err(AppError::Custom(
+        "SQL queries require the 'sql' feature (enable with --features sql)".into(),
+    ))
 }
 
 // ---------------------------------------------------------------------------

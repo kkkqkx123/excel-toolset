@@ -187,16 +187,11 @@ pub fn dedup_sheet(
     })
 }
 
-pub fn sql_query(path: &str, sheet: &str, _sql: &str) -> Result<Vec<Vec<CellData>>> {
-    let data = crate::excel_read::read_sheet_all(path, sheet)?;
-    Ok(data.rows)
-}
-
 // ---------------------------------------------------------------------------
 // Internal
 // ---------------------------------------------------------------------------
 
-fn modify_data_file<F>(path: &str, params: &SecurityParams, modifier: F) -> Result<WriteResult>
+pub fn modify_data_file<F>(path: &str, params: &SecurityParams, modifier: F) -> Result<WriteResult>
 where
     F: FnOnce(&HashMap<String, SheetData>) -> Result<HashMap<String, SheetData>>,
 {

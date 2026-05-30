@@ -343,8 +343,31 @@ pub fn add_chart(path: &str, params: &SecurityParams, config: &ChartConfig) -> R
     })
 }
 
-pub fn refresh_formulas(path: &str, params: &SecurityParams, _sheet: &str) -> Result<WriteResult> {
-    modify_file(path, params, |_old_data, _wb| Ok(_old_data.clone()))
+pub fn refresh_formulas(path: &str, params: &SecurityParams, sheet: &str) -> Result<WriteResult> {
+    modify_file(path, params, |old_data, wb| {
+        let mut new_data = old_data.clone();
+
+        for (name, data) in new_data.iter_mut() {
+            if name == sheet || sheet == "*" {
+                for row in data.rows.iter_mut() {
+                    for cell in row.iter_mut() {
+                        if cell.formula.is_some() {
+                            cell.value = None;
+                        }
+                    }
+                }
+            }
+        }
+
+        *wb = Workbook::new();
+        for (name, data) in new_data.iter() {
+            let ws = wb.add_worksheet();
+            ws.set_name(name).map_err(AppError::Xlsx)?;
+            write_sheet_data(ws, data)?;
+        }
+
+        Ok(new_data)
+    })
 }
 
 pub fn set_calculation_mode(

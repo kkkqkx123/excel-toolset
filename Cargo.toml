@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/excel-core",
+    "crates/excel-sql",
     "crates/excel-diff",
     "crates/excel-cli",
     "crates/excel-http",

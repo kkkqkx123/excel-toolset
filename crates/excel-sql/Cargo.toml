@@ -1,0 +1,8 @@
+[package]
+name = "excel-sql"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+excel-core = { path = "../excel-core" }
+duckdb = { version = "1.1", features = ["bundled"] }

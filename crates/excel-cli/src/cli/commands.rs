@@ -537,7 +537,7 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 operator: filter_op,
                 value: value.clone(),
             }];
-            let result = excel_data::filter_rows(path, sheet, &conditions)?;
+            let result = filter_rows_dispatch(path, sheet, &conditions)?;
             Ok(serde_json::to_value(result).unwrap())
         }
         DataSub::Sort {
@@ -556,7 +556,7 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 create_backup: true,
                 file_path: path.clone(),
             };
-            let result = excel_data::sort_sheet(path, &params, sheet, &sort_cols)?;
+            let result = sort_sheet_dispatch(path, &params, sheet, &sort_cols)?;
             Ok(serde_json::to_value(result).unwrap())
         }
         DataSub::Dedup {
@@ -571,11 +571,11 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 create_backup: true,
                 file_path: path.clone(),
             };
-            let result = excel_data::dedup_sheet(path, &params, sheet, &cols)?;
+            let result = dedup_sheet_dispatch(path, &params, sheet, &cols)?;
             Ok(serde_json::to_value(result).unwrap())
         }
         DataSub::Sql { path, sheet, query } => {
-            let result = excel_data::sql_query(path, sheet, query)?;
+            let result = sql_query_dispatch(path, sheet, query)?;
             Ok(serde_json::to_value(result).unwrap())
         }
     }
@@ -768,6 +768,80 @@ fn run_rollback(args: &RollbackArgs) -> Result<serde_json::Value> {
     Ok(
         serde_json::json!({ "success": true, "message": format!("Rolled back {} from {}", args.path, args.backup_path) }),
     )
+}
+
+// ---------------------------------------------------------------------------
+// Feature-gated dispatch: Rust fallback vs DuckDB SQL engine
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "sql")]
+fn filter_rows_dispatch(
+    path: &str,
+    sheet: &str,
+    conditions: &[FilterCondition],
+) -> Result<Vec<Vec<CellData>>> {
+    excel_sql::filter_rows(path, sheet, conditions)
+}
+
+#[cfg(not(feature = "sql"))]
+fn filter_rows_dispatch(
+    path: &str,
+    sheet: &str,
+    conditions: &[FilterCondition],
+) -> Result<Vec<Vec<CellData>>> {
+    excel_data::filter_rows(path, sheet, conditions)
+}
+
+#[cfg(feature = "sql")]
+fn sort_sheet_dispatch(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    sort_columns: &[SortColumn],
+) -> Result<WriteResult> {
+    excel_sql::sort_sheet(path, params, sheet, sort_columns)
+}
+
+#[cfg(not(feature = "sql"))]
+fn sort_sheet_dispatch(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    sort_columns: &[SortColumn],
+) -> Result<WriteResult> {
+    excel_data::sort_sheet(path, params, sheet, sort_columns)
+}
+
+#[cfg(feature = "sql")]
+fn dedup_sheet_dispatch(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    columns: &[u16],
+) -> Result<WriteResult> {
+    excel_sql::dedup_sheet(path, params, sheet, columns)
+}
+
+#[cfg(not(feature = "sql"))]
+fn dedup_sheet_dispatch(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    columns: &[u16],
+) -> Result<WriteResult> {
+    excel_data::dedup_sheet(path, params, sheet, columns)
+}
+
+#[cfg(feature = "sql")]
+fn sql_query_dispatch(path: &str, sheet: &str, query: &str) -> Result<Vec<Vec<CellData>>> {
+    excel_sql::sql_query(path, query)
+}
+
+#[cfg(not(feature = "sql"))]
+fn sql_query_dispatch(_path: &str, _sheet: &str, _query: &str) -> Result<Vec<Vec<CellData>>> {
+    Err(AppError::Custom(
+        "SQL queries require the 'sql' feature (enable with --features sql)".into(),
+    ))
 }
 
 fn parse_cell_value(s: &str) -> CellValue {
