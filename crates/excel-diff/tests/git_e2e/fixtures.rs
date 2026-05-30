@@ -77,3 +77,29 @@ pub fn create_formulas_xlsx(path: &std::path::Path) {
     ws.write_formula(2, 1, "=SUM(B1:B2)").unwrap();
     wb.save(path).unwrap();
 }
+
+pub fn create_formulas_modified_xlsx(path: &std::path::Path) {
+    let mut wb = rust_xlsxwriter::Workbook::new();
+    let ws = wb.add_worksheet();
+    ws.set_name("Sheet1").unwrap();
+    ws.write_string(0, 0, "A").unwrap();
+    ws.write_number(0, 1, 10.0).unwrap();
+    ws.write_string(1, 0, "B").unwrap();
+    ws.write_number(1, 1, 20.0).unwrap();
+    ws.write_string(2, 0, "Average").unwrap();
+    ws.write_formula(2, 1, "=AVERAGE(B1:B2)").unwrap();
+    wb.save(path).unwrap();
+}
+
+pub fn create_formulas_passive_change_xlsx(path: &std::path::Path) {
+    let mut wb = rust_xlsxwriter::Workbook::new();
+    let ws = wb.add_worksheet();
+    ws.set_name("Sheet1").unwrap();
+    ws.write_string(0, 0, "A").unwrap();
+    ws.write_number(0, 1, 30.0).unwrap();
+    ws.write_string(1, 0, "B").unwrap();
+    ws.write_number(1, 1, 20.0).unwrap();
+    ws.write_string(2, 0, "Sum").unwrap();
+    ws.write_formula(2, 1, "=SUM(B1:B2)").unwrap();
+    wb.save(path).unwrap();
+}

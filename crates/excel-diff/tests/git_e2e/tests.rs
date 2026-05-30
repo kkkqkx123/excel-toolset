@@ -2,12 +2,25 @@ pub mod helpers;
 pub mod fixtures;
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use excel_diff::git_driver;
+use excel_core::types::{CellData, CellDataType, DiffType};
 use fixtures::*;
 use helpers::*;
+
+fn output_dir() -> PathBuf {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/git_e2e/outputs");
+    fs::create_dir_all(&dir).ok();
+    dir
+}
+
+fn write_diff_output(test_name: &str, diff: &serde_json::Value) {
+    let path = output_dir().join(format!("{}.json", test_name));
+    let json = serde_json::to_string_pretty(diff).unwrap();
+    fs::write(&path, json).ok();
+}
 
 #[test]
 fn test_install_creates_gitattributes_and_config() {
@@ -167,6 +180,11 @@ fn test_diff_files_via_fixtures() {
     assert!(result.is_ok(), "diff_files should succeed");
     let diff = result.unwrap();
 
+    write_diff_output(
+        "simple_vs_modified",
+        &serde_json::to_value(&diff).unwrap(),
+    );
+
     assert!(!diff.file_hash_match, "files differ");
     assert!(diff.summary.total_changes > 0, "should detect changes");
     assert!(diff.summary.modifies > 0, "should have modifications");
@@ -184,6 +202,12 @@ fn test_diff_files_identical_returns_zero_changes() {
 
     assert!(result.is_ok());
     let diff = result.unwrap();
+
+    write_diff_output(
+        "identical_files",
+        &serde_json::to_value(&diff).unwrap(),
+    );
+
     assert!(diff.file_hash_match, "same file => hash match");
     assert_eq!(diff.summary.total_changes, 0, "no changes expected");
 }
@@ -202,6 +226,12 @@ fn test_diff_multi_sheet_detects_sheet_additions() {
 
     assert!(result.is_ok());
     let diff = result.unwrap();
+
+    write_diff_output(
+        "multi_sheet_addition",
+        &serde_json::to_value(&diff).unwrap(),
+    );
+
     assert!(diff.sheet_diffs.len() > 1, "multi-sheet should have >1 diffs");
 }
 
@@ -219,6 +249,12 @@ fn test_diff_detects_sheet_deletion() {
 
     assert!(result.is_ok());
     let diff = result.unwrap();
+
+    write_diff_output(
+        "sheet_deletion",
+        &serde_json::to_value(&diff).unwrap(),
+    );
+
     let sheet_names: Vec<_> = diff.sheet_diffs.iter().map(|s| &s.sheet_name).collect();
     assert!(
         sheet_names.contains(&&"Extra".to_string()),
@@ -241,6 +277,12 @@ fn test_diff_empty_workbook() {
 
     assert!(result.is_ok());
     let diff = result.unwrap();
+
+    write_diff_output(
+        "empty_vs_simple",
+        &serde_json::to_value(&diff).unwrap(),
+    );
+
     assert!(!diff.file_hash_match, "empty vs data should differ");
     assert!(diff.summary.adds > 0, "should detect added rows");
 }
@@ -259,6 +301,12 @@ fn test_diff_both_empty_workbooks() {
 
     assert!(result.is_ok());
     let diff = result.unwrap();
+
+    write_diff_output(
+        "empty_vs_empty",
+        &serde_json::to_value(&diff).unwrap(),
+    );
+
     assert!(diff.file_hash_match, "both empty should match");
 }
 
@@ -289,7 +337,99 @@ fn test_diff_formula_file() {
 
     assert!(result.is_ok(), "formula file should be diffable");
     let diff = result.unwrap();
+
+    write_diff_output(
+        "formulas_identical",
+        &serde_json::to_value(&diff).unwrap(),
+    );
+
     assert!(diff.file_hash_match, "identical formula files should match");
+}
+
+#[test]
+fn test_diff_formula_text_change() {
+    let dir = tempfile::tempdir().unwrap();
+    let old_path = dir.path().join("old.xlsx");
+    let new_path = dir.path().join("new.xlsx");
+
+    create_formulas_xlsx(&old_path);
+    create_formulas_modified_xlsx(&new_path);
+
+    let result =
+        excel_diff::diff_files(&old_path.to_string_lossy(), &new_path.to_string_lossy());
+
+    assert!(result.is_ok(), "formula change should be diffable");
+    let diff = result.unwrap();
+
+    write_diff_output(
+        "formulas_text_changed",
+        &serde_json::to_value(&diff).unwrap(),
+    );
+
+    assert!(!diff.file_hash_match, "formula text changed");
+    assert!(diff.summary.modifies > 0, "should detect formula modification");
+
+    let formula_diffs: Vec<_> = diff.sheet_diffs.iter()
+        .flat_map(|s| &s.cell_diffs)
+        .filter(|c| c.diff_type == DiffType::Modify
+            && c.old_formula.is_some() && c.new_formula.is_some())
+        .collect();
+    assert!(!formula_diffs.is_empty(), "should have formula modification entry");
+
+    let cell = &formula_diffs[0];
+    assert_eq!(cell.cell_ref, "B3",
+        "formula cell should be at B3");
+    assert_eq!(cell.old_formula.as_deref(), Some("SUM(B1:B2)"),
+        "old formula text (calamine strips = prefix)");
+    assert_eq!(cell.new_formula.as_deref(), Some("AVERAGE(B1:B2)"),
+        "new formula text");
+}
+
+#[test]
+fn test_diff_formula_passive_value_change() {
+    let old_sheet = excel_core::types::SheetData {
+        name: "Sheet1".into(),
+        rows: vec![
+            vec![
+                CellData { value: Some("A".into()), data_type: CellDataType::String, formula: None },
+                CellData { value: Some("10".into()), data_type: CellDataType::Int, formula: None },
+            ],
+            vec![
+                CellData { value: Some("B".into()), data_type: CellDataType::String, formula: None },
+                CellData { value: Some("20".into()), data_type: CellDataType::Int, formula: None },
+            ],
+            vec![
+                CellData { value: Some("Sum".into()), data_type: CellDataType::String, formula: None },
+                CellData { value: Some("30".into()), data_type: CellDataType::Int,
+                    formula: Some("SUM(B1:B2)".into()) },
+            ],
+        ],
+    };
+    // Simulate: input B1 changed from 10→30, so formula cell's cached value 30→50
+    let mut new_sheet = old_sheet.clone();
+    new_sheet.rows[0][1].value = Some("30".into());
+    new_sheet.rows[2][1].value = Some("50".into());
+
+    let diffs = excel_diff::compute_diffs(&old_sheet, &new_sheet);
+
+    write_diff_output("formulas_passive_value_change", &serde_json::to_value(&diffs).unwrap());
+
+    let passive: Vec<_> = diffs.iter().filter(|c| c.diff_type == DiffType::Passive).collect();
+    assert!(!passive.is_empty(), "formula cell with same formula but changed value should be Passive");
+    assert_eq!(passive[0].cell_ref, "B3");
+    assert_eq!(passive[0].old_value.as_deref(), Some("30"));
+    assert_eq!(passive[0].new_value.as_deref(), Some("50"));
+    assert_eq!(passive[0].old_formula.as_deref(), Some("SUM(B1:B2)"));
+    assert_eq!(passive[0].new_formula.as_deref(), Some("SUM(B1:B2)"),
+        "formula unchanged but still captured");
+
+    let modify: Vec<_> = diffs.iter().filter(|c| c.diff_type == DiffType::Modify).collect();
+    assert!(!modify.is_empty(), "non-formula value change should be Modify");
+    assert_eq!(modify[0].cell_ref, "B1");
+    assert_eq!(modify[0].old_value.as_deref(), Some("10"));
+    assert_eq!(modify[0].new_value.as_deref(), Some("30"));
+    assert_eq!(modify[0].old_formula, None);
+    assert_eq!(modify[0].new_formula, None);
 }
 
 #[test]
@@ -310,6 +450,12 @@ fn test_diff_with_fixture_files() {
 
     assert!(result.is_ok());
     let diff = result.unwrap();
+
+    write_diff_output(
+        "fixture_simple_vs_modified",
+        &serde_json::to_value(&diff).unwrap(),
+    );
+
     assert!(!diff.file_hash_match);
     assert!(diff.summary.total_changes > 0);
 }
@@ -342,8 +488,6 @@ fn test_git_diff_driver_e2e_with_cargo_run() {
         git(&["add", "."]);
         git(&["commit", "-m", "initial"]);
 
-        fs::copy(&modified, &old_file).unwrap();
-
         let diff_output = Command::new("cargo")
             .args([
                 "run", "--manifest-path", &manifest_toml.to_string_lossy(),
@@ -361,9 +505,17 @@ fn test_git_diff_driver_e2e_with_cargo_run() {
         );
 
         let output = String::from_utf8_lossy(&diff_output.stdout);
+        let parsed: serde_json::Value = serde_json::from_str(&output)
+            .unwrap_or_else(|_| serde_json::json!({"raw": output}));
+        std::fs::write(
+            output_dir().join("git_driver_e2e.json"),
+            serde_json::to_string_pretty(&parsed).unwrap(),
+        )
+        .ok();
+
         assert!(
-            output.contains("success") || output.len() > 0,
-            "diff output should contain result, got: {}",
+            output.contains("file_hash_match") || output.len() > 0,
+            "diff output should contain diff result, got: {}",
             output
         );
     });
