@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use rust_xlsxwriter::{Workbook, Worksheet};
 
-use crate::excel_diff::diff_sheet_maps;
 use crate::excel_read::read_all_sheets_to_map;
 use crate::security::{compute_file_hash, create_backup};
 use crate::types::*;
@@ -123,8 +122,14 @@ pub fn sort_sheet(
 
             body.sort_by(|a, b| {
                 for sc in sort_columns {
-                    let ca = a.get(sc.column as usize).and_then(|c| c.value.as_deref()).unwrap_or("");
-                    let cb = b.get(sc.column as usize).and_then(|c| c.value.as_deref()).unwrap_or("");
+                    let ca = a
+                        .get(sc.column as usize)
+                        .and_then(|c| c.value.as_deref())
+                        .unwrap_or("");
+                    let cb = b
+                        .get(sc.column as usize)
+                        .and_then(|c| c.value.as_deref())
+                        .unwrap_or("");
                     let cmp = ca.to_lowercase().cmp(&cb.to_lowercase());
                     if cmp != std::cmp::Ordering::Equal {
                         return if sc.descending { cmp.reverse() } else { cmp };
@@ -165,7 +170,12 @@ pub fn dedup_sheet(
             for row in body {
                 let key: Vec<String> = cols
                     .iter()
-                    .map(|&ci| row.get(ci).and_then(|c| c.value.as_deref()).unwrap_or("").to_string())
+                    .map(|&ci| {
+                        row.get(ci)
+                            .and_then(|c| c.value.as_deref())
+                            .unwrap_or("")
+                            .to_string()
+                    })
                     .collect();
                 if seen.insert(key) {
                     sd.rows.push(row);
@@ -214,20 +224,13 @@ where
         compute_file_hash(path).map_err(AppError::Io)?
     };
 
-    let sheet_diffs = diff_sheet_maps(&old_data, &new_data);
-    let flat_diffs: Vec<CellDiff> = sheet_diffs
-        .iter()
-        .flat_map(|sd| sd.cell_diffs.clone())
-        .collect();
-    let diff = if flat_diffs.is_empty() { None } else { Some(flat_diffs) };
-
     Ok(WriteResult {
         success: true,
         message: String::new(),
         backup_info,
         old_hash,
         new_hash,
-        diff,
+        diff: None,
     })
 }
 
@@ -241,17 +244,21 @@ fn write_sheet_data(ws: &mut Worksheet, data: &SheetData) -> Result<()> {
                 match cell.data_type {
                     CellDataType::Float | CellDataType::Int | CellDataType::DateTime => {
                         if let Ok(n) = val.parse::<f64>() {
-                            ws.write_number(ri as u32, ci as u16, n).map_err(AppError::Xlsx)?;
+                            ws.write_number(ri as u32, ci as u16, n)
+                                .map_err(AppError::Xlsx)?;
                         } else {
-                            ws.write_string(ri as u32, ci as u16, val).map_err(AppError::Xlsx)?;
+                            ws.write_string(ri as u32, ci as u16, val)
+                                .map_err(AppError::Xlsx)?;
                         }
                     }
                     CellDataType::Bool => {
                         let b = val == "true" || val == "1" || val == "True";
-                        ws.write_boolean(ri as u32, ci as u16, b).map_err(AppError::Xlsx)?;
+                        ws.write_boolean(ri as u32, ci as u16, b)
+                            .map_err(AppError::Xlsx)?;
                     }
                     _ => {
-                        ws.write_string(ri as u32, ci as u16, val).map_err(AppError::Xlsx)?;
+                        ws.write_string(ri as u32, ci as u16, val)
+                            .map_err(AppError::Xlsx)?;
                     }
                 }
             }

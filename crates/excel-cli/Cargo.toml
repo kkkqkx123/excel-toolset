@@ -1,0 +1,11 @@
+[package]
+name = "excel-cli"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+excel-core = { path = "../excel-core" }
+excel-diff = { path = "../excel-diff" }
+clap = { version = "4", features = ["derive"] }
+serde_json = "1"
+chrono = "0.4"

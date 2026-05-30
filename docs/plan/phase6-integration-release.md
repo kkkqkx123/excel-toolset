@@ -7,14 +7,14 @@
 
 ## 6.1 集成测试
 
-### 6.1.1 Rust 主项目测试
+### 6.1.1 单元与集成测试
 
 ```bash
 # 单元测试
-cargo test
+cargo test --workspace
 
-# 集成测试（tests/ 目录）
-cargo test --test integration
+# 集成测试
+cargo test --test integration --workspace
 
 # 端到端测试
 # 1. 创建临时文件
@@ -33,31 +33,12 @@ cargo test --test integration
 | 异常处理 | 文件不存在 → sheet 不存在 → 无效单元格引用 | 错误统一 |
 | 并发安全 | 同一文件连续多次写入操作 | 功能正常 |
 
-### 6.1.2 Python Diff 项目测试
-
-```bash
-pytest tests/
-```
-
-**覆盖场景**：
-- 两个相同 Excel diff → `NoChange`
-- 单元格值修改 → `Modify` 正确标记
-- 公式不变但值变 → `AUTO_UPDATE` 标记
-- 公式文本变化 → `Modify` 主动标记
-- 行新增/删除 → `Add`/`Delete` 行级 diff
-
-### 6.1.3 跨项目集成测试
-
-验证两个工具的协同工作：
-1. Rust CLI 编辑 Excel 文件 → `git commit`
-2. `excel-diff diff` 查看版本差异 → diff 正确
-
 ## 6.2 文档编写
 
 | 文档 | 位置 | 内容 |
 |------|------|------|
 | README.md | 项目根目录 | 简介、安装、快速开始、命令列表 |
-| 架构设计 | `docs/架构设计.md` | 已存在，补充实现细节 |
+| 架构文档 | `docs/architecture/` | Workspace 结构、模块关系、diff 子系统 |
 | CLI 使用手册 | `docs/cli-usage.md` | 所有子命令+参数+示例 |
 | HTTP API 文档 | `docs/api-docs.md` | 路由+请求体+响应示例 |
 | 开发指南 | `docs/development.md` | 环境配置、编码规范、PR 流程 |
@@ -75,21 +56,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build Rust
-        run: cargo build --all-features
-      - name: Run Rust tests
-        run: cargo test
+      - name: Build Rust workspace
+        run: cargo build --workspace
+      - name: Run all tests
+        run: cargo test --workspace
       - name: Lint
-        run: cargo clippy -- -D warnings
+        run: cargo clippy --workspace -- -D warnings
       - name: Format check
-        run: cargo fmt --check
+        run: cargo fmt --all --check
 ```
 
 **包含的检查项**：
-- `cargo build`（全特性）
-- `cargo test`（单元+集成）
-- `cargo clippy`
-- `cargo fmt`
+- `cargo build --workspace`
+- `cargo test --workspace`
+- `cargo clippy --workspace`
+- `cargo fmt --all --check`
 - `cargo audit`（依赖安全扫描）
 - 跨平台编译验证（ubuntu/macos/windows）
 
@@ -99,22 +80,15 @@ jobs:
 
 ```bash
 # 验证发布
-cargo publish --dry-run
+cargo publish --dry-run -p excel-core
+cargo publish --dry-run -p excel-diff
 
 # 本地打包
-cargo build --release
-# 产物：target/release/excel-tool-gateway.exe (Windows)
-# 产物：target/release/excel-tool-gateway (Linux/macOS)
-```
-
-### Python 项目发布
-
-```bash
-# 构建
-python -m build
-
-# 发布到 PyPI
-twine upload dist/*
+cargo build --release --workspace
+# 产物：target/release/excel-cli.exe (Windows)
+# 产物：target/release/excel-cli (Linux/macOS)
+# 产物：target/release/excel-http.exe (Windows)
+# 产物：target/release/excel-http (Linux/macOS)
 ```
 
 ### GitHub Release
@@ -122,7 +96,6 @@ twine upload dist/*
 | 资源 | 说明 |
 |------|------|
 | Rust CLI 静态二进制 | Windows/macOS/Linux 三平台 |
-| pip install excel-diff | PyPI 发布 |
 | Web 前端静态文件 | GitHub Pages 部署 |
 
 ## 6.5 性能验证
@@ -132,7 +105,7 @@ twine upload dist/*
 | 指标 | 目标值 | 衡量方式 |
 |------|--------|----------|
 | CLI 二进制大小 | < 10MB | `ls -lh target/release/` |
-| 启动时间 | < 100ms | `hyperfine excel --help` |
+| 启动时间 | < 100ms | `hyperfine excel-cli --help` |
 | 读取 10MB xlsx | < 1s | 集成测试计时 |
 | 写入 1000 单元格 | < 2s | 集成测试计时 |
 | HTTP 首次响应 | < 200ms | `curl -w %{time_total}` |
@@ -141,8 +114,8 @@ twine upload dist/*
 ## 6.6 发布检查清单
 
 ### 代码质量
-- [ ] `cargo clippy` 无 warning
-- [ ] `cargo fmt` 已格式化
+- [ ] `cargo clippy --workspace` 无 warning
+- [ ] `cargo fmt --all` 已格式化
 - [ ] 所有测试通过
 - [ ] 无用代码/注释清理
 - [ ] API 无破坏性变更

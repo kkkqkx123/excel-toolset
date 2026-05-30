@@ -39,43 +39,6 @@ pub fn rollback(backup_info: &BackupInfo, original_path: &str) -> io::Result<()>
     Ok(())
 }
 
-pub fn with_security<F, T>(
-    params: crate::types::SecurityParams,
-    f: F,
-) -> Result<(T, Option<BackupInfo>), Box<dyn std::error::Error>>
-where
-    F: FnOnce() -> Result<T, Box<dyn std::error::Error>>,
-{
-    let file_path = params.file_path.clone();
-    let pre_hash = compute_file_hash(&file_path)?;
-
-    let backup_info = if params.create_backup {
-        Some(create_backup(&file_path, &pre_hash)?)
-    } else {
-        None
-    };
-
-    if params.dry_run {
-        return Err("Dry run: operation skipped".into());
-    }
-
-    let result = match f() {
-        Ok(val) => val,
-        Err(e) => {
-            if let Some(ref backup) = backup_info {
-                let _ = rollback(backup, &file_path);
-            }
-            return Err(e);
-        }
-    };
-
-    if let Some(ref _backup) = backup_info {
-        let _post_hash = compute_file_hash(&file_path)?;
-    }
-
-    Ok((result, backup_info))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

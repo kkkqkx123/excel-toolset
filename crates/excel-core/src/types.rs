@@ -82,6 +82,30 @@ pub struct ApiResponse<T: Serialize> {
     pub backup_info: Option<BackupInfo>,
 }
 
+impl<T: Serialize> ApiResponse<T> {
+    pub fn ok(data: Option<T>) -> Self {
+        ApiResponse {
+            success: true,
+            message: String::new(),
+            file_hash: None,
+            data,
+            diff: None,
+            backup_info: None,
+        }
+    }
+
+    pub fn err(e: AppError) -> Self {
+        ApiResponse {
+            success: false,
+            message: e.to_string(),
+            file_hash: None,
+            data: None,
+            diff: None,
+            backup_info: None,
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // File / Backup
 // ---------------------------------------------------------------------------

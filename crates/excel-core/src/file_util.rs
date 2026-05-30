@@ -1,6 +1,7 @@
-use std::path::{Path, PathBuf};
 use std::fs;
 use std::io;
+use std::path::{Path, PathBuf};
+
 use chrono::Utc;
 
 pub fn path_exists(p: &str) -> bool {
@@ -21,10 +22,16 @@ pub fn create_temp_dir() -> io::Result<PathBuf> {
 pub fn append_timestamp(path: &str) -> String {
     let p = Path::new(path);
     let stem = p.file_stem().unwrap_or_default().to_string_lossy();
-    let ext = p.extension().map(|e| format!(".{}", e.to_string_lossy())).unwrap_or_default();
+    let ext = p
+        .extension()
+        .map(|e| format!(".{}", e.to_string_lossy()))
+        .unwrap_or_default();
     let timestamp = Utc::now().format("%Y%m%d_%H%M%S_%3f");
     let parent = p.parent().unwrap_or(Path::new(""));
-    parent.join(format!("{}_{}{}", stem, timestamp, ext)).to_string_lossy().to_string()
+    parent
+        .join(format!("{}_{}{}", stem, timestamp, ext))
+        .to_string_lossy()
+        .to_string()
 }
 
 pub fn ensure_parent_dir(path: &str) -> io::Result<()> {

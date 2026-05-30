@@ -1,67 +1,125 @@
 # 阶段1：项目骨架与基础模块
 
-**目标**：搭建 Rust 项目脚手架，完成全局类型定义、基础文件工具、安全组件。
-**产出**：可编译的空壳项目，验证 Cargo 依赖、模块结构、类型系统。
+**目标**：搭建 Cargo Workspace 脚手架，完成全局类型定义、基础文件工具、安全组件。
+**产出**：可编译的空壳 workspace，验证 Cargo 依赖、模块结构、类型系统。
 
 ---
 
-## 1.1 初始化项目
+## 1.1 初始化 Workspace
 
 ```bash
-cargo init excel-tool-gateway
+# Create workspace root
+cargo init excel-tool-gateway --workspace
+
+# Create individual crate directories
+mkdir -p crates/excel-core/src
+mkdir -p crates/excel-diff/src
+mkdir -p crates/excel-cli/src
+mkdir -p crates/excel-http/src
 ```
 
-**Cargo.toml 依赖**：
+**Workspace Cargo.toml**：
 ```toml
+[workspace]
+resolver = "2"
+members = [
+    "crates/excel-core",
+    "crates/excel-diff",
+    "crates/excel-cli",
+    "crates/excel-http",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+```
+
+**excel-core Cargo.toml**：
+```toml
+[package]
+name = "excel-core"
+version.workspace = true
+edition.workspace = true
+
 [dependencies]
-# 核心 Excel 库
 calamine = "0.31"
 rust_xlsxwriter = "0.50"
-
-# HTTP 服务（可选，可延迟引入）
-axum = { version = "0.7", optional = true }
-tokio = { version = "1.0", features = ["full"], optional = true }
-
-# CLI 解析
-clap = { version = "4", features = ["derive"] }
-
-# 序列化
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-
-# 安全
 sha2 = "0.10"
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+```
 
-[features]
-default = ["cli"]
-cli = ["clap"]
-http = ["axum", "tokio"]
+**excel-diff Cargo.toml**：
+```toml
+[package]
+name = "excel-diff"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+excel-core = { path = "../excel-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+```
+
+**excel-cli Cargo.toml**：
+```toml
+[package]
+name = "excel-cli"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+excel-core = { path = "../excel-core" }
+excel-diff = { path = "../excel-diff" }
+clap = { version = "4", features = ["derive"] }
+serde_json = "1"
+```
+
+**excel-http Cargo.toml**：
+```toml
+[package]
+name = "excel-http"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+excel-core = { path = "../excel-core" }
+excel-diff = { path = "../excel-diff" }
+axum = "0.7"
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 ```
 
 ## 1.2 创建目录结构
 
 ```
-src/
-├── main.rs              # 入口
-├── types.rs             # 全局数据结构中心
-├── file_util.rs         # 基础文件工具
-├── security.rs          # 安全组件（指纹/备份/dry-run/回滚）
-├── excel_read.rs        # Excel 读取
-├── excel_write.rs       # Excel 写入
-├── excel_data.rs        # 数据加工
-├── vba_util.rs          # VBA 读写
-├── excel_diff.rs        # Diff 对比
-├── cli/
-│   ├── mod.rs
-│   └── commands.rs
-└── http/
-    ├── mod.rs
-    ├── router.rs
-    └── handlers.rs
+crates/
+├── excel-core/
+│   └── src/
+│       ├── lib.rs              # 公开 API
+│       ├── types.rs            # 全局数据结构中心
+│       ├── file_util.rs        # 基础文件工具
+│       ├── security.rs         # 安全组件（指纹/备份/dry-run/回滚）
+│       ├── excel_read.rs       # Excel 读取
+│       ├── excel_write.rs      # Excel 写入
+│       ├── excel_data.rs       # 数据加工
+│       └── vba_util.rs         # VBA 读写
+├── excel-diff/
+│   └── src/
+│       └── lib.rs              # diff 引擎
+├── excel-cli/
+│   └── src/
+│       └── main.rs             # CLI 入口
+└── excel-http/
+    └── src/
+        └── main.rs             # HTTP 入口
 ```
 
-**阶段1只实现**：`main.rs`, `types.rs`, `file_util.rs`, `security.rs`, 空壳模块存根。
+**阶段1只实现**：`excel-core` 的 `lib.rs`, `types.rs`, `file_util.rs`, `security.rs`，其余空壳存根。
 
 ## 1.3 全局类型定义（types.rs）
 
@@ -107,21 +165,10 @@ compute_file_hash → create_backup → (dry_run 判断) → execute → verify_
 
 创建 `excel_read.rs`, `excel_write.rs`, `excel_data.rs`, `vba_util.rs`, `excel_diff.rs` 的空壳模块，仅含模块声明和占位函数签名，确保 `cargo build` 通过。
 
-## 1.7 main.rs 入口
-
-最小入口：打印欢迎信息，预留 CLI/HTTP 特征门控。
-
-```rust
-fn main() {
-    println!("Excel Tool Gateway v0.1.0");
-    // 后续通过 cargo features 切换 CLI/HTTP
-}
-```
-
-## 1.8 验证标准
+## 1.7 验证标准
 
 - [ ] `cargo build` 通过
-- [ ] `cargo test` 通过
+- [ ] `cargo test --workspace` 通过
 - [ ] `types.rs` 核心结构体定义完整
 - [ ] `file_util.rs` 文件操作函数单元测试通过
 - [ ] `security.rs` 指纹计算、备份、回滚集成测试通过

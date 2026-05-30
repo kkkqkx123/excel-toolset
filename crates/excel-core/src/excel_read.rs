@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use calamine::{open_workbook, Data, Reader, Xlsx};
+use calamine::{Data, Reader, Xlsx, open_workbook};
 
 use crate::cell_ref;
 use crate::security::compute_file_hash;
@@ -64,9 +64,7 @@ pub fn read_range(path: &str, sheet: &str, range_spec: &str) -> Result<Vec<Vec<C
     for row in r_start..=r_end {
         let mut row_data = Vec::new();
         for col in c_start..=c_end {
-            let cell = range
-                .get_value((row, col as u32))
-                .unwrap_or(&Data::Empty);
+            let cell = range.get_value((row, col as u32)).unwrap_or(&Data::Empty);
             let formula = ws_formulas
                 .as_ref()
                 .and_then(|f| f.get_value((row, col as u32)).map(|s| s.to_string()));
@@ -87,9 +85,7 @@ pub fn read_formula(path: &str, sheet: &str, cell_spec: &str) -> Result<Option<S
         .worksheet_formula(sheet)
         .map_err(|e: calamine::XlsxError| AppError::Calamine(e.to_string()))?;
 
-    Ok(formulas
-        .get_value((row, col as u32))
-        .map(|s| s.to_string()))
+    Ok(formulas.get_value((row, col as u32)).map(|s| s.to_string()))
 }
 
 pub fn read_style(_path: &str, _sheet: &str, _cell_spec: &str) -> Result<Style> {
@@ -120,9 +116,10 @@ pub fn read_sheet_all(path: &str, sheet: &str) -> Result<SheetData> {
     for (row_idx, row) in range.rows().enumerate() {
         let mut cells = Vec::new();
         for (col_idx, cell) in row.iter().enumerate() {
-            let formula = ws_formulas
-                .as_ref()
-                .and_then(|f| f.get_value((row_idx as u32, col_idx as u32)).map(|s| s.to_string()));
+            let formula = ws_formulas.as_ref().and_then(|f| {
+                f.get_value((row_idx as u32, col_idx as u32))
+                    .map(|s| s.to_string())
+            });
             cells.push(data_to_cell_data(cell, formula));
         }
         rows.push(cells);

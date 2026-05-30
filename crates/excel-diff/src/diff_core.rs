@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
-use crate::excel_read::read_all_sheets_to_map;
-use crate::types::{
-    AppError, CellDiff, DiffSummary, DiffType, FileDiff, Result, SheetData, SheetDiff,
+use excel_core::excel_read;
+use excel_core::types::{
+    AppError, CellDiff, DiffSummary, DiffType, FileDiff, RangeDiff, Result, SheetData, SheetDiff,
 };
 
 /// Full file comparison: hash quick-check first, then cell-level diff.
 pub fn diff_files(old_path: &str, new_path: &str) -> Result<FileDiff> {
-    use crate::security::compute_file_hash;
+    use excel_core::security::compute_file_hash;
 
     let old_hash = compute_file_hash(old_path).map_err(AppError::Io)?;
     let new_hash = compute_file_hash(new_path).map_err(AppError::Io)?;
@@ -39,11 +39,7 @@ pub fn diff_files(old_path: &str, new_path: &str) -> Result<FileDiff> {
 }
 
 /// Compare a specific sheet between two files.
-pub fn diff_sheets(
-    old_path: &str,
-    new_path: &str,
-    sheet: &str,
-) -> Result<SheetDiff> {
+pub fn diff_sheets(old_path: &str, new_path: &str, sheet: &str) -> Result<SheetDiff> {
     let old_sheets = read_all_sheets_to_map(old_path)?;
     let new_sheets = read_all_sheets_to_map(new_path)?;
 
@@ -80,9 +76,9 @@ pub fn diff_range(
     new_path: &str,
     sheet: &str,
     range_spec: &str,
-) -> Result<crate::types::RangeDiff> {
-    use crate::cell_ref;
-    use crate::excel_read::read_range;
+) -> Result<RangeDiff> {
+    use excel_core::cell_ref;
+    use excel_core::excel_read::read_range;
 
     let old_data = read_range(old_path, sheet, range_spec)?;
     let new_data = read_range(new_path, sheet, range_spec)?;
@@ -131,14 +127,14 @@ pub fn diff_range(
         }
     }
 
-    Ok(crate::types::RangeDiff {
+    Ok(RangeDiff {
         range: range_spec.to_string(),
         cell_diffs,
     })
 }
 
-/// Compute diff between two in-memory sheet data maps (for write operations).
-pub(crate) fn diff_sheet_maps(
+/// Compute diff between two in-memory sheet data maps.
+pub fn diff_sheet_maps(
     old: &HashMap<String, SheetData>,
     new: &HashMap<String, SheetData>,
 ) -> Vec<SheetDiff> {
@@ -183,7 +179,7 @@ pub(crate) fn diff_sheet_maps(
 }
 
 /// Compute cell-level diff between two SheetData structs.
-pub(crate) fn compute_cell_diffs(old: &SheetData, new: &SheetData) -> Vec<CellDiff> {
+pub fn compute_cell_diffs(old: &SheetData, new: &SheetData) -> Vec<CellDiff> {
     let mut diffs = Vec::new();
     let max_rows = old.rows.len().max(new.rows.len());
 
@@ -227,6 +223,20 @@ pub(crate) fn compute_cell_diffs(old: &SheetData, new: &SheetData) -> Vec<CellDi
     }
 
     diffs
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+pub(crate) fn read_all_sheets_to_map(path: &str) -> Result<HashMap<String, SheetData>> {
+    let sheets = excel_read::list_sheets(path)?;
+    let mut map = HashMap::new();
+    for name in sheets {
+        let data = excel_read::read_sheet_all(path, &name)?;
+        map.insert(name, data);
+    }
+    Ok(map)
 }
 
 fn all_cells_as_diff(data: &SheetData, diff_type: DiffType) -> Vec<CellDiff> {
@@ -290,7 +300,7 @@ fn summarize(sheet_diffs: &[SheetDiff]) -> DiffSummary {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{CellData, CellDataType};
+    use excel_core::types::{CellData, CellDataType};
 
     #[test]
     fn test_diff_identical_returns_no_changes() {
@@ -299,13 +309,11 @@ mod tests {
             "Sheet1".to_string(),
             SheetData {
                 name: "Sheet1".to_string(),
-                rows: vec![vec![
-                    CellData {
-                        value: Some("hello".into()),
-                        data_type: CellDataType::String,
-                        formula: None,
-                    },
-                ]],
+                rows: vec![vec![CellData {
+                    value: Some("hello".into()),
+                    data_type: CellDataType::String,
+                    formula: None,
+                }]],
             },
         );
         let new = old.clone();
@@ -329,14 +337,16 @@ mod tests {
     fn sheet_data_with_values(values: &[&str]) -> SheetData {
         SheetData {
             name: "Sheet1".to_string(),
-            rows: vec![values
-                .iter()
-                .map(|v| CellData {
-                    value: Some(v.to_string()),
-                    data_type: CellDataType::String,
-                    formula: None,
-                })
-                .collect()],
+            rows: vec![
+                values
+                    .iter()
+                    .map(|v| CellData {
+                        value: Some(v.to_string()),
+                        data_type: CellDataType::String,
+                        formula: None,
+                    })
+                    .collect(),
+            ],
         }
     }
 }

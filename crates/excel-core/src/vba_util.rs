@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use calamine::{open_workbook, Reader, Xlsx};
+use calamine::{Reader, Xlsx, open_workbook};
 
 use crate::types::*;
 
@@ -33,8 +33,7 @@ pub fn export_vba(path: &str) -> Result<Vec<u8>> {
                     }
                     Err(_) => {
                         let zero = 0u32;
-                        buf.write_all(&zero.to_le_bytes())
-                            .map_err(AppError::Io)?;
+                        buf.write_all(&zero.to_le_bytes()).map_err(AppError::Io)?;
                     }
                 }
             }

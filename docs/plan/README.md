@@ -1,29 +1,60 @@
-# 实施计划总览
+# Implementation Plan Overview
 
-本文档将项目拆分为 **6 个阶段**，按依赖关系递进实施。每个阶段产出可独立验证的成果。
+This document organizes the project into **6 phases**, executed sequentially by dependency. Each phase produces independently verifiable deliverables.
 
-## 项目概览
+## Project Overview
 
-| 维度 | 内容 |
-|------|------|
-| 项目名 | Excel Tool Gateway |
-| 定位 | Rust 轻量化 Excel 原子操作网关，CLI + HTTP 双入口，为 AI Agent 提供标准化 Excel 操作能力 |
-| 核心依赖 | `calamine` (只读) + `rust_xlsxwriter` (只写) |
-| 附属项目 | `excel-diff` — Python 实现的 Git + Excel 智能 diff 工具 |
-| 架构原则 | 扁平两层架构，无 DDD/领域层；原子操作一一对应函数/命令/接口；所有写操作强制安全前置 |
+| Dimension | Content |
+|-----------|---------|
+| Name | Excel Tool Gateway |
+| Type | Rust Cargo Workspace (monorepo) |
+| Target | AI Agent Excel operations — CLI + HTTP gateway |
+| Core Dependencies | `calamine` (read-only) + `rust_xlsxwriter` (write-only) |
+| Architecture | Flat two-layer (entry → core); workspace-level modularity with `excel-core`, `excel-diff`, `excel-cli`, `excel-http` crates |
+| Language | Rust only |
 
-## 阶段依赖关系
+## Project Structure
+
+The project uses a Cargo workspace layout with independent crates:
+
+```
+excel-tool-gateway/
+├── Cargo.toml                    # [workspace] manifest
+└── crates/
+    ├── excel-core/              # Core engine (read/write/data/security/vba)
+    ├── excel-diff/              # Diff engine (depends on excel-core read)
+    ├── excel-cli/               # CLI binary (depends on core + diff)
+    └── excel-http/              # HTTP binary (depends on core + diff)
+```
+
+Key design principles:
+- **Core engine下沉**: All Excel operations live in `excel-core`. Entry crates depend on it, never the reverse.
+- **Diff独立可扩展**: `excel-diff` depends only on `excel-core`'s read types, keeping it reusable as a git diff driver or web UI diff backend.
+- **双入口上浮**: `excel-cli` and `excel-http` are independent binaries, sharing only `excel-core`.
+
+## Phase Dependencies
 
 ```mermaid
 graph TD
-    P1[阶段1: 项目骨架] --> P2[阶段2: 读写核心]
-    P2 --> P3[阶段3: 数据加工+高级能力]
-    P3 --> P4[阶段4: 双入口封装]
-    P2 --> P5[阶段5: Diff 子系统]
-    P4 --> P6[阶段6: 集成测试与发布]
+    P1[Phase 1: Project Scaffold] --> P2[Phase 2: Read/Write Core]
+    P2 --> P3[Phase 3: Data Processing + Advanced]
+    P3 --> P4[Phase 4: CLI + HTTP Entries]
+    P2 --> P5[Phase 5: Diff Subsystem]
+    P4 --> P6[Phase 6: Integration + Release]
     P5 --> P6
 ```
 
-- **P1~P4**: 主项目 `excel-tool-gateway`（Rust）
-- **P5**: 附属项目 `excel-diff`（Python）
-- **P6**: 统一集成、测试与发布
+- **P1–P4**: `excel-core`, `excel-cli`, `excel-http`
+- **P5**: `excel-diff`
+- **P6**: Integration, CI/CD, documentation, release
+
+## Technology Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Excel read | `calamine` 0.31 |
+| Excel write | `rust_xlsxwriter` 0.50 |
+| CLI parsing | `clap` 4 |
+| HTTP framework | `axum` 0.7 + `tokio` |
+| Serialization | `serde` + `serde_json` |
+| Security | `sha2`, `chrono` |

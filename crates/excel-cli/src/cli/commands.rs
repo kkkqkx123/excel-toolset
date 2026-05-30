@@ -1,11 +1,15 @@
 use clap::{Parser, Subcommand};
 
-use crate::excel_data;
-use crate::excel_diff;
-use crate::excel_read;
-use crate::excel_write;
-use crate::types::*;
-use crate::vba_util;
+use excel_core::excel_data;
+use excel_core::excel_read;
+use excel_core::excel_write;
+use excel_core::security;
+use excel_core::types::*;
+use excel_core::vba_util;
+use excel_diff::diff_files;
+use excel_diff::diff_range;
+use excel_diff::diff_sheets;
+use excel_diff::git_driver;
 
 #[derive(Parser)]
 #[command(name = "excel", version = "0.1.0", about = "Excel Tool Gateway")]
@@ -40,9 +44,19 @@ pub struct FileArgs {
 
 #[derive(Subcommand)]
 pub enum FileSub {
-    Create { path: String, #[arg(long, default_value = "Sheet1")] sheet: String },
-    Info { path: String },
-    Backup { path: String, #[arg(long)] output: Option<String> },
+    Create {
+        path: String,
+        #[arg(long, default_value = "Sheet1")]
+        sheet: String,
+    },
+    Info {
+        path: String,
+    },
+    Backup {
+        path: String,
+        #[arg(long)]
+        output: Option<String>,
+    },
 }
 
 #[derive(clap::Args)]
@@ -53,10 +67,22 @@ pub struct SheetArgs {
 
 #[derive(Subcommand)]
 pub enum SheetSub {
-    List { path: String },
-    Add { path: String, name: String },
-    Delete { path: String, name: String },
-    Rename { path: String, old: String, new: String },
+    List {
+        path: String,
+    },
+    Add {
+        path: String,
+        name: String,
+    },
+    Delete {
+        path: String,
+        name: String,
+    },
+    Rename {
+        path: String,
+        old: String,
+        new: String,
+    },
 }
 
 #[derive(clap::Args)]
@@ -67,8 +93,19 @@ pub struct CellArgs {
 
 #[derive(Subcommand)]
 pub enum CellSub {
-    Read { path: String, sheet: String, cell: String },
-    Write { path: String, sheet: String, cell: String, value: String, #[arg(long)] dry_run: bool },
+    Read {
+        path: String,
+        sheet: String,
+        cell: String,
+    },
+    Write {
+        path: String,
+        sheet: String,
+        cell: String,
+        value: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(clap::Args)]
@@ -79,9 +116,26 @@ pub struct RangeArgs {
 
 #[derive(Subcommand)]
 pub enum RangeSub {
-    Read { path: String, sheet: String, range: String },
-    Write { path: String, sheet: String, range: String, data: String, #[arg(long)] dry_run: bool },
-    Clear { path: String, sheet: String, range: String, #[arg(long)] dry_run: bool },
+    Read {
+        path: String,
+        sheet: String,
+        range: String,
+    },
+    Write {
+        path: String,
+        sheet: String,
+        range: String,
+        data: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    Clear {
+        path: String,
+        sheet: String,
+        range: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(clap::Args)]
@@ -92,13 +146,57 @@ pub struct DataArgs {
 
 #[derive(Subcommand)]
 pub enum DataSub {
-    AppendRow { path: String, sheet: String, values: Vec<String>, #[arg(long)] dry_run: bool },
-    InsertRow { path: String, sheet: String, row: u32, values: Vec<String>, #[arg(long)] dry_run: bool },
-    DeleteRow { path: String, sheet: String, row: u32, #[arg(long)] dry_run: bool },
-    Filter { path: String, sheet: String, column: u16, op: String, value: String },
-    Sort { path: String, sheet: String, column: u16, #[arg(long)] desc: bool, #[arg(long)] dry_run: bool },
-    Dedup { path: String, sheet: String, #[arg(long)] column: Option<u16>, #[arg(long)] dry_run: bool },
-    Sql { path: String, sheet: String, query: String },
+    AppendRow {
+        path: String,
+        sheet: String,
+        values: Vec<String>,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    InsertRow {
+        path: String,
+        sheet: String,
+        row: u32,
+        values: Vec<String>,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    DeleteRow {
+        path: String,
+        sheet: String,
+        row: u32,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    Filter {
+        path: String,
+        sheet: String,
+        column: u16,
+        op: String,
+        value: String,
+    },
+    Sort {
+        path: String,
+        sheet: String,
+        column: u16,
+        #[arg(long)]
+        desc: bool,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    Dedup {
+        path: String,
+        sheet: String,
+        #[arg(long)]
+        column: Option<u16>,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    Sql {
+        path: String,
+        sheet: String,
+        query: String,
+    },
 }
 
 #[derive(clap::Args)]
@@ -109,8 +207,20 @@ pub struct FormulaArgs {
 
 #[derive(Subcommand)]
 pub enum FormulaSub {
-    Set { path: String, sheet: String, cell: String, formula: String, #[arg(long)] dry_run: bool },
-    Refresh { path: String, sheet: String, #[arg(long)] dry_run: bool },
+    Set {
+        path: String,
+        sheet: String,
+        cell: String,
+        formula: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    Refresh {
+        path: String,
+        sheet: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(clap::Args)]
@@ -121,8 +231,21 @@ pub struct FormatArgs {
 
 #[derive(Subcommand)]
 pub enum FormatSub {
-    Set { path: String, sheet: String, range: String, style: String, #[arg(long)] dry_run: bool },
-    Merge { path: String, sheet: String, range: String, #[arg(long)] dry_run: bool },
+    Set {
+        path: String,
+        sheet: String,
+        range: String,
+        style: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    Merge {
+        path: String,
+        sheet: String,
+        range: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(clap::Args)]
@@ -133,7 +256,15 @@ pub struct ChartArgs {
 
 #[derive(Subcommand)]
 pub enum ChartSub {
-    Create { path: String, sheet: String, range: String, chart_type: String, title: Option<String>, #[arg(long)] dry_run: bool },
+    Create {
+        path: String,
+        sheet: String,
+        range: String,
+        chart_type: String,
+        title: Option<String>,
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(clap::Args)]
@@ -144,8 +275,16 @@ pub struct VbaArgs {
 
 #[derive(Subcommand)]
 pub enum VbaSub {
-    Export { path: String, output: String },
-    Import { path: String, vba_file: String, #[arg(long)] dry_run: bool },
+    Export {
+        path: String,
+        output: String,
+    },
+    Import {
+        path: String,
+        vba_file: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(clap::Args)]
@@ -156,8 +295,19 @@ pub struct DiffArgs {
 
 #[derive(Subcommand)]
 pub enum DiffSub {
-    File { old_path: String, new_path: String, #[arg(long)] sheet: Option<String> },
-    Range { old_path: String, new_path: String, sheet: String, range: String },
+    File {
+        old_path: String,
+        new_path: String,
+        #[arg(long)]
+        sheet: Option<String>,
+    },
+    Range {
+        old_path: String,
+        new_path: String,
+        sheet: String,
+        range: String,
+    },
+    InstallGitDriver {},
 }
 
 #[derive(clap::Args)]
@@ -217,10 +367,10 @@ fn run_file(args: &FileArgs) -> Result<serde_json::Value> {
             Ok(serde_json::to_value(info).unwrap())
         }
         FileSub::Backup { path, output } => {
-            let hash = crate::security::compute_file_hash(path).map_err(AppError::Io)?;
-            let backup = crate::security::create_backup(path, &hash).map_err(AppError::Io)?;
+            let hash = security::compute_file_hash(path)?;
+            let backup = security::create_backup(path, &hash)?;
             if let Some(out) = output {
-                std::fs::copy(&backup.backup_path, out).map_err(AppError::Io)?;
+                std::fs::copy(&backup.backup_path, out)?;
             }
             Ok(serde_json::json!({
                 "success": true,
@@ -261,13 +411,23 @@ fn run_sheet(args: &SheetArgs) -> Result<serde_json::Value> {
 fn run_cell(args: &CellArgs) -> Result<serde_json::Value> {
     match &args.command {
         CellSub::Read { path, sheet, cell } => {
-            let (row, col) = crate::cell_ref::parse_cell_ref(cell)?;
+            let (row, col) = excel_core::cell_ref::parse_cell_ref(cell)?;
             let data = excel_read::read_cell(path, sheet, row, col)?;
             Ok(serde_json::to_value(data).unwrap())
         }
-        CellSub::Write { path, sheet, cell, value, dry_run } => {
-            let (row, col) = crate::cell_ref::parse_cell_ref(cell)?;
-            let params = SecurityParams { dry_run: *dry_run, create_backup: true, file_path: path.clone() };
+        CellSub::Write {
+            path,
+            sheet,
+            cell,
+            value,
+            dry_run,
+        } => {
+            let (row, col) = excel_core::cell_ref::parse_cell_ref(cell)?;
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
             let cell_value = parse_cell_value(value);
             let result = excel_write::write_cell(path, &params, sheet, row, col, &cell_value)?;
             Ok(serde_json::to_value(result).unwrap())
@@ -281,14 +441,33 @@ fn run_range(args: &RangeArgs) -> Result<serde_json::Value> {
             let data = excel_read::read_range(path, sheet, range)?;
             Ok(serde_json::to_value(data).unwrap())
         }
-        RangeSub::Write { path, sheet, range, data, dry_run } => {
+        RangeSub::Write {
+            path,
+            sheet,
+            range,
+            data,
+            dry_run,
+        } => {
             let values: Vec<Vec<CellValue>> = parse_cell_value_grid(data)?;
-            let params = SecurityParams { dry_run: *dry_run, create_backup: true, file_path: path.clone() };
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
             let result = excel_write::write_range(path, &params, sheet, range, &values)?;
             Ok(serde_json::to_value(result).unwrap())
         }
-        RangeSub::Clear { path, sheet, range, dry_run } => {
-            let params = SecurityParams { dry_run: *dry_run, create_backup: true, file_path: path.clone() };
+        RangeSub::Clear {
+            path,
+            sheet,
+            range,
+            dry_run,
+        } => {
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
             let result = excel_write::clear_range(path, &params, sheet, range)?;
             Ok(serde_json::to_value(result).unwrap())
         }
@@ -297,38 +476,100 @@ fn run_range(args: &RangeArgs) -> Result<serde_json::Value> {
 
 fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
     match &args.command {
-        DataSub::AppendRow { path, sheet, values, dry_run } => {
-            let cell_values: Vec<Vec<CellValue>> = vec![values.iter().map(|v| parse_cell_value(v)).collect()];
-            let params = SecurityParams { dry_run: *dry_run, create_backup: true, file_path: path.clone() };
+        DataSub::AppendRow {
+            path,
+            sheet,
+            values,
+            dry_run,
+        } => {
+            let cell_values: Vec<Vec<CellValue>> =
+                vec![values.iter().map(|v| parse_cell_value(v)).collect()];
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
             let result = excel_data::append_rows(path, &params, sheet, &cell_values)?;
             Ok(serde_json::to_value(result).unwrap())
         }
-        DataSub::InsertRow { path, sheet, row, values, dry_run } => {
-            let cell_values: Vec<Vec<CellValue>> = vec![values.iter().map(|v| parse_cell_value(v)).collect()];
-            let params = SecurityParams { dry_run: *dry_run, create_backup: true, file_path: path.clone() };
+        DataSub::InsertRow {
+            path,
+            sheet,
+            row,
+            values,
+            dry_run,
+        } => {
+            let cell_values: Vec<Vec<CellValue>> =
+                vec![values.iter().map(|v| parse_cell_value(v)).collect()];
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
             let result = excel_data::insert_rows(path, &params, sheet, *row, &cell_values)?;
             Ok(serde_json::to_value(result).unwrap())
         }
-        DataSub::DeleteRow { path, sheet, row, dry_run } => {
-            let params = SecurityParams { dry_run: *dry_run, create_backup: true, file_path: path.clone() };
+        DataSub::DeleteRow {
+            path,
+            sheet,
+            row,
+            dry_run,
+        } => {
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
             let result = excel_data::delete_rows(path, &params, sheet, *row, *row)?;
             Ok(serde_json::to_value(result).unwrap())
         }
-        DataSub::Filter { path, sheet, column, op, value } => {
+        DataSub::Filter {
+            path,
+            sheet,
+            column,
+            op,
+            value,
+        } => {
             let filter_op = parse_filter_op(op)?;
-            let conditions = vec![FilterCondition { column: *column, operator: filter_op, value: value.clone() }];
+            let conditions = vec![FilterCondition {
+                column: *column,
+                operator: filter_op,
+                value: value.clone(),
+            }];
             let result = excel_data::filter_rows(path, sheet, &conditions)?;
             Ok(serde_json::to_value(result).unwrap())
         }
-        DataSub::Sort { path, sheet, column, desc, dry_run } => {
-            let sort_cols = vec![SortColumn { column: *column, descending: *desc }];
-            let params = SecurityParams { dry_run: *dry_run, create_backup: true, file_path: path.clone() };
+        DataSub::Sort {
+            path,
+            sheet,
+            column,
+            desc,
+            dry_run,
+        } => {
+            let sort_cols = vec![SortColumn {
+                column: *column,
+                descending: *desc,
+            }];
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
             let result = excel_data::sort_sheet(path, &params, sheet, &sort_cols)?;
             Ok(serde_json::to_value(result).unwrap())
         }
-        DataSub::Dedup { path, sheet, column, dry_run } => {
+        DataSub::Dedup {
+            path,
+            sheet,
+            column,
+            dry_run,
+        } => {
             let cols: Vec<u16> = column.map(|c| vec![c]).unwrap_or_default();
-            let params = SecurityParams { dry_run: *dry_run, create_backup: true, file_path: path.clone() };
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
             let result = excel_data::dedup_sheet(path, &params, sheet, &cols)?;
             Ok(serde_json::to_value(result).unwrap())
         }
@@ -341,13 +582,31 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
 
 fn run_formula(args: &FormulaArgs) -> Result<serde_json::Value> {
     match &args.command {
-        FormulaSub::Set { path, sheet, cell, formula, dry_run } => {
-            let params = SecurityParams { dry_run: *dry_run, create_backup: true, file_path: path.clone() };
+        FormulaSub::Set {
+            path,
+            sheet,
+            cell,
+            formula,
+            dry_run,
+        } => {
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
             let result = excel_write::set_formula(path, &params, sheet, cell, formula)?;
             Ok(serde_json::to_value(result).unwrap())
         }
-        FormulaSub::Refresh { path, sheet, dry_run } => {
-            let params = SecurityParams { dry_run: *dry_run, create_backup: true, file_path: path.clone() };
+        FormulaSub::Refresh {
+            path,
+            sheet,
+            dry_run,
+        } => {
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
             let result = excel_write::refresh_formulas(path, &params, sheet)?;
             Ok(serde_json::to_value(result).unwrap())
         }
@@ -356,14 +615,34 @@ fn run_formula(args: &FormulaArgs) -> Result<serde_json::Value> {
 
 fn run_format(args: &FormatArgs) -> Result<serde_json::Value> {
     match &args.command {
-        FormatSub::Set { path, sheet, range, style, dry_run } => {
-            let style_val: Style = serde_json::from_str(style).map_err(|e| AppError::Custom(format!("Invalid style JSON: {}", e)))?;
-            let params = SecurityParams { dry_run: *dry_run, create_backup: true, file_path: path.clone() };
+        FormatSub::Set {
+            path,
+            sheet,
+            range,
+            style,
+            dry_run,
+        } => {
+            let style_val: Style = serde_json::from_str(style)
+                .map_err(|e| AppError::Custom(format!("Invalid style JSON: {}", e)))?;
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
             let result = excel_write::set_format(path, &params, sheet, range, &style_val)?;
             Ok(serde_json::to_value(result).unwrap())
         }
-        FormatSub::Merge { path, sheet, range, dry_run } => {
-            let params = SecurityParams { dry_run: *dry_run, create_backup: true, file_path: path.clone() };
+        FormatSub::Merge {
+            path,
+            sheet,
+            range,
+            dry_run,
+        } => {
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
             let result = excel_write::merge_cells(path, &params, sheet, range, "")?;
             Ok(serde_json::to_value(result).unwrap())
         }
@@ -372,7 +651,14 @@ fn run_format(args: &FormatArgs) -> Result<serde_json::Value> {
 
 fn run_chart(args: &ChartArgs) -> Result<serde_json::Value> {
     match &args.command {
-        ChartSub::Create { path, sheet, range, chart_type, title, dry_run } => {
+        ChartSub::Create {
+            path,
+            sheet,
+            range,
+            chart_type,
+            title,
+            dry_run,
+        } => {
             let ct = match chart_type.to_lowercase().as_str() {
                 "column" => ChartType::Column,
                 "line" => ChartType::Line,
@@ -380,9 +666,14 @@ fn run_chart(args: &ChartArgs) -> Result<serde_json::Value> {
                 "bar" => ChartType::Bar,
                 "area" => ChartType::Area,
                 "scatter" => ChartType::Scatter,
-                _ => return Err(AppError::Custom(format!("Unknown chart type: {}", chart_type))),
+                _ => {
+                    return Err(AppError::Custom(format!(
+                        "Unknown chart type: {}",
+                        chart_type
+                    )));
+                }
             };
-            let (r1, c1, _, _) = crate::cell_ref::parse_range(range)?;
+            let (r1, c1, _, _) = excel_core::cell_ref::parse_range(range)?;
             let config = ChartConfig {
                 chart_type: ct,
                 title: title.clone(),
@@ -392,7 +683,11 @@ fn run_chart(args: &ChartArgs) -> Result<serde_json::Value> {
                 row: r1,
                 col: c1,
             };
-            let params = SecurityParams { dry_run: *dry_run, create_backup: true, file_path: path.clone() };
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
             let result = excel_write::add_chart(path, &params, &config)?;
             Ok(serde_json::to_value(result).unwrap())
         }
@@ -403,12 +698,22 @@ fn run_vba(args: &VbaArgs) -> Result<serde_json::Value> {
     match &args.command {
         VbaSub::Export { path, output } => {
             let data = vba_util::export_vba(path)?;
-            std::fs::write(output, &data).map_err(AppError::Io)?;
-            Ok(serde_json::json!({ "success": true, "message": format!("VBA exported to {}", output) }))
+            std::fs::write(output, &data)?;
+            Ok(
+                serde_json::json!({ "success": true, "message": format!("VBA exported to {}", output) }),
+            )
         }
-        VbaSub::Import { path, vba_file, dry_run } => {
-            let data = std::fs::read(vba_file).map_err(AppError::Io)?;
-            let params = SecurityParams { dry_run: *dry_run, create_backup: true, file_path: path.clone() };
+        VbaSub::Import {
+            path,
+            vba_file,
+            dry_run,
+        } => {
+            let data = std::fs::read(vba_file)?;
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
             let result = vba_util::import_vba(path, &params, &data)?;
             Ok(serde_json::to_value(result).unwrap())
         }
@@ -417,39 +722,48 @@ fn run_vba(args: &VbaArgs) -> Result<serde_json::Value> {
 
 fn run_diff(args: &DiffArgs) -> Result<serde_json::Value> {
     match &args.command {
-        DiffSub::File { old_path, new_path, sheet } => {
-            match sheet {
-                Some(s) => {
-                    let diff = excel_diff::diff_sheets(old_path, new_path, s)?;
-                    Ok(serde_json::to_value(diff).unwrap())
-                }
-                None => {
-                    let diff = excel_diff::diff_files(old_path, new_path)?;
-                    Ok(serde_json::to_value(diff).unwrap())
-                }
+        DiffSub::File {
+            old_path,
+            new_path,
+            sheet,
+        } => match sheet {
+            Some(s) => {
+                let diff = diff_sheets(old_path, new_path, s)?;
+                Ok(serde_json::to_value(diff).unwrap())
             }
-        }
-        DiffSub::Range { old_path, new_path, sheet, range } => {
-            let diff = excel_diff::diff_range(old_path, new_path, sheet, range)?;
+            None => {
+                let diff = diff_files(old_path, new_path)?;
+                Ok(serde_json::to_value(diff).unwrap())
+            }
+        },
+        DiffSub::Range {
+            old_path,
+            new_path,
+            sheet,
+            range,
+        } => {
+            let diff = diff_range(old_path, new_path, sheet, range)?;
             Ok(serde_json::to_value(diff).unwrap())
+        }
+        DiffSub::InstallGitDriver {} => {
+            git_driver::install_git_driver().map_err(AppError::Custom)?;
+            Ok(serde_json::json!({ "success": true, "message": "Git diff driver installed" }))
         }
     }
 }
 
 fn run_rollback(args: &RollbackArgs) -> Result<serde_json::Value> {
-    let backup = crate::types::BackupInfo {
+    let backup = BackupInfo {
         backup_path: args.backup_path.clone(),
         timestamp: chrono::Utc::now(),
         operation: "rollback".into(),
         file_hash: String::new(),
     };
-    crate::security::rollback(&backup, &args.path).map_err(AppError::Io)?;
-    Ok(serde_json::json!({ "success": true, "message": format!("Rolled back {} from {}", args.path, args.backup_path) }))
+    security::rollback(&backup, &args.path)?;
+    Ok(
+        serde_json::json!({ "success": true, "message": format!("Rolled back {} from {}", args.path, args.backup_path) }),
+    )
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 fn parse_cell_value(s: &str) -> CellValue {
     if let Ok(n) = s.parse::<f64>() {

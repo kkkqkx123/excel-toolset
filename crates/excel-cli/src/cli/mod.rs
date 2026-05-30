@@ -1,4 +1,4 @@
 pub mod commands;
 
-pub use commands::execute;
 pub use commands::Cli;
+pub use commands::execute;

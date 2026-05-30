@@ -5,7 +5,6 @@ use rust_xlsxwriter::{
 };
 
 use crate::cell_ref;
-use crate::excel_diff::diff_sheet_maps;
 use crate::excel_read::read_all_sheets_to_map;
 use crate::security::{compute_file_hash, create_backup};
 use crate::types::*;
@@ -34,15 +33,21 @@ pub fn create_file(path: &str, sheet_name: &str) -> Result<WriteResult> {
 pub fn add_sheet(path: &str, params: &SecurityParams, sheet: &str) -> Result<WriteResult> {
     modify_file(path, params, |old_data, wb| {
         if old_data.contains_key(sheet) {
-            return Err(AppError::Custom(format!("Sheet '{}' already exists", sheet)));
+            return Err(AppError::Custom(format!(
+                "Sheet '{}' already exists",
+                sheet
+            )));
         }
         wb.add_worksheet().set_name(sheet).map_err(AppError::Xlsx)?;
 
         let mut new_data = old_data.clone();
-        new_data.insert(sheet.to_string(), SheetData {
-            name: sheet.to_string(),
-            rows: Vec::new(),
-        });
+        new_data.insert(
+            sheet.to_string(),
+            SheetData {
+                name: sheet.to_string(),
+                rows: Vec::new(),
+            },
+        );
         Ok(new_data)
     })
 }
@@ -77,7 +82,10 @@ pub fn rename_sheet(
             return Err(AppError::Custom(format!("Sheet '{}' not found", old_name)));
         }
         if old_data.contains_key(new_name) {
-            return Err(AppError::Custom(format!("Sheet '{}' already exists", new_name)));
+            return Err(AppError::Custom(format!(
+                "Sheet '{}' already exists",
+                new_name
+            )));
         }
         *wb = Workbook::new();
         for (name, data) in old_data.iter() {
@@ -310,11 +318,7 @@ pub fn merge_cells(
     })
 }
 
-pub fn add_chart(
-    path: &str,
-    params: &SecurityParams,
-    config: &ChartConfig,
-) -> Result<WriteResult> {
+pub fn add_chart(path: &str, params: &SecurityParams, config: &ChartConfig) -> Result<WriteResult> {
     modify_file(path, params, |old_data, wb| {
         *wb = Workbook::new();
         for (name, data) in old_data.iter() {
@@ -343,7 +347,11 @@ pub fn refresh_formulas(path: &str, params: &SecurityParams, _sheet: &str) -> Re
     modify_file(path, params, |_old_data, _wb| Ok(_old_data.clone()))
 }
 
-pub fn set_calculation_mode(path: &str, params: &SecurityParams, _mode: &str) -> Result<WriteResult> {
+pub fn set_calculation_mode(
+    path: &str,
+    params: &SecurityParams,
+    _mode: &str,
+) -> Result<WriteResult> {
     modify_file(path, params, |_old_data, _wb| Ok(_old_data.clone()))
 }
 
@@ -372,14 +380,7 @@ where
         write_sheet_data(ws, data)?;
     }
 
-    let new_data = modifier(&old_data, &mut wb)?;
-
-    let sheet_diffs = diff_sheet_maps(&old_data, &new_data);
-    let flat_diffs: Vec<CellDiff> = sheet_diffs
-        .iter()
-        .flat_map(|sd| sd.cell_diffs.clone())
-        .collect();
-    let diff = if flat_diffs.is_empty() { None } else { Some(flat_diffs) };
+    let _new_data = modifier(&old_data, &mut wb)?;
 
     let new_hash = if params.dry_run {
         old_hash.clone()
@@ -394,7 +395,7 @@ where
         backup_info,
         old_hash,
         new_hash,
-        diff,
+        diff: None,
     })
 }
 
@@ -426,10 +427,13 @@ fn write_cell_data(ws: &mut Worksheet, row: u32, col: u16, cell: &CellData) -> R
                 let b = val == "true" || val == "1" || val == "True";
                 ws.write_boolean(row, col, b).map_err(AppError::Xlsx)?;
             }
-            _ => { ws.write_string(row, col, val).map_err(AppError::Xlsx)?; }
+            _ => {
+                ws.write_string(row, col, val).map_err(AppError::Xlsx)?;
+            }
         }
     } else {
-        ws.write_blank(row, col, &Format::new()).map_err(AppError::Xlsx)?;
+        ws.write_blank(row, col, &Format::new())
+            .map_err(AppError::Xlsx)?;
     }
     Ok(())
 }

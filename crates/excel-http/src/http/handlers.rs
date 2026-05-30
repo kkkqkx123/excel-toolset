@@ -1,13 +1,14 @@
-use axum::{extract::Path, Json};
-use serde::{Deserialize, Serialize};
+use axum::{Json, extract::Path};
+use serde::Deserialize;
 
-use crate::cell_ref;
-use crate::excel_data;
-use crate::excel_diff;
-use crate::excel_read;
-use crate::excel_write;
-use crate::types::*;
-use crate::vba_util;
+use excel_core::excel_data;
+use excel_core::excel_read;
+use excel_core::excel_write;
+use excel_core::security;
+use excel_core::types::*;
+use excel_core::vba_util;
+use excel_diff::diff_files;
+use excel_diff::diff_sheets;
 
 // ---------------------------------------------------------------------------
 // File
@@ -26,7 +27,9 @@ pub struct CreateFileReq {
     #[serde(default = "default_sheet")]
     pub sheet: String,
 }
-fn default_sheet() -> String { "Sheet1".into() }
+fn default_sheet() -> String {
+    "Sheet1".into()
+}
 
 pub async fn file_create(Json(req): Json<CreateFileReq>) -> Json<ApiResponse<WriteResult>> {
     match excel_write::create_file(&req.path, &req.sheet) {
@@ -42,11 +45,11 @@ pub struct BackupFileReq {
 }
 
 pub async fn file_backup(Json(req): Json<BackupFileReq>) -> Json<ApiResponse<BackupInfo>> {
-    let hash = match crate::security::compute_file_hash(&req.path) {
+    let hash = match security::compute_file_hash(&req.path) {
         Ok(h) => h,
         Err(e) => return Json(ApiResponse::err(AppError::Io(e))),
     };
-    match crate::security::create_backup(&req.path, &hash) {
+    match security::create_backup(&req.path, &hash) {
         Ok(backup) => {
             if let Some(ref out) = req.output {
                 let _ = std::fs::copy(&backup.backup_path, out);
@@ -75,7 +78,11 @@ pub struct SheetNameReq {
 }
 
 pub async fn sheet_add(Json(req): Json<SheetNameReq>) -> Json<ApiResponse<WriteResult>> {
-    let params = SecurityParams { dry_run: false, create_backup: true, file_path: req.path.clone() };
+    let params = SecurityParams {
+        dry_run: false,
+        create_backup: true,
+        file_path: req.path.clone(),
+    };
     match excel_write::add_sheet(&req.path, &params, &req.name) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
@@ -83,7 +90,11 @@ pub async fn sheet_add(Json(req): Json<SheetNameReq>) -> Json<ApiResponse<WriteR
 }
 
 pub async fn sheet_delete(Json(req): Json<SheetNameReq>) -> Json<ApiResponse<WriteResult>> {
-    let params = SecurityParams { dry_run: false, create_backup: true, file_path: req.path.clone() };
+    let params = SecurityParams {
+        dry_run: false,
+        create_backup: true,
+        file_path: req.path.clone(),
+    };
     match excel_write::delete_sheet(&req.path, &params, &req.name) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
@@ -98,7 +109,11 @@ pub struct RenameSheetReq {
 }
 
 pub async fn sheet_rename(Json(req): Json<RenameSheetReq>) -> Json<ApiResponse<WriteResult>> {
-    let params = SecurityParams { dry_run: false, create_backup: true, file_path: req.path.clone() };
+    let params = SecurityParams {
+        dry_run: false,
+        create_backup: true,
+        file_path: req.path.clone(),
+    };
     match excel_write::rename_sheet(&req.path, &params, &req.old, &req.new) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
@@ -109,8 +124,10 @@ pub async fn sheet_rename(Json(req): Json<RenameSheetReq>) -> Json<ApiResponse<W
 // Cell
 // ---------------------------------------------------------------------------
 
-pub async fn cell_read(Path((path, sheet, cell)): Path<(String, String, String)>) -> Json<ApiResponse<CellData>> {
-    let (row, col) = match cell_ref::parse_cell_ref(&cell) {
+pub async fn cell_read(
+    Path((path, sheet, cell)): Path<(String, String, String)>,
+) -> Json<ApiResponse<CellData>> {
+    let (row, col) = match excel_core::cell_ref::parse_cell_ref(&cell) {
         Ok(v) => v,
         Err(e) => return Json(ApiResponse::err(e)),
     };
@@ -131,12 +148,23 @@ pub struct CellWriteReq {
 }
 
 pub async fn cell_write(Json(req): Json<CellWriteReq>) -> Json<ApiResponse<WriteResult>> {
-    let (row, col) = match cell_ref::parse_cell_ref(&req.cell) {
+    let (row, col) = match excel_core::cell_ref::parse_cell_ref(&req.cell) {
         Ok(v) => v,
         Err(e) => return Json(ApiResponse::err(e)),
     };
-    let params = SecurityParams { dry_run: req.dry_run, create_backup: true, file_path: req.path.clone() };
-    match excel_write::write_cell(&req.path, &params, &req.sheet, row, col, &parse_cell_value(&req.value)) {
+    let params = SecurityParams {
+        dry_run: req.dry_run,
+        create_backup: true,
+        file_path: req.path.clone(),
+    };
+    match excel_write::write_cell(
+        &req.path,
+        &params,
+        &req.sheet,
+        row,
+        col,
+        &parse_cell_value(&req.value),
+    ) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
     }
@@ -146,7 +174,9 @@ pub async fn cell_write(Json(req): Json<CellWriteReq>) -> Json<ApiResponse<Write
 // Range
 // ---------------------------------------------------------------------------
 
-pub async fn range_read(Path((path, sheet, range)): Path<(String, String, String)>) -> Json<ApiResponse<Vec<Vec<CellData>>>> {
+pub async fn range_read(
+    Path((path, sheet, range)): Path<(String, String, String)>,
+) -> Json<ApiResponse<Vec<Vec<CellData>>>> {
     match excel_read::read_range(&path, &sheet, &range) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
@@ -164,10 +194,20 @@ pub struct RangeWriteReq {
 }
 
 pub async fn range_write(Json(req): Json<RangeWriteReq>) -> Json<ApiResponse<WriteResult>> {
-    let values: Vec<Vec<CellValue>> = req.data.iter().map(|row: &Vec<serde_json::Value>| {
-        row.iter().map(|v: &serde_json::Value| json_val_to_cell_value(v)).collect::<Vec<CellValue>>()
-    }).collect();
-    let params = SecurityParams { dry_run: req.dry_run, create_backup: true, file_path: req.path.clone() };
+    let values: Vec<Vec<CellValue>> = req
+        .data
+        .iter()
+        .map(|row: &Vec<serde_json::Value>| {
+            row.iter()
+                .map(|v: &serde_json::Value| json_val_to_cell_value(v))
+                .collect()
+        })
+        .collect();
+    let params = SecurityParams {
+        dry_run: req.dry_run,
+        create_backup: true,
+        file_path: req.path.clone(),
+    };
     match excel_write::write_range(&req.path, &params, &req.sheet, &req.range, &values) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
@@ -184,7 +224,11 @@ pub struct RangeClearReq {
 }
 
 pub async fn range_clear(Json(req): Json<RangeClearReq>) -> Json<ApiResponse<WriteResult>> {
-    let params = SecurityParams { dry_run: req.dry_run, create_backup: true, file_path: req.path.clone() };
+    let params = SecurityParams {
+        dry_run: req.dry_run,
+        create_backup: true,
+        file_path: req.path.clone(),
+    };
     match excel_write::clear_range(&req.path, &params, &req.sheet, &req.range) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
@@ -206,7 +250,11 @@ pub struct RowOpReq {
 
 pub async fn data_append_row(Json(req): Json<RowOpReq>) -> Json<ApiResponse<WriteResult>> {
     let row: Vec<Vec<CellValue>> = vec![req.values.iter().map(|v| parse_cell_value(v)).collect()];
-    let params = SecurityParams { dry_run: req.dry_run, create_backup: true, file_path: req.path.clone() };
+    let params = SecurityParams {
+        dry_run: req.dry_run,
+        create_backup: true,
+        file_path: req.path.clone(),
+    };
     match excel_data::append_rows(&req.path, &params, &req.sheet, &row) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
@@ -225,7 +273,11 @@ pub struct InsertRowReq {
 
 pub async fn data_insert_row(Json(req): Json<InsertRowReq>) -> Json<ApiResponse<WriteResult>> {
     let row: Vec<Vec<CellValue>> = vec![req.values.iter().map(|v| parse_cell_value(v)).collect()];
-    let params = SecurityParams { dry_run: req.dry_run, create_backup: true, file_path: req.path.clone() };
+    let params = SecurityParams {
+        dry_run: req.dry_run,
+        create_backup: true,
+        file_path: req.path.clone(),
+    };
     match excel_data::insert_rows(&req.path, &params, &req.sheet, req.row, &row) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
@@ -242,7 +294,11 @@ pub struct DeleteRowReq {
 }
 
 pub async fn data_delete_row(Json(req): Json<DeleteRowReq>) -> Json<ApiResponse<WriteResult>> {
-    let params = SecurityParams { dry_run: req.dry_run, create_backup: true, file_path: req.path.clone() };
+    let params = SecurityParams {
+        dry_run: req.dry_run,
+        create_backup: true,
+        file_path: req.path.clone(),
+    };
     match excel_data::delete_rows(&req.path, &params, &req.sheet, req.row, req.row) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
@@ -263,7 +319,11 @@ pub async fn data_filter(Json(req): Json<FilterReq>) -> Json<ApiResponse<Vec<Vec
         Ok(op) => op,
         Err(e) => return Json(ApiResponse::err(e)),
     };
-    let conditions = vec![FilterCondition { column: req.column, operator: filter_op, value: req.value }];
+    let conditions = vec![FilterCondition {
+        column: req.column,
+        operator: filter_op,
+        value: req.value,
+    }];
     match excel_data::filter_rows(&req.path, &req.sheet, &conditions) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
@@ -282,8 +342,15 @@ pub struct SortReq {
 }
 
 pub async fn data_sort(Json(req): Json<SortReq>) -> Json<ApiResponse<WriteResult>> {
-    let sort_cols = vec![SortColumn { column: req.column, descending: req.descending }];
-    let params = SecurityParams { dry_run: req.dry_run, create_backup: true, file_path: req.path.clone() };
+    let sort_cols = vec![SortColumn {
+        column: req.column,
+        descending: req.descending,
+    }];
+    let params = SecurityParams {
+        dry_run: req.dry_run,
+        create_backup: true,
+        file_path: req.path.clone(),
+    };
     match excel_data::sort_sheet(&req.path, &params, &req.sheet, &sort_cols) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
@@ -301,7 +368,11 @@ pub struct DedupReq {
 
 pub async fn data_dedup(Json(req): Json<DedupReq>) -> Json<ApiResponse<WriteResult>> {
     let cols = req.column.map(|c| vec![c]).unwrap_or_default();
-    let params = SecurityParams { dry_run: req.dry_run, create_backup: true, file_path: req.path.clone() };
+    let params = SecurityParams {
+        dry_run: req.dry_run,
+        create_backup: true,
+        file_path: req.path.clone(),
+    };
     match excel_data::dedup_sheet(&req.path, &params, &req.sheet, &cols) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
@@ -337,7 +408,11 @@ pub struct FormulaSetReq {
 }
 
 pub async fn formula_set(Json(req): Json<FormulaSetReq>) -> Json<ApiResponse<WriteResult>> {
-    let params = SecurityParams { dry_run: req.dry_run, create_backup: true, file_path: req.path.clone() };
+    let params = SecurityParams {
+        dry_run: req.dry_run,
+        create_backup: true,
+        file_path: req.path.clone(),
+    };
     match excel_write::set_formula(&req.path, &params, &req.sheet, &req.cell, &req.formula) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
@@ -353,7 +428,11 @@ pub struct FormulaRefreshReq {
 }
 
 pub async fn formula_refresh(Json(req): Json<FormulaRefreshReq>) -> Json<ApiResponse<WriteResult>> {
-    let params = SecurityParams { dry_run: req.dry_run, create_backup: true, file_path: req.path.clone() };
+    let params = SecurityParams {
+        dry_run: req.dry_run,
+        create_backup: true,
+        file_path: req.path.clone(),
+    };
     match excel_write::refresh_formulas(&req.path, &params, &req.sheet) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
@@ -375,7 +454,11 @@ pub struct FormatSetReq {
 }
 
 pub async fn format_set(Json(req): Json<FormatSetReq>) -> Json<ApiResponse<WriteResult>> {
-    let params = SecurityParams { dry_run: req.dry_run, create_backup: true, file_path: req.path.clone() };
+    let params = SecurityParams {
+        dry_run: req.dry_run,
+        create_backup: true,
+        file_path: req.path.clone(),
+    };
     match excel_write::set_format(&req.path, &params, &req.sheet, &req.range, &req.style) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
@@ -394,7 +477,11 @@ pub struct MergeReq {
 }
 
 pub async fn cell_merge(Json(req): Json<MergeReq>) -> Json<ApiResponse<WriteResult>> {
-    let params = SecurityParams { dry_run: req.dry_run, create_backup: true, file_path: req.path.clone() };
+    let params = SecurityParams {
+        dry_run: req.dry_run,
+        create_backup: true,
+        file_path: req.path.clone(),
+    };
     match excel_write::merge_cells(&req.path, &params, &req.sheet, &req.range, &req.value) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
@@ -424,9 +511,14 @@ pub async fn chart_create(Json(req): Json<ChartCreateReq>) -> Json<ApiResponse<W
         "bar" => ChartType::Bar,
         "area" => ChartType::Area,
         "scatter" => ChartType::Scatter,
-        _ => return Json(ApiResponse::err(AppError::Custom(format!("Unknown chart type: {}", req.chart_type)))),
+        _ => {
+            return Json(ApiResponse::err(AppError::Custom(format!(
+                "Unknown chart type: {}",
+                req.chart_type
+            ))));
+        }
     };
-    let (r1, c1, _, _) = match cell_ref::parse_range(&req.range) {
+    let (r1, c1, _, _) = match excel_core::cell_ref::parse_range(&req.range) {
         Ok(v) => v,
         Err(e) => return Json(ApiResponse::err(e)),
     };
@@ -439,7 +531,11 @@ pub async fn chart_create(Json(req): Json<ChartCreateReq>) -> Json<ApiResponse<W
         row: r1,
         col: c1,
     };
-    let params = SecurityParams { dry_run: req.dry_run, create_backup: true, file_path: req.path.clone() };
+    let params = SecurityParams {
+        dry_run: req.dry_run,
+        create_backup: true,
+        file_path: req.path.clone(),
+    };
     match excel_write::add_chart(&req.path, &params, &config) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
@@ -481,7 +577,11 @@ pub async fn vba_import(Json(req): Json<VbaImportReq>) -> Json<ApiResponse<Write
         Ok(d) => d,
         Err(e) => return Json(ApiResponse::err(AppError::Io(e))),
     };
-    let params = SecurityParams { dry_run: req.dry_run, create_backup: true, file_path: req.path.clone() };
+    let params = SecurityParams {
+        dry_run: req.dry_run,
+        create_backup: true,
+        file_path: req.path.clone(),
+    };
     match vba_util::import_vba(&req.path, &params, &data) {
         Ok(result) => Json(ApiResponse::ok(Some(result))),
         Err(e) => Json(ApiResponse::err(e)),
@@ -501,12 +601,12 @@ pub struct DiffFileReq {
 
 pub async fn diff_file(Json(req): Json<DiffFileReq>) -> Json<ApiResponse<serde_json::Value>> {
     if let Some(ref sheet_name) = req.sheet {
-        match excel_diff::diff_sheets(&req.old_path, &req.new_path, sheet_name) {
+        match diff_sheets(&req.old_path, &req.new_path, sheet_name) {
             Ok(data) => Json(ApiResponse::ok(Some(serde_json::to_value(data).unwrap()))),
             Err(e) => Json(ApiResponse::err(e)),
         }
     } else {
-        match excel_diff::diff_files(&req.old_path, &req.new_path) {
+        match diff_files(&req.old_path, &req.new_path) {
             Ok(data) => Json(ApiResponse::ok(Some(serde_json::to_value(data).unwrap()))),
             Err(e) => Json(ApiResponse::err(e)),
         }
@@ -521,7 +621,9 @@ pub struct DiffRangeReq {
     pub range: String,
 }
 
-pub async fn diff_range(Json(req): Json<DiffRangeReq>) -> Json<ApiResponse<RangeDiff>> {
+pub async fn handle_diff_range(
+    Json(req): Json<DiffRangeReq>,
+) -> Json<ApiResponse<excel_core::types::RangeDiff>> {
     match excel_diff::diff_range(&req.old_path, &req.new_path, &req.sheet, &req.range) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
@@ -537,35 +639,7 @@ pub async fn health() -> Json<serde_json::Value> {
 }
 
 // ---------------------------------------------------------------------------
-// ApiResponse helpers
-// ---------------------------------------------------------------------------
-
-impl<T: Serialize> ApiResponse<T> {
-    fn ok(data: Option<T>) -> Self {
-        ApiResponse {
-            success: true,
-            message: String::new(),
-            file_hash: None,
-            data,
-            diff: None,
-            backup_info: None,
-        }
-    }
-
-    fn err(e: AppError) -> Self {
-        ApiResponse {
-            success: false,
-            message: e.to_string(),
-            file_hash: None,
-            data: None,
-            diff: None,
-            backup_info: None,
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Helpers (shared with CLI)
+// Helpers
 // ---------------------------------------------------------------------------
 
 fn parse_cell_value(s: &str) -> CellValue {

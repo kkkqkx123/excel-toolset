@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/excel-core",
+    "crates/excel-diff",
+    "crates/excel-cli",
+    "crates/excel-http",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
