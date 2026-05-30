@@ -307,6 +307,7 @@ pub enum DiffType {
     Add,
     Delete,
     Modify,
+    Passive,
     NoChange,
 }
 
@@ -320,6 +321,7 @@ pub enum OperationMode {
 pub struct CellDiff {
     pub row: u32,
     pub col: u16,
+    pub cell_ref: String,
     pub diff_type: DiffType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub old_value: Option<String>,
@@ -344,6 +346,7 @@ pub struct DiffSummary {
     pub adds: usize,
     pub deletes: usize,
     pub modifies: usize,
+    pub passives: usize,
     pub total_changes: usize,
 }
 

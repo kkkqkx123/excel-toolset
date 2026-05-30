@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use excel_core::cell_ref;
 use excel_core::excel_read;
 use excel_core::types::{
     AppError, CellDiff, DiffSummary, DiffType, FileDiff, RangeDiff, Result, SheetData, SheetDiff,
@@ -20,6 +21,7 @@ pub fn diff_files(old_path: &str, new_path: &str) -> Result<FileDiff> {
                 adds: 0,
                 deletes: 0,
                 modifies: 0,
+                passives: 0,
                 total_changes: 0,
             },
         });
@@ -96,27 +98,33 @@ pub fn diff_range(
 
     for ri in 0..max_rows {
         for ci in 0..max_cols {
+            let abs_row = r_start + ri as u32;
+            let abs_col = c_start + ci as u16;
             let old_cell = old_data.get(ri).and_then(|r| r.get(ci));
             let new_cell = new_data.get(ri).and_then(|r| r.get(ci));
 
-            let diff_type = if old_cell.is_none() && new_cell.is_some() {
-                DiffType::Add
-            } else if old_cell.is_some() && new_cell.is_none() {
-                DiffType::Delete
-            } else if let (Some(a), Some(b)) = (old_cell, new_cell) {
-                if a.value != b.value || a.formula != b.formula {
-                    DiffType::Modify
-                } else {
-                    DiffType::NoChange
+            let diff_type = match (&old_cell, &new_cell) {
+                (None, Some(_)) => DiffType::Add,
+                (Some(_), None) => DiffType::Delete,
+                (Some(a), Some(b)) => {
+                    if a.formula != b.formula {
+                        DiffType::Modify
+                    } else if a.value != b.value && a.formula.is_some() {
+                        DiffType::Passive
+                    } else if a.value != b.value {
+                        DiffType::Modify
+                    } else {
+                        DiffType::NoChange
+                    }
                 }
-            } else {
-                DiffType::NoChange
+                (None, None) => DiffType::NoChange,
             };
 
             if diff_type != DiffType::NoChange {
                 cell_diffs.push(CellDiff {
-                    row: r_start + ri as u32,
-                    col: c_start + ci as u16,
+                    row: abs_row,
+                    col: abs_col,
+                    cell_ref: cell_ref::format_cell_ref(abs_row, abs_col),
                     diff_type,
                     old_value: old_cell.and_then(|c| c.value.clone()),
                     new_value: new_cell.and_then(|c| c.value.clone()),
@@ -179,6 +187,8 @@ pub fn diff_sheet_maps(
 }
 
 /// Compute cell-level diff between two SheetData structs.
+/// Uses FormulaTracker to distinguish Modify (formula text changed or value-only change on non-formula cell)
+/// from Passive (formula text unchanged, value changed due to recalculation).
 pub fn compute_cell_diffs(old: &SheetData, new: &SheetData) -> Vec<CellDiff> {
     let mut diffs = Vec::new();
     let max_rows = old.rows.len().max(new.rows.len());
@@ -194,12 +204,17 @@ pub fn compute_cell_diffs(old: &SheetData, new: &SheetData) -> Vec<CellDiff> {
         for ci in 0..max_cols {
             let old_cell = old_row.and_then(|r| r.get(ci));
             let new_cell = new_row.and_then(|r| r.get(ci));
+            let cell_ref_str = cell_ref::format_cell_ref(ri as u32, ci as u16);
 
             let diff_type = match (&old_cell, &new_cell) {
                 (None, Some(_)) => DiffType::Add,
                 (Some(_), None) => DiffType::Delete,
                 (Some(a), Some(b)) => {
-                    if a.value != b.value || a.formula != b.formula {
+                    if a.formula != b.formula {
+                        DiffType::Modify
+                    } else if a.value != b.value && a.formula.is_some() {
+                        DiffType::Passive
+                    } else if a.value != b.value {
                         DiffType::Modify
                     } else {
                         DiffType::NoChange
@@ -212,6 +227,7 @@ pub fn compute_cell_diffs(old: &SheetData, new: &SheetData) -> Vec<CellDiff> {
                 diffs.push(CellDiff {
                     row: ri as u32,
                     col: ci as u16,
+                    cell_ref: cell_ref_str,
                     diff_type,
                     old_value: old_cell.and_then(|c| c.value.clone()),
                     new_value: new_cell.and_then(|c| c.value.clone()),
@@ -246,6 +262,7 @@ fn all_cells_as_diff(data: &SheetData, diff_type: DiffType) -> Vec<CellDiff> {
             diffs.push(CellDiff {
                 row: ri as u32,
                 col: ci as u16,
+                cell_ref: cell_ref::format_cell_ref(ri as u32, ci as u16),
                 diff_type: diff_type.clone(),
                 old_value: if diff_type == DiffType::Delete {
                     cell.value.clone()
@@ -277,6 +294,7 @@ fn summarize(sheet_diffs: &[SheetDiff]) -> DiffSummary {
     let mut adds = 0;
     let mut deletes = 0;
     let mut modifies = 0;
+    let mut passives = 0;
 
     for sd in sheet_diffs {
         for cd in &sd.cell_diffs {
@@ -284,16 +302,20 @@ fn summarize(sheet_diffs: &[SheetDiff]) -> DiffSummary {
                 DiffType::Add => adds += 1,
                 DiffType::Delete => deletes += 1,
                 DiffType::Modify => modifies += 1,
+                DiffType::Passive => passives += 1,
                 DiffType::NoChange => {}
             }
         }
     }
 
+    let total_changes = adds + deletes + modifies + passives;
+
     DiffSummary {
         adds,
         deletes,
         modifies,
-        total_changes: adds + deletes + modifies,
+        passives,
+        total_changes,
     }
 }
 

@@ -21,7 +21,11 @@ pub fn export_vba(path: &str) -> Result<Vec<u8>> {
     match workbook.vba_project() {
         Ok(Some(vba)) => {
             let mut buf: Vec<u8> = Vec::new();
-            let names: Vec<String> = vba.get_module_names().into_iter().map(|s| s.to_owned()).collect();
+            let names: Vec<String> = vba
+                .get_module_names()
+                .into_iter()
+                .map(|s| s.to_owned())
+                .collect();
             let count = names.len() as u32;
             buf.write_all(&count.to_le_bytes()).map_err(AppError::Io)?;
             for name in &names {
