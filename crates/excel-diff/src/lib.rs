@@ -5,6 +5,7 @@ pub mod formula_tracker;
 pub mod git_driver;
 pub mod helpers;
 pub mod range_diff;
+pub mod semantic;
 pub mod sheet_diff;
 pub mod summarize;
 

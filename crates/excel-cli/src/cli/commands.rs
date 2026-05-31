@@ -10,12 +10,17 @@ use excel_diff::diff_files;
 use excel_diff::diff_range;
 use excel_diff::diff_sheets;
 use excel_diff::git_driver;
+use excel_diff::semantic::{self, Verbosity};
+use excel_diff::summarize;
 
 #[derive(Parser)]
 #[command(name = "excel", version = "0.1.0", about = "Excel Tool Gateway")]
 pub struct Cli {
     #[arg(long, short)]
     pub pretty: bool,
+
+    #[arg(long, default_value = "json", value_parser = ["json", "text"])]
+    pub format: String,
 
     #[command(subcommand)]
     pub command: Commands,
@@ -347,6 +352,13 @@ pub fn execute(cli: &Cli) {
     let result = run_command(cli);
     match result {
         Ok(json) => {
+            // If text format requested, extract raw_text field and print directly
+            if cli.format == "text"
+                && let Some(text) = json.get("raw_text").and_then(|v| v.as_str())
+            {
+                println!("{}", text);
+                return;
+            }
             if cli.pretty {
                 println!("{}", serde_json::to_string_pretty(&json).unwrap());
             } else {
@@ -378,7 +390,7 @@ fn run_command(cli: &Cli) -> Result<serde_json::Value> {
         Commands::Format(args) => run_format(args),
         Commands::Chart(args) => run_chart(args),
         Commands::Vba(args) => run_vba(args),
-        Commands::Diff(args) => run_diff(args),
+        Commands::Diff(args) => run_diff(args, &cli.format),
         Commands::Batch(args) => run_batch(args),
         Commands::Rollback(args) => run_rollback(args),
     }
@@ -785,22 +797,33 @@ fn run_batch(args: &BatchArgs) -> Result<serde_json::Value> {
     }
 }
 
-fn run_diff(args: &DiffArgs) -> Result<serde_json::Value> {
+fn run_diff(args: &DiffArgs, format: &str) -> Result<serde_json::Value> {
     match &args.command {
         DiffSub::File {
             old_path,
             new_path,
             sheet,
-        } => match sheet {
-            Some(s) => {
-                let diff = diff_sheets(old_path, new_path, s)?;
+        } => {
+            let diff = match sheet {
+                Some(s) => {
+                    let sd = diff_sheets(old_path, new_path, s)?;
+                    let summary = summarize::summarize(std::slice::from_ref(&sd));
+                    FileDiff {
+                        file_hash_match: false,
+                        sheet_diffs: vec![sd],
+                        summary,
+                    }
+                }
+                None => diff_files(old_path, new_path)?,
+            };
+
+            if format == "text" {
+                let text = semantic::to_natural_text(&diff, None, Verbosity::Detailed);
+                Ok(serde_json::json!({"raw_text": text}))
+            } else {
                 Ok(serde_json::to_value(diff).map_err(|e| AppError::Serialize(e.to_string()))?)
             }
-            None => {
-                let diff = diff_files(old_path, new_path)?;
-                Ok(serde_json::to_value(diff).map_err(|e| AppError::Serialize(e.to_string()))?)
-            }
-        },
+        }
         DiffSub::Range {
             old_path,
             new_path,
@@ -808,7 +831,17 @@ fn run_diff(args: &DiffArgs) -> Result<serde_json::Value> {
             range,
         } => {
             let diff = diff_range(old_path, new_path, sheet, range)?;
-            Ok(serde_json::to_value(diff).map_err(|e| AppError::Serialize(e.to_string()))?)
+            if format == "text" {
+                let text = format!(
+                    "Range diff for {} in \"{}\": {} changes",
+                    range,
+                    sheet,
+                    diff.cell_diffs.len()
+                );
+                Ok(serde_json::json!({"raw_text": text}))
+            } else {
+                Ok(serde_json::to_value(diff).map_err(|e| AppError::Serialize(e.to_string()))?)
+            }
         }
         DiffSub::InstallGitDriver {} => {
             git_driver::install_git_driver()?;

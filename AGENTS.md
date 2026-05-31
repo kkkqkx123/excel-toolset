@@ -1,5 +1,23 @@
 # AGENTS.md
 
+**No-backward-compatible**
+At present, the project is in the development stage and there is no need to specifically consider backward compatibility. Prioritize ensuring the long-term maintainability of the architecture and refactoring design defects as early as possible.
+
+**Language**
+Always use English in code files(include config files, comments) and use Simplified Chinese in docs.
+
+**Plan/Design Document**
+Avoid including complete code snippets. Mainly using concise natural language descriptions.
+
+**Security Assurance**
+Always avoid the use of unwrap. In testing, substitute with expect.
+Refrain from using unsafe methods except where directly involving low-level operations.
+All instances of unsafe usage must be explicitly documented in the unsafe.md file within the docs\archive directory.
+
+**Type Design Guidelines**
+Minimise the use of dynamic dispatch forms such as `dyn`, always prioritising deterministic types.
+All instances of dynamic dispatch must be explicitly documented in the `dynamic.md` file within the `docs\archive` directory.
+
 ## Repository structure
 
 ```
