@@ -4,47 +4,43 @@ use std::path::{Path, PathBuf};
 
 use chrono::Utc;
 
-pub fn path_exists(p: &str) -> bool {
-    Path::new(p).exists()
+pub fn path_exists(p: impl AsRef<Path>) -> bool {
+    p.as_ref().exists()
 }
 
-pub fn copy_file(src: &str, dst: &str) -> io::Result<()> {
+pub fn copy_file(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
     fs::copy(src, dst)?;
     Ok(())
 }
 
 pub fn create_temp_dir() -> io::Result<PathBuf> {
-    let temp_dir = std::env::temp_dir().join("excel_tool_gateway");
+    let temp_dir = std::env::temp_dir().join("excel_core");
     fs::create_dir_all(&temp_dir)?;
     Ok(temp_dir)
 }
 
-pub fn append_timestamp(path: &str) -> String {
-    let p = Path::new(path);
-    let stem = p.file_stem().unwrap_or_default().to_string_lossy();
+pub fn append_timestamp(path: impl AsRef<Path>) -> PathBuf {
+    let p = path.as_ref();
+    let stem = p.file_stem().unwrap_or_default();
+    let timestamp = Utc::now().format("%Y%m%d_%H%M%S_%3f");
     let ext = p
         .extension()
         .map(|e| format!(".{}", e.to_string_lossy()))
         .unwrap_or_default();
-    let timestamp = Utc::now().format("%Y%m%d_%H%M%S_%3f");
-    let parent = p.parent().unwrap_or(Path::new(""));
-    parent
-        .join(format!("{}_{}{}", stem, timestamp, ext))
-        .to_string_lossy()
-        .to_string()
+    let mut result = p.parent().unwrap_or(Path::new("")).to_path_buf();
+    result.push(format!("{}_{}{}", stem.to_string_lossy(), timestamp, ext));
+    result
 }
 
-pub fn ensure_parent_dir(path: &str) -> io::Result<()> {
-    let p = Path::new(path);
-    if let Some(parent) = p.parent() {
+pub fn ensure_parent_dir(path: impl AsRef<Path>) -> io::Result<()> {
+    if let Some(parent) = path.as_ref().parent() {
         fs::create_dir_all(parent)?;
     }
     Ok(())
 }
 
-pub fn file_size(path: &str) -> io::Result<u64> {
-    let metadata = fs::metadata(path)?;
-    Ok(metadata.len())
+pub fn file_size(path: impl AsRef<Path>) -> io::Result<u64> {
+    Ok(fs::metadata(path)?.len())
 }
 
 #[cfg(test)]
@@ -72,15 +68,16 @@ mod tests {
     fn test_create_temp_dir() {
         let dir = create_temp_dir().unwrap();
         assert!(dir.exists());
-        assert!(dir.to_string_lossy().contains("excel_tool_gateway"));
+        assert!(dir.to_string_lossy().contains("excel_core"));
     }
 
     #[test]
     fn test_append_timestamp() {
         let result = append_timestamp("test.xlsx");
-        assert!(result.starts_with("test_"));
-        assert!(result.ends_with(".xlsx"));
-        assert!(result.len() > "test_.xlsx".len());
+        let s = result.to_string_lossy();
+        assert!(s.starts_with("test_"));
+        assert!(s.ends_with(".xlsx"));
+        assert!(s.len() > "test_.xlsx".len());
     }
 
     #[test]
