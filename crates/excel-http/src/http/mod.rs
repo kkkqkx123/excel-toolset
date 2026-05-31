@@ -1,2 +1,13 @@
-pub mod handlers;
+pub mod batch;
+pub mod cell;
+pub mod chart;
+pub mod data;
+pub mod diff;
+pub mod file;
+pub mod format;
+pub mod formula;
+pub mod health;
+pub mod range;
 pub mod router;
+pub mod sheet;
+pub mod vba;
