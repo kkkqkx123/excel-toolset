@@ -33,6 +33,7 @@ pub enum Commands {
     Chart(ChartArgs),
     Vba(VbaArgs),
     Diff(DiffArgs),
+    Batch(BatchArgs),
     Rollback(RollbackArgs),
 }
 
@@ -126,6 +127,14 @@ pub enum RangeSub {
         sheet: String,
         range: String,
         data: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    WriteCsv {
+        path: String,
+        sheet: String,
+        range: String,
+        csv: String,
         #[arg(long)]
         dry_run: bool,
     },
@@ -312,6 +321,23 @@ pub enum DiffSub {
 }
 
 #[derive(clap::Args)]
+pub struct BatchArgs {
+    #[command(subcommand)]
+    pub command: BatchSub,
+}
+
+#[derive(Subcommand)]
+pub enum BatchSub {
+    Modify {
+        path: String,
+        #[arg(long)]
+        operations: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
+
+#[derive(clap::Args)]
 pub struct RollbackArgs {
     pub path: String,
     pub backup_path: String,
@@ -353,6 +379,7 @@ fn run_command(cli: &Cli) -> Result<serde_json::Value> {
         Commands::Chart(args) => run_chart(args),
         Commands::Vba(args) => run_vba(args),
         Commands::Diff(args) => run_diff(args),
+        Commands::Batch(args) => run_batch(args),
         Commands::Rollback(args) => run_rollback(args),
     }
 }
@@ -470,6 +497,21 @@ fn run_range(args: &RangeArgs) -> Result<serde_json::Value> {
                 file_path: path.clone(),
             };
             let result = excel_write::clear_range(path, &params, sheet, range)?;
+            Ok(serde_json::to_value(result).unwrap())
+        }
+        RangeSub::WriteCsv {
+            path,
+            sheet,
+            range,
+            csv,
+            dry_run,
+        } => {
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
+            let result = excel_write::write_range_from_csv(path, &params, sheet, range, csv)?;
             Ok(serde_json::to_value(result).unwrap())
         }
     }
@@ -716,6 +758,31 @@ fn run_vba(args: &VbaArgs) -> Result<serde_json::Value> {
                 file_path: path.clone(),
             };
             let result = vba_util::import_vba(path, &params, &data)?;
+            Ok(serde_json::to_value(result).unwrap())
+        }
+    }
+}
+
+fn run_batch(args: &BatchArgs) -> Result<serde_json::Value> {
+    match &args.command {
+        BatchSub::Modify {
+            path,
+            operations,
+            dry_run,
+        } => {
+            let ops: Vec<BatchOperation> = serde_json::from_str(operations)
+                .map_err(|e| AppError::Custom(format!("Invalid operations JSON: {}", e)))?;
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
+            let mut result = excel_write::execute_batch_operations(path, &params, &ops)?;
+            if let Some(ref backup) = result.backup_info
+                && let Ok(diff) = excel_diff::diff_files(&backup.backup_path, path)
+            {
+                result.diff = Some(diff);
+            }
             Ok(serde_json::to_value(result).unwrap())
         }
     }

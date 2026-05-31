@@ -610,3 +610,582 @@ fn map_chart_type(ct: &ChartType) -> XlsxChartType {
         ChartType::Scatter => XlsxChartType::Scatter,
     }
 }
+
+// ---------------------------------------------------------------------------
+// CSV helper
+// ---------------------------------------------------------------------------
+
+fn read_csv_to_cell_values(csv_path: &str) -> Result<Vec<Vec<CellValue>>> {
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .from_path(csv_path)
+        .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
+
+    let mut grid = Vec::new();
+    for result in rdr.records() {
+        let record = result.map_err(|e| AppError::Io(std::io::Error::other(e)))?;
+        let row: Vec<CellValue> = record
+            .iter()
+            .map(|field| {
+                if let Ok(n) = field.parse::<f64>() {
+                    CellValue::Number(n)
+                } else {
+                    CellValue::String(field.to_string())
+                }
+            })
+            .collect();
+        grid.push(row);
+    }
+    Ok(grid)
+}
+
+// ---------------------------------------------------------------------------
+// write_range_from_csv
+// ---------------------------------------------------------------------------
+
+pub fn write_range_from_csv(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    target_range: &str,
+    csv_path: &str,
+) -> Result<WriteResult> {
+    let data = read_csv_to_cell_values(csv_path)?;
+    write_range(path, params, sheet, target_range, &data)
+}
+
+// ---------------------------------------------------------------------------
+// Batch executor
+// ---------------------------------------------------------------------------
+
+fn apply_write_cell(
+    data: &mut HashMap<String, SheetData>,
+    sheet: &str,
+    row: u32,
+    col: u16,
+    value: &CellValue,
+) -> Result<()> {
+    let sd = data
+        .get_mut(sheet)
+        .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+    ensure_dimensions(sd, row as usize, col as usize);
+    sd.rows[row as usize][col as usize] = cell_value_to_data(value);
+    Ok(())
+}
+
+fn apply_write_range(
+    data: &mut HashMap<String, SheetData>,
+    sheet: &str,
+    range: &str,
+    grid: &[Vec<CellValue>],
+) -> Result<()> {
+    let (r1, c1, _, _) = cell_ref::parse_range(range)?;
+    let sd = data
+        .get_mut(sheet)
+        .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+    for (ri, row) in grid.iter().enumerate() {
+        for (ci, val) in row.iter().enumerate() {
+            let target_row = r1 as usize + ri;
+            let target_col = c1 as usize + ci;
+            ensure_dimensions(sd, target_row, target_col);
+            sd.rows[target_row][target_col] = cell_value_to_data(val);
+        }
+    }
+    Ok(())
+}
+
+fn apply_clear_range(
+    data: &mut HashMap<String, SheetData>,
+    sheet: &str,
+    range: &str,
+) -> Result<()> {
+    let (r_start, r_end, c_start, c_end) = cell_ref::parse_range_normalized(range)?;
+    let sd = data
+        .get_mut(sheet)
+        .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+    for ri in r_start..=r_end {
+        for ci in c_start..=c_end {
+            let row = ri as usize;
+            let col = ci as usize;
+            if row < sd.rows.len() && col < sd.rows[row].len() {
+                sd.rows[row][col] = CellData {
+                    value: None,
+                    data_type: CellDataType::Empty,
+                    formula: None,
+                };
+            }
+        }
+    }
+    Ok(())
+}
+
+fn apply_set_formula(
+    data: &mut HashMap<String, SheetData>,
+    sheet: &str,
+    cell: &str,
+    formula: &str,
+) -> Result<()> {
+    let (row, col) = cell_ref::parse_cell_ref(cell)?;
+    let sd = data
+        .get_mut(sheet)
+        .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+    ensure_dimensions(sd, row as usize, col as usize);
+    sd.rows[row as usize][col as usize] = CellData {
+        value: None,
+        data_type: CellDataType::String,
+        formula: Some(formula.to_string()),
+    };
+    Ok(())
+}
+
+fn apply_insert_rows(
+    data: &mut HashMap<String, SheetData>,
+    sheet: &str,
+    at_row: u32,
+    grid: &[Vec<CellValue>],
+) -> Result<()> {
+    let sd = data
+        .get_mut(sheet)
+        .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+    let new_rows: Vec<Vec<CellData>> = grid
+        .iter()
+        .map(|row| row.iter().map(cell_value_to_data).collect())
+        .collect();
+    let idx = at_row as usize;
+    let mut tail = sd.rows.split_off(idx);
+    sd.rows.extend(new_rows);
+    sd.rows.append(&mut tail);
+    Ok(())
+}
+
+fn apply_delete_rows(
+    data: &mut HashMap<String, SheetData>,
+    sheet: &str,
+    start_row: u32,
+    end_row: u32,
+) -> Result<()> {
+    let sd = data
+        .get_mut(sheet)
+        .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+    let start = start_row as usize;
+    let end = end_row as usize;
+    if start < sd.rows.len() {
+        let count = (end.saturating_sub(start) + 1).min(sd.rows.len() - start);
+        for _ in 0..count {
+            sd.rows.remove(start);
+        }
+    }
+    Ok(())
+}
+
+fn apply_append_rows(
+    data: &mut HashMap<String, SheetData>,
+    sheet: &str,
+    grid: &[Vec<CellValue>],
+) -> Result<()> {
+    let sd = data
+        .get_mut(sheet)
+        .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+    let new_rows: Vec<Vec<CellData>> = grid
+        .iter()
+        .map(|row| row.iter().map(cell_value_to_data).collect())
+        .collect();
+    sd.rows.extend(new_rows);
+    Ok(())
+}
+
+fn apply_add_sheet(data: &mut HashMap<String, SheetData>, name: &str) -> Result<()> {
+    if data.contains_key(name) {
+        return Err(AppError::Custom(format!("Sheet '{}' already exists", name)));
+    }
+    data.insert(
+        name.to_string(),
+        SheetData {
+            name: name.to_string(),
+            rows: Vec::new(),
+        },
+    );
+    Ok(())
+}
+
+fn apply_delete_sheet(data: &mut HashMap<String, SheetData>, name: &str) -> Result<()> {
+    if !data.contains_key(name) {
+        return Err(AppError::Custom(format!("Sheet '{}' not found", name)));
+    }
+    data.remove(name);
+    Ok(())
+}
+
+fn apply_rename_sheet(
+    data: &mut HashMap<String, SheetData>,
+    old_name: &str,
+    new_name: &str,
+) -> Result<()> {
+    if !data.contains_key(old_name) {
+        return Err(AppError::Custom(format!("Sheet '{}' not found", old_name)));
+    }
+    if data.contains_key(new_name) {
+        return Err(AppError::Custom(format!(
+            "Sheet '{}' already exists",
+            new_name
+        )));
+    }
+    if let Some(mut sd) = data.remove(old_name) {
+        sd.name = new_name.to_string();
+        data.insert(new_name.to_string(), sd);
+    }
+    Ok(())
+}
+
+fn apply_sort_sheet(
+    data: &mut HashMap<String, SheetData>,
+    sheet: &str,
+    columns: &[SortColumn],
+) -> Result<()> {
+    let sd = data
+        .get_mut(sheet)
+        .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+    if sd.rows.len() > 1 {
+        let header = sd.rows[0].clone();
+        let mut body: Vec<Vec<CellData>> = sd.rows.drain(1..).collect();
+        body.sort_by(|a, b| {
+            for sc in columns {
+                let ca = a
+                    .get(sc.column as usize)
+                    .and_then(|c| c.value.as_deref())
+                    .unwrap_or("");
+                let cb = b
+                    .get(sc.column as usize)
+                    .and_then(|c| c.value.as_deref())
+                    .unwrap_or("");
+                let cmp = ca.to_lowercase().cmp(&cb.to_lowercase());
+                if cmp != std::cmp::Ordering::Equal {
+                    return if sc.descending { cmp.reverse() } else { cmp };
+                }
+            }
+            std::cmp::Ordering::Equal
+        });
+        sd.rows.push(header);
+        sd.rows.extend(body);
+    }
+    Ok(())
+}
+
+fn apply_dedup_sheet(
+    data: &mut HashMap<String, SheetData>,
+    sheet: &str,
+    columns: &[u16],
+) -> Result<()> {
+    let sd = data
+        .get_mut(sheet)
+        .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+    if sd.rows.len() > 1 {
+        let header = sd.rows[0].clone();
+        let body: Vec<Vec<CellData>> = sd.rows.drain(1..).collect();
+        let mut seen = std::collections::HashSet::new();
+        let cols: Vec<usize> = if columns.is_empty() {
+            (0..body.iter().map(|r| r.len()).max().unwrap_or(0)).collect()
+        } else {
+            columns.iter().map(|c| *c as usize).collect()
+        };
+        for row in body {
+            let key: Vec<String> = cols
+                .iter()
+                .map(|&ci| {
+                    row.get(ci)
+                        .and_then(|c| c.value.as_deref())
+                        .unwrap_or("")
+                        .to_string()
+                })
+                .collect();
+            if seen.insert(key) {
+                sd.rows.push(row);
+            }
+        }
+        sd.rows.insert(0, header);
+    }
+    Ok(())
+}
+
+/// Apply data-only batch operations to the in-memory sheet data map.
+fn apply_data_operations(
+    data: &mut HashMap<String, SheetData>,
+    operations: &[BatchOperation],
+) -> Result<usize> {
+    let mut succeeded = 0usize;
+    for op in operations {
+        match op {
+            BatchOperation::WriteCell {
+                sheet,
+                row,
+                col,
+                value,
+            } => {
+                apply_write_cell(data, sheet, *row, *col, value)?;
+                succeeded += 1;
+            }
+            BatchOperation::WriteRange {
+                sheet,
+                range,
+                data: grid,
+            } => {
+                apply_write_range(data, sheet, range, grid)?;
+                succeeded += 1;
+            }
+            BatchOperation::WriteRangeFromCsv {
+                sheet,
+                range,
+                csv_path,
+            } => {
+                let grid = read_csv_to_cell_values(csv_path)?;
+                apply_write_range(data, sheet, range, &grid)?;
+                succeeded += 1;
+            }
+            BatchOperation::ClearRange { sheet, range } => {
+                apply_clear_range(data, sheet, range)?;
+                succeeded += 1;
+            }
+            BatchOperation::SetFormula {
+                sheet,
+                cell,
+                formula,
+            } => {
+                apply_set_formula(data, sheet, cell, formula)?;
+                succeeded += 1;
+            }
+            BatchOperation::InsertRows {
+                sheet,
+                at_row,
+                data: grid,
+            } => {
+                apply_insert_rows(data, sheet, *at_row, grid)?;
+                succeeded += 1;
+            }
+            BatchOperation::DeleteRows {
+                sheet,
+                start_row,
+                end_row,
+            } => {
+                apply_delete_rows(data, sheet, *start_row, *end_row)?;
+                succeeded += 1;
+            }
+            BatchOperation::AppendRows { sheet, data: grid } => {
+                apply_append_rows(data, sheet, grid)?;
+                succeeded += 1;
+            }
+            BatchOperation::AddSheet { name } => {
+                apply_add_sheet(data, name)?;
+                succeeded += 1;
+            }
+            BatchOperation::DeleteSheet { name } => {
+                apply_delete_sheet(data, name)?;
+                succeeded += 1;
+            }
+            BatchOperation::RenameSheet { old_name, new_name } => {
+                apply_rename_sheet(data, old_name, new_name)?;
+                succeeded += 1;
+            }
+            BatchOperation::SortSheet { sheet, columns } => {
+                apply_sort_sheet(data, sheet, columns)?;
+                succeeded += 1;
+            }
+            BatchOperation::DedupSheet { sheet, columns } => {
+                apply_dedup_sheet(data, sheet, columns)?;
+                succeeded += 1;
+            }
+            // Workbook operations — handled in Pass 2
+            BatchOperation::SetFormat { .. }
+            | BatchOperation::MergeCells { .. }
+            | BatchOperation::AddChart { .. } => {}
+        }
+    }
+    Ok(succeeded)
+}
+
+/// Build a workbook from the data map, applying format/merge/chart operations.
+fn build_workbook_with_ops(
+    data: &HashMap<String, SheetData>,
+    operations: &[BatchOperation],
+) -> Result<Workbook> {
+    let mut wb = Workbook::new();
+    let sheet_names: Vec<&str> = data.keys().map(|s| s.as_str()).collect();
+
+    for name in &sheet_names {
+        let sd = &data[*name];
+        let ws = wb.add_worksheet();
+        ws.set_name(*name).map_err(AppError::Xlsx)?;
+
+        // Accumulate Pass 2 operations for this sheet
+        let formats: Vec<(&str, &Style)> = operations
+            .iter()
+            .filter_map(|op| {
+                if let BatchOperation::SetFormat {
+                    sheet,
+                    range,
+                    style,
+                } = op
+                {
+                    if sheet == *name {
+                        Some((range.as_str(), style))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let merges: Vec<(&str, &Option<String>)> = operations
+            .iter()
+            .filter_map(|op| {
+                if let BatchOperation::MergeCells {
+                    sheet,
+                    range,
+                    value,
+                } = op
+                {
+                    if sheet == *name {
+                        Some((range.as_str(), value))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if formats.is_empty() && merges.is_empty() {
+            write_sheet_data(ws, sd)?;
+        } else {
+            // Write with formats applied
+            for (ri, row) in sd.rows.iter().enumerate() {
+                for (ci, cell) in row.iter().enumerate() {
+                    let mut applied_format = false;
+                    for (range_str, style) in &formats {
+                        if let Ok((fr, fc)) = cell_ref::parse_cell_ref(range_str)
+                            && ri as u32 == fr
+                            && ci as u16 == fc
+                        {
+                            let fmt = build_format(style);
+                            write_cell_with_format(ws, ri as u32, ci as u16, cell, &fmt)?;
+                            applied_format = true;
+                            break;
+                        }
+                    }
+                    if !applied_format {
+                        write_cell_data(ws, ri as u32, ci as u16, cell)?;
+                    }
+                }
+            }
+            // Apply merges after writing all data
+            for (range_str, value) in &merges {
+                if let Ok((r1, c1, r2, c2)) = cell_ref::parse_range(range_str) {
+                    ws.merge_range(
+                        r1,
+                        c1,
+                        r2,
+                        c2,
+                        value.as_deref().unwrap_or(""),
+                        &Format::new(),
+                    )
+                    .map_err(AppError::Xlsx)?;
+                }
+            }
+        }
+    }
+
+    // Apply AddChart operations
+    for op in operations {
+        if let BatchOperation::AddChart { config } = op {
+            let sheet_idx = sheet_names
+                .iter()
+                .position(|n| *n == config.sheet)
+                .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", config.sheet)))?;
+            if let Ok(ws) = wb.worksheet_from_index(sheet_idx) {
+                let mut chart = Chart::new(map_chart_type(&config.chart_type));
+                chart
+                    .add_series()
+                    .set_categories(config.categories_range.as_str())
+                    .set_values(config.values_range.as_str());
+                if let Some(ref title) = config.title {
+                    chart.title().set_name(title);
+                }
+                ws.insert_chart(config.row, config.col, &chart)
+                    .map_err(AppError::Xlsx)?;
+            }
+        }
+    }
+
+    Ok(wb)
+}
+
+pub fn execute_batch_operations(
+    path: &str,
+    params: &SecurityParams,
+    operations: &[BatchOperation],
+) -> Result<BatchWriteResult> {
+    if operations.is_empty() {
+        let hash = compute_file_hash(path).map_err(AppError::Io)?;
+        return Ok(BatchWriteResult {
+            success: true,
+            message: "No operations to execute".into(),
+            backup_info: None,
+            old_hash: hash.clone(),
+            new_hash: hash,
+            diff: None,
+            operations_count: 0,
+            succeeded_count: 0,
+        });
+    }
+
+    let old_hash = compute_file_hash(path).map_err(AppError::Io)?;
+
+    let backup_info = if params.create_backup {
+        Some(create_backup(path, &old_hash).map_err(AppError::Io)?)
+    } else {
+        None
+    };
+
+    let mut data = read_all_sheets_to_map(path)?;
+
+    let data_succeeded = apply_data_operations(&mut data, operations)?;
+
+    let mut wb = build_workbook_with_ops(&data, operations)?;
+
+    let all_ops_count = operations.len();
+    let workbook_ops_count = operations
+        .iter()
+        .filter(|op| {
+            matches!(
+                op,
+                BatchOperation::SetFormat { .. }
+                    | BatchOperation::MergeCells { .. }
+                    | BatchOperation::AddChart { .. }
+            )
+        })
+        .count();
+    let succeeded = data_succeeded + workbook_ops_count;
+
+    let new_hash = if params.dry_run {
+        old_hash.clone()
+    } else {
+        wb.save(path).map_err(AppError::Xlsx)?;
+        compute_file_hash(path).map_err(AppError::Io)?
+    };
+
+    Ok(BatchWriteResult {
+        success: true,
+        message: format!(
+            "Batch executed: {}/{} operations succeeded",
+            succeeded, all_ops_count
+        ),
+        backup_info,
+        old_hash,
+        new_hash,
+        diff: None,
+        operations_count: all_ops_count,
+        succeeded_count: succeeded,
+    })
+}

@@ -1,6 +1,6 @@
 use excel_core::types::{DiffSummary, DiffType, SheetDiff};
 
-pub(crate) fn summarize(sheet_diffs: &[SheetDiff]) -> DiffSummary {
+pub fn summarize(sheet_diffs: &[SheetDiff]) -> DiffSummary {
     let mut adds = 0;
     let mut deletes = 0;
     let mut modifies = 0;

@@ -713,6 +713,67 @@ fn sql_query_dispatch(_path: &str, _sheet: &str, _query: &str) -> Result<Vec<Vec
 }
 
 // ---------------------------------------------------------------------------
+// Batch
+// ---------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+pub struct BatchModifyReq {
+    pub path: String,
+    pub operations: Vec<BatchOperation>,
+    #[serde(default)]
+    pub dry_run: bool,
+}
+
+pub async fn batch_modify(Json(req): Json<BatchModifyReq>) -> Json<ApiResponse<BatchWriteResult>> {
+    let params = SecurityParams {
+        dry_run: req.dry_run,
+        create_backup: true,
+        file_path: req.path.clone(),
+    };
+    let mut result =
+        match excel_write::execute_batch_operations(&req.path, &params, &req.operations) {
+            Ok(r) => r,
+            Err(e) => return Json(ApiResponse::err(e)),
+        };
+    if let Some(ref backup) = result.backup_info
+        && let Ok(diff) = excel_diff::diff_files(&backup.backup_path, &req.path)
+    {
+        result.diff = Some(diff);
+    }
+    Json(ApiResponse::ok(Some(result)))
+}
+
+#[derive(Deserialize)]
+pub struct RangeWriteCsvReq {
+    pub path: String,
+    pub sheet: String,
+    pub range: String,
+    pub csv_path: String,
+    #[serde(default)]
+    pub dry_run: bool,
+}
+
+pub async fn range_write_from_csv(
+    Json(req): Json<RangeWriteCsvReq>,
+) -> Json<ApiResponse<WriteResult>> {
+    let params = SecurityParams {
+        dry_run: req.dry_run,
+        create_backup: true,
+        file_path: req.path.clone(),
+    };
+    match excel_write::write_range_from_csv(
+        &req.path,
+        &params,
+        &req.sheet,
+        &req.range,
+        &req.csv_path,
+    ) {
+        Ok(data) => Json(ApiResponse::ok(Some(data))),
+        Err(e) => Json(ApiResponse::err(e)),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

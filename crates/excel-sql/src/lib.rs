@@ -15,9 +15,7 @@ fn load_sheet_to_db(
         return Ok(());
     }
 
-    let col_defs: Vec<String> = (0..max_cols)
-        .map(|i| format!("c{} VARCHAR", i))
-        .collect();
+    let col_defs: Vec<String> = (0..max_cols).map(|i| format!("c{} VARCHAR", i)).collect();
     let escaped_name = name.replace('"', "\"\"");
     db.execute_batch(&format!(
         r#"CREATE TABLE "{}" ({})"#,
@@ -88,7 +86,7 @@ fn query_to_cell_data(
 ) -> std::result::Result<Vec<Vec<CellData>>, duckdb::Error> {
     let col_count = stmt.column_count();
     let rows = stmt.query_map([], |row| {
-        let mut cells = Vec::with_capacity(col_count as usize);
+        let mut cells = Vec::with_capacity(col_count);
         for i in 0..col_count {
             let val: Option<String> = row.get(i).ok().flatten();
             cells.push(CellData {

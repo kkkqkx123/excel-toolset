@@ -25,7 +25,12 @@ pub fn create_router() -> Router {
             get(handlers::range_read),
         )
         .route("/api/range/write", post(handlers::range_write))
+        .route(
+            "/api/range/write-from-csv",
+            post(handlers::range_write_from_csv),
+        )
         .route("/api/range/clear", post(handlers::range_clear))
+        .route("/api/batch/modify", post(handlers::batch_modify))
         .route("/api/data/append-row", post(handlers::data_append_row))
         .route("/api/data/insert-row", post(handlers::data_insert_row))
         .route("/api/data/delete-row", post(handlers::data_delete_row))

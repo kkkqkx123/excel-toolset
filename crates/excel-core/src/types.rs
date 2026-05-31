@@ -182,7 +182,7 @@ pub struct CellData {
 // Cell value (write input)
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CellValue {
     String(String),
     Number(f64),
@@ -361,6 +361,99 @@ pub struct FileDiff {
 pub struct RangeDiff {
     pub range: String,
     pub cell_diffs: Vec<CellDiff>,
+}
+
+// ---------------------------------------------------------------------------
+// Batch operations
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum BatchOperation {
+    WriteCell {
+        sheet: String,
+        row: u32,
+        col: u16,
+        value: CellValue,
+    },
+    WriteRange {
+        sheet: String,
+        range: String,
+        data: Vec<Vec<CellValue>>,
+    },
+    WriteRangeFromCsv {
+        sheet: String,
+        range: String,
+        csv_path: String,
+    },
+    ClearRange {
+        sheet: String,
+        range: String,
+    },
+    SetFormula {
+        sheet: String,
+        cell: String,
+        formula: String,
+    },
+    InsertRows {
+        sheet: String,
+        at_row: u32,
+        data: Vec<Vec<CellValue>>,
+    },
+    DeleteRows {
+        sheet: String,
+        start_row: u32,
+        end_row: u32,
+    },
+    AppendRows {
+        sheet: String,
+        data: Vec<Vec<CellValue>>,
+    },
+    AddSheet {
+        name: String,
+    },
+    DeleteSheet {
+        name: String,
+    },
+    RenameSheet {
+        old_name: String,
+        new_name: String,
+    },
+    SortSheet {
+        sheet: String,
+        columns: Vec<SortColumn>,
+    },
+    DedupSheet {
+        sheet: String,
+        columns: Vec<u16>,
+    },
+    MergeCells {
+        sheet: String,
+        range: String,
+        value: Option<String>,
+    },
+    SetFormat {
+        sheet: String,
+        range: String,
+        style: Style,
+    },
+    AddChart {
+        config: ChartConfig,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchWriteResult {
+    pub success: bool,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub backup_info: Option<BackupInfo>,
+    pub old_hash: String,
+    pub new_hash: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diff: Option<FileDiff>,
+    pub operations_count: usize,
+    pub succeeded_count: usize,
 }
 
 // ---------------------------------------------------------------------------
