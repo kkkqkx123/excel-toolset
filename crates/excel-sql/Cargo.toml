@@ -5,4 +5,7 @@ edition.workspace = true
 
 [dependencies]
 excel-core = { path = "../excel-core" }
+excel-diff = { path = "../excel-diff" }
 duckdb = { version = "1.1", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+thiserror.workspace = true
