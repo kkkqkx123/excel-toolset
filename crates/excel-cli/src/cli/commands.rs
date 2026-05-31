@@ -352,12 +352,15 @@ pub fn execute(cli: &Cli) {
     let result = run_command(cli);
     match result {
         Ok(json) => {
-            // If text format requested, extract raw_text field and print directly
-            if cli.format == "text"
-                && let Some(text) = json.get("raw_text").and_then(|v| v.as_str())
-            {
-                println!("{}", text);
-                return;
+            if cli.format == "text" {
+                if let Some(text) = json.get("raw_text").and_then(|v| v.as_str()) {
+                    println!("{}", text);
+                    return;
+                }
+                eprintln!(
+                    "Warning: --format text is only supported for diff commands. \
+                     Showing JSON output."
+                );
             }
             if cli.pretty {
                 println!("{}", serde_json::to_string_pretty(&json).unwrap());
@@ -391,7 +394,7 @@ fn run_command(cli: &Cli) -> Result<serde_json::Value> {
         Commands::Chart(args) => run_chart(args),
         Commands::Vba(args) => run_vba(args),
         Commands::Diff(args) => run_diff(args, &cli.format),
-        Commands::Batch(args) => run_batch(args),
+        Commands::Batch(args) => run_batch(args, &cli.format),
         Commands::Rollback(args) => run_rollback(args),
     }
 }
@@ -772,7 +775,7 @@ fn run_vba(args: &VbaArgs) -> Result<serde_json::Value> {
     }
 }
 
-fn run_batch(args: &BatchArgs) -> Result<serde_json::Value> {
+fn run_batch(args: &BatchArgs, format: &str) -> Result<serde_json::Value> {
     match &args.command {
         BatchSub::Modify {
             path,
@@ -792,7 +795,23 @@ fn run_batch(args: &BatchArgs) -> Result<serde_json::Value> {
             {
                 result.diff = Some(diff);
             }
-            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+            if format == "text" {
+                let mut parts = Vec::new();
+                if !result.message.is_empty() {
+                    parts.push(result.message.clone());
+                }
+                if let Some(ref diff) = result.diff {
+                    parts.push(semantic::to_natural_text(diff, None, Verbosity::Detailed));
+                }
+                let text = if parts.is_empty() {
+                    "Batch modify completed.".to_string()
+                } else {
+                    parts.join("\n")
+                };
+                Ok(serde_json::json!({"raw_text": text}))
+            } else {
+                Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+            }
         }
     }
 }
@@ -832,12 +851,19 @@ fn run_diff(args: &DiffArgs, format: &str) -> Result<serde_json::Value> {
         } => {
             let diff = diff_range(old_path, new_path, sheet, range)?;
             if format == "text" {
-                let text = format!(
-                    "Range diff for {} in \"{}\": {} changes",
-                    range,
-                    sheet,
-                    diff.cell_diffs.len()
-                );
+                let sd = SheetDiff {
+                    sheet_name: sheet.clone(),
+                    row_count_diff: 0,
+                    col_count_diff: 0,
+                    cell_diffs: diff.cell_diffs.clone(),
+                };
+                let summary = summarize::summarize(std::slice::from_ref(&sd));
+                let fd = FileDiff {
+                    file_hash_match: false,
+                    sheet_diffs: vec![sd],
+                    summary,
+                };
+                let text = semantic::to_natural_text(&fd, None, Verbosity::Detailed);
                 Ok(serde_json::json!({"raw_text": text}))
             } else {
                 Ok(serde_json::to_value(diff).map_err(|e| AppError::Serialize(e.to_string()))?)

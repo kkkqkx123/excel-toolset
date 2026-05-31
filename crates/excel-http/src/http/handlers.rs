@@ -667,14 +667,63 @@ pub struct DiffRangeReq {
     pub new_path: String,
     pub sheet: String,
     pub range: String,
+    #[serde(default = "default_json_format")]
+    pub format: String,
 }
 
-pub async fn handle_diff_range(
-    Json(req): Json<DiffRangeReq>,
-) -> Json<ApiResponse<excel_core::types::RangeDiff>> {
-    match excel_diff::diff_range(&req.old_path, &req.new_path, &req.sheet, &req.range) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+pub async fn handle_diff_range(Json(req): Json<DiffRangeReq>) -> impl IntoResponse {
+    let diff_result = excel_diff::diff_range(&req.old_path, &req.new_path, &req.sheet, &req.range);
+
+    match diff_result {
+        Ok(data) => {
+            if req.format == "text" {
+                let sd = SheetDiff {
+                    sheet_name: req.sheet.clone(),
+                    row_count_diff: 0,
+                    col_count_diff: 0,
+                    cell_diffs: data.cell_diffs,
+                };
+                let summary = summarize::summarize(std::slice::from_ref(&sd));
+                let fd = FileDiff {
+                    file_hash_match: false,
+                    sheet_diffs: vec![sd],
+                    summary,
+                };
+                let text = semantic::to_natural_text(&fd, None, Verbosity::Detailed);
+                Ok((
+                    StatusCode::OK,
+                    [("content-type", "text/plain; charset=utf-8")],
+                    text,
+                ))
+            } else {
+                match serde_json::to_value(data) {
+                    Ok(val) => {
+                        let body =
+                            serde_json::to_string(&ApiResponse::ok(Some(val))).unwrap_or_default();
+                        Ok((StatusCode::OK, [("content-type", "application/json")], body))
+                    }
+                    Err(e) => {
+                        let body = serde_json::to_string(&ApiResponse::<()>::err(
+                            AppError::Serialize(e.to_string()),
+                        ))
+                        .unwrap_or_default();
+                        Err((
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            [("content-type", "application/json")],
+                            body,
+                        ))
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            let body = serde_json::to_string(&ApiResponse::<()>::err(e)).unwrap_or_default();
+            Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                [("content-type", "application/json")],
+                body,
+            ))
+        }
     }
 }
 
@@ -770,9 +819,11 @@ pub struct BatchModifyReq {
     pub operations: Vec<BatchOperation>,
     #[serde(default)]
     pub dry_run: bool,
+    #[serde(default = "default_json_format")]
+    pub format: String,
 }
 
-pub async fn batch_modify(Json(req): Json<BatchModifyReq>) -> Json<ApiResponse<BatchWriteResult>> {
+pub async fn batch_modify(Json(req): Json<BatchModifyReq>) -> impl IntoResponse {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,
@@ -781,14 +832,38 @@ pub async fn batch_modify(Json(req): Json<BatchModifyReq>) -> Json<ApiResponse<B
     let mut result =
         match excel_write::execute_batch_operations(&req.path, &params, &req.operations) {
             Ok(r) => r,
-            Err(e) => return Json(ApiResponse::err(e)),
+            Err(e) => {
+                let body = serde_json::to_string(&ApiResponse::<()>::err(e)).unwrap_or_default();
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    [("content-type", "application/json")],
+                    body,
+                ));
+            }
         };
     if let Some(ref backup) = result.backup_info
         && let Ok(diff) = excel_diff::diff_files(&backup.backup_path, &req.path)
     {
         result.diff = Some(diff);
     }
-    Json(ApiResponse::ok(Some(result)))
+    if req.format == "text" {
+        let text = if let Some(ref diff) = result.diff {
+            semantic::to_natural_text(diff, None, Verbosity::Detailed)
+        } else {
+            "Batch modify completed (no changes detected).".to_string()
+        };
+        Ok((
+            StatusCode::OK,
+            [("content-type", "text/plain; charset=utf-8")],
+            text,
+        ))
+    } else {
+        Ok((
+            StatusCode::OK,
+            [("content-type", "application/json")],
+            serde_json::to_string(&ApiResponse::ok(Some(result))).unwrap_or_default(),
+        ))
+    }
 }
 
 #[derive(Deserialize)]
