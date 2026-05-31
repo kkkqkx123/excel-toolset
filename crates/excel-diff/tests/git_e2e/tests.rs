@@ -128,7 +128,8 @@ fn test_install_fails_outside_git_repo() {
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(
-            err.contains("Not in a git repository") || err.contains("Failed to find git root"),
+            err.to_string().contains("Not in a git repository")
+                || err.to_string().contains("Failed to find git root"),
             "expected git root error, got: {}",
             err
         );

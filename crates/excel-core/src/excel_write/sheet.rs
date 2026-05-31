@@ -4,7 +4,7 @@ use crate::types::*;
 
 pub fn add(data: &mut HashMap<String, SheetData>, name: &str) -> Result<()> {
     if data.contains_key(name) {
-        return Err(AppError::Custom(format!("Sheet '{}' already exists", name)));
+        return Err(AppError::SheetAlreadyExists(name.into()));
     }
     data.insert(
         name.to_string(),
@@ -18,7 +18,7 @@ pub fn add(data: &mut HashMap<String, SheetData>, name: &str) -> Result<()> {
 
 pub fn delete(data: &mut HashMap<String, SheetData>, name: &str) -> Result<()> {
     if !data.contains_key(name) {
-        return Err(AppError::Custom(format!("Sheet '{}' not found", name)));
+        return Err(AppError::SheetNotFound(name.into()));
     }
     data.remove(name);
     Ok(())
@@ -26,13 +26,10 @@ pub fn delete(data: &mut HashMap<String, SheetData>, name: &str) -> Result<()> {
 
 pub fn rename(data: &mut HashMap<String, SheetData>, old_name: &str, new_name: &str) -> Result<()> {
     if !data.contains_key(old_name) {
-        return Err(AppError::Custom(format!("Sheet '{}' not found", old_name)));
+        return Err(AppError::SheetNotFound(old_name.into()));
     }
     if data.contains_key(new_name) {
-        return Err(AppError::Custom(format!(
-            "Sheet '{}' already exists",
-            new_name
-        )));
+        return Err(AppError::SheetAlreadyExists(new_name.into()));
     }
     if let Some(mut sd) = data.remove(old_name) {
         sd.name = new_name.to_string();
@@ -48,7 +45,7 @@ pub fn sort(
 ) -> Result<()> {
     let sd = data
         .get_mut(sheet)
-        .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+        .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
     if sd.rows.len() > 1 {
         let header = sd.rows[0].clone();
         let mut body: Vec<Vec<CellData>> = sd.rows.drain(1..).collect();
@@ -78,7 +75,7 @@ pub fn sort(
 pub fn dedup(data: &mut HashMap<String, SheetData>, sheet: &str, columns: &[u16]) -> Result<()> {
     let sd = data
         .get_mut(sheet)
-        .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+        .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
     if sd.rows.len() > 1 {
         let header = sd.rows[0].clone();
         let body: Vec<Vec<CellData>> = sd.rows.drain(1..).collect();

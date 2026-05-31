@@ -2,7 +2,7 @@ use excel_core::excel_read;
 use excel_core::types::*;
 
 fn map_duckdb_err(e: duckdb::Error) -> AppError {
-    AppError::Custom(format!("DuckDB error: {}", e))
+    AppError::DuckDb(e.to_string())
 }
 
 fn load_sheet_to_db(
@@ -181,7 +181,7 @@ pub fn sort_sheet(
         let mut new_data = old_data.clone();
         let sd = new_data
             .get_mut(sheet)
-            .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+            .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
 
         if sd.rows.len() <= 1 {
             return Ok(new_data);
@@ -209,7 +209,7 @@ pub fn sort_sheet(
             .query_map([], |row| row.get::<_, i64>(0).map(|v| v as usize))
             .map_err(map_duckdb_err)?
             .collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(|e| AppError::Custom(format!("DuckDB error: {}", e)))?;
+            .map_err(|e| AppError::DuckDb(e.to_string()))?;
 
         let original_rows = std::mem::take(&mut sd.rows);
         for &id in &sorted_ids {
@@ -234,7 +234,7 @@ pub fn dedup_sheet(
         let mut new_data = old_data.clone();
         let sd = new_data
             .get_mut(sheet)
-            .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+            .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
 
         if sd.rows.len() <= 1 {
             return Ok(new_data);
@@ -269,7 +269,7 @@ pub fn dedup_sheet(
             .query_map([], |row| row.get::<_, i64>(0).map(|v| v as usize))
             .map_err(map_duckdb_err)?
             .collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(|e| AppError::Custom(format!("DuckDB error: {}", e)))?;
+            .map_err(|e| AppError::DuckDb(e.to_string()))?;
 
         let header = sd.rows[0].clone();
         let original_body: Vec<Vec<CellData>> = sd.rows.drain(1..).collect();

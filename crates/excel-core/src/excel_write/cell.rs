@@ -14,7 +14,7 @@ pub fn write(
 ) -> Result<()> {
     let sd = data
         .get_mut(sheet)
-        .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+        .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
     ensure_dimensions(sd, row as usize, col as usize);
     sd.rows[row as usize][col as usize] = cell_value_to_data(value);
     Ok(())
@@ -29,7 +29,7 @@ pub fn write_range(
     let (r1, c1, _, _) = cell_ref::parse_range(range)?;
     let sd = data
         .get_mut(sheet)
-        .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+        .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
     for (ri, row) in grid.iter().enumerate() {
         for (ci, val) in row.iter().enumerate() {
             let target_row = r1 as usize + ri;
@@ -45,7 +45,7 @@ pub fn clear_range(data: &mut HashMap<String, SheetData>, sheet: &str, range: &s
     let (r_start, r_end, c_start, c_end) = cell_ref::parse_range_normalized(range)?;
     let sd = data
         .get_mut(sheet)
-        .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+        .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
     for ri in r_start..=r_end {
         for ci in c_start..=c_end {
             let row = ri as usize;
@@ -71,7 +71,7 @@ pub fn set_formula(
     let (row, col) = cell_ref::parse_cell_ref(cell)?;
     let sd = data
         .get_mut(sheet)
-        .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+        .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
     ensure_dimensions(sd, row as usize, col as usize);
     sd.rows[row as usize][col as usize] = CellData {
         value: None,
@@ -89,7 +89,7 @@ pub fn insert_rows(
 ) -> Result<()> {
     let sd = data
         .get_mut(sheet)
-        .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+        .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
     let new_rows: Vec<Vec<CellData>> = grid
         .iter()
         .map(|row| row.iter().map(cell_value_to_data).collect())
@@ -109,7 +109,7 @@ pub fn delete_rows(
 ) -> Result<()> {
     let sd = data
         .get_mut(sheet)
-        .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+        .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
     let start = start_row as usize;
     let end = end_row as usize;
     if start < sd.rows.len() {
@@ -128,7 +128,7 @@ pub fn append_rows(
 ) -> Result<()> {
     let sd = data
         .get_mut(sheet)
-        .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+        .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
     let new_rows: Vec<Vec<CellData>> = grid
         .iter()
         .map(|row| row.iter().map(cell_value_to_data).collect())

@@ -12,10 +12,7 @@ pub fn add_sheet(path: &str, params: &SecurityParams, sheet: &str) -> Result<Wri
     modify_file(path, params, |old_data, wb| {
         let mut new_data = old_data.clone();
         if new_data.contains_key(sheet) {
-            return Err(AppError::Custom(format!(
-                "Sheet '{}' already exists",
-                sheet
-            )));
+            return Err(AppError::SheetAlreadyExists(sheet.into()));
         }
         new_data.insert(
             sheet.to_string(),
@@ -32,7 +29,7 @@ pub fn add_sheet(path: &str, params: &SecurityParams, sheet: &str) -> Result<Wri
 pub fn delete_sheet(path: &str, params: &SecurityParams, sheet: &str) -> Result<WriteResult> {
     modify_file(path, params, |old_data, wb| {
         if !old_data.contains_key(sheet) {
-            return Err(AppError::Custom(format!("Sheet '{}' not found", sheet)));
+            return Err(AppError::SheetNotFound(sheet.into()));
         }
         *wb = Workbook::new();
         for (name, data) in old_data.iter() {
@@ -56,13 +53,10 @@ pub fn rename_sheet(
 ) -> Result<WriteResult> {
     modify_file(path, params, |old_data, wb| {
         if !old_data.contains_key(old_name) {
-            return Err(AppError::Custom(format!("Sheet '{}' not found", old_name)));
+            return Err(AppError::SheetNotFound(old_name.into()));
         }
         if old_data.contains_key(new_name) {
-            return Err(AppError::Custom(format!(
-                "Sheet '{}' already exists",
-                new_name
-            )));
+            return Err(AppError::SheetAlreadyExists(new_name.into()));
         }
         *wb = Workbook::new();
         for (name, data) in old_data.iter() {
@@ -94,7 +88,7 @@ pub fn write_cell(
             ensure_dimensions(sd, row as usize, col as usize);
             sd.rows[row as usize][col as usize] = cell_value_to_data(value);
         } else {
-            return Err(AppError::Custom(format!("Sheet '{}' not found", sheet)));
+            return Err(AppError::SheetNotFound(sheet.into()));
         }
         *wb = Workbook::new();
         for (name, data) in new_data.iter() {
@@ -119,7 +113,7 @@ pub fn write_range(
         let mut new_data = old_data.clone();
         let sd = new_data
             .get_mut(sheet)
-            .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+            .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
 
         for (ri, row) in data.iter().enumerate() {
             for (ci, val) in row.iter().enumerate() {
@@ -152,7 +146,7 @@ pub fn clear_range(
         let mut new_data = old_data.clone();
         let sd = new_data
             .get_mut(sheet)
-            .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+            .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
 
         for ri in r_start..=r_end {
             for ci in c_start..=c_end {
@@ -191,7 +185,7 @@ pub fn set_formula(
         let mut new_data = old_data.clone();
         let sd = new_data
             .get_mut(sheet)
-            .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+            .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
 
         ensure_dimensions(sd, row as usize, col as usize);
         sd.rows[row as usize][col as usize] = CellData {

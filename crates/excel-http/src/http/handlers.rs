@@ -512,10 +512,9 @@ pub async fn chart_create(Json(req): Json<ChartCreateReq>) -> Json<ApiResponse<W
         "area" => ChartType::Area,
         "scatter" => ChartType::Scatter,
         _ => {
-            return Json(ApiResponse::err(AppError::Custom(format!(
-                "Unknown chart type: {}",
-                req.chart_type
-            ))));
+            return Json(ApiResponse::err(AppError::InvalidChartType(
+                req.chart_type.clone(),
+            )));
         }
     };
     let (r1, c1, _, _) = match excel_core::cell_ref::parse_range(&req.range) {
@@ -600,14 +599,20 @@ pub struct DiffFileReq {
 }
 
 pub async fn diff_file(Json(req): Json<DiffFileReq>) -> Json<ApiResponse<serde_json::Value>> {
+    fn to_json<T: serde::Serialize>(data: T) -> Json<ApiResponse<serde_json::Value>> {
+        match serde_json::to_value(data) {
+            Ok(val) => Json(ApiResponse::ok(Some(val))),
+            Err(e) => Json(ApiResponse::err(AppError::Serialize(e.to_string()))),
+        }
+    }
     if let Some(ref sheet_name) = req.sheet {
         match diff_sheets(&req.old_path, &req.new_path, sheet_name) {
-            Ok(data) => Json(ApiResponse::ok(Some(serde_json::to_value(data).unwrap()))),
+            Ok(data) => to_json(data),
             Err(e) => Json(ApiResponse::err(e)),
         }
     } else {
         match diff_files(&req.old_path, &req.new_path) {
-            Ok(data) => Json(ApiResponse::ok(Some(serde_json::to_value(data).unwrap()))),
+            Ok(data) => to_json(data),
             Err(e) => Json(ApiResponse::err(e)),
         }
     }
@@ -707,7 +712,7 @@ fn sql_query_dispatch(path: &str, sheet: &str, query: &str) -> Result<Vec<Vec<Ce
 
 #[cfg(not(feature = "sql"))]
 fn sql_query_dispatch(_path: &str, _sheet: &str, _query: &str) -> Result<Vec<Vec<CellData>>> {
-    Err(AppError::Custom(
+    Err(AppError::FeatureNotEnabled(
         "SQL queries require the 'sql' feature (enable with --features sql)".into(),
     ))
 }
@@ -811,6 +816,6 @@ fn parse_filter_op(s: &str) -> Result<FilterOp> {
         "contains" => Ok(FilterOp::Contains),
         "startswith" | "starts_with" => Ok(FilterOp::StartsWith),
         "endswith" | "ends_with" => Ok(FilterOp::EndsWith),
-        _ => Err(AppError::Custom(format!("Unknown filter operator: {}", s))),
+        _ => Err(AppError::InvalidFilterOp(s.into())),
     }
 }

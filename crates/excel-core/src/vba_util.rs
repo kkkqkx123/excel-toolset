@@ -5,8 +5,7 @@ use calamine::{Reader, Xlsx, open_workbook};
 use crate::types::*;
 
 pub fn has_vba(path: &str) -> Result<bool> {
-    let mut workbook: Xlsx<_> =
-        open_workbook(path).map_err(|e: calamine::XlsxError| AppError::Calamine(e.to_string()))?;
+    let mut workbook: Xlsx<_> = open_workbook(path)?;
     match workbook.vba_project() {
         Ok(Some(_)) => Ok(true),
         Ok(None) => Ok(false),
@@ -16,8 +15,7 @@ pub fn has_vba(path: &str) -> Result<bool> {
 
 /// Export VBA modules as a binary blob: (module count u32le) × [(name_len u32le, name, code_len u32le, code)]
 pub fn export_vba(path: &str) -> Result<Vec<u8>> {
-    let mut workbook: Xlsx<_> =
-        open_workbook(path).map_err(|e: calamine::XlsxError| AppError::Calamine(e.to_string()))?;
+    let mut workbook: Xlsx<_> = open_workbook(path)?;
     match workbook.vba_project() {
         Ok(Some(vba)) => {
             let mut buf: Vec<u8> = Vec::new();
@@ -48,14 +46,14 @@ pub fn export_vba(path: &str) -> Result<Vec<u8>> {
             }
             Ok(buf)
         }
-        Ok(None) => Err(AppError::Custom("No VBA project found".into())),
-        Err(e) => Err(AppError::Calamine(e.to_string())),
+        Ok(None) => Err(AppError::VbaNotSupported("No VBA project found".into())),
+        Err(e) => Err(AppError::Calamine(e)),
     }
 }
 
 /// VBA import is not supported in rust_xlsxwriter 0.50.
 pub fn import_vba(_path: &str, _params: &SecurityParams, _vba_data: &[u8]) -> Result<WriteResult> {
-    Err(AppError::Custom(
+    Err(AppError::VbaNotSupported(
         "VBA import is not supported in rust_xlsxwriter 0.50".into(),
     ))
 }

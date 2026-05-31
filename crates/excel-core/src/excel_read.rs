@@ -23,24 +23,20 @@ pub fn read_file_info(path: &str) -> Result<FileInfo> {
 }
 
 pub fn list_sheets(path: &str) -> Result<Vec<String>> {
-    let workbook: Xlsx<_> =
-        open_workbook(path).map_err(|e: calamine::XlsxError| AppError::Calamine(e.to_string()))?;
+    let workbook: Xlsx<_> = open_workbook(path)?;
     Ok(workbook.sheet_names().to_vec())
 }
 
 pub fn read_cell(path: &str, sheet: &str, row: u32, col: u16) -> Result<CellData> {
-    let mut workbook: Xlsx<_> =
-        open_workbook(path).map_err(|e: calamine::XlsxError| AppError::Calamine(e.to_string()))?;
+    let mut workbook: Xlsx<_> = open_workbook(path)?;
 
-    let range = workbook
-        .worksheet_range(sheet)
-        .map_err(|e: calamine::XlsxError| AppError::Calamine(e.to_string()))?;
+    let range = workbook.worksheet_range(sheet)?;
 
     let ws_formulas = workbook.worksheet_formula(sheet).ok();
 
     let cell = range
         .get_value((row, col as u32))
-        .ok_or_else(|| AppError::Custom(format!("Cell ({},{}) not found", row, col)))?;
+        .ok_or(AppError::CellNotFound(row, col))?;
 
     let formula = ws_formulas
         .as_ref()
@@ -51,12 +47,9 @@ pub fn read_cell(path: &str, sheet: &str, row: u32, col: u16) -> Result<CellData
 
 pub fn read_range(path: &str, sheet: &str, range_spec: &str) -> Result<Vec<Vec<CellData>>> {
     let (r_start, r_end, c_start, c_end) = cell_ref::parse_range_normalized(range_spec)?;
-    let mut workbook: Xlsx<_> =
-        open_workbook(path).map_err(|e: calamine::XlsxError| AppError::Calamine(e.to_string()))?;
+    let mut workbook: Xlsx<_> = open_workbook(path)?;
 
-    let range = workbook
-        .worksheet_range(sheet)
-        .map_err(|e: calamine::XlsxError| AppError::Calamine(e.to_string()))?;
+    let range = workbook.worksheet_range(sheet)?;
 
     let ws_formulas = workbook.worksheet_formula(sheet).ok();
 
@@ -78,12 +71,9 @@ pub fn read_range(path: &str, sheet: &str, range_spec: &str) -> Result<Vec<Vec<C
 
 pub fn read_formula(path: &str, sheet: &str, cell_spec: &str) -> Result<Option<String>> {
     let (row, col) = cell_ref::parse_cell_ref(cell_spec)?;
-    let mut workbook: Xlsx<_> =
-        open_workbook(path).map_err(|e: calamine::XlsxError| AppError::Calamine(e.to_string()))?;
+    let mut workbook: Xlsx<_> = open_workbook(path)?;
 
-    let formulas = workbook
-        .worksheet_formula(sheet)
-        .map_err(|e: calamine::XlsxError| AppError::Calamine(e.to_string()))?;
+    let formulas = workbook.worksheet_formula(sheet)?;
 
     Ok(formulas.get_value((row, col as u32)).map(|s| s.to_string()))
 }
@@ -103,12 +93,9 @@ pub fn read_style(_path: &str, _sheet: &str, _cell_spec: &str) -> Result<Style> 
 }
 
 pub fn read_sheet_all(path: &str, sheet: &str) -> Result<SheetData> {
-    let mut workbook: Xlsx<_> =
-        open_workbook(path).map_err(|e: calamine::XlsxError| AppError::Calamine(e.to_string()))?;
+    let mut workbook: Xlsx<_> = open_workbook(path)?;
 
-    let range = workbook
-        .worksheet_range(sheet)
-        .map_err(|e: calamine::XlsxError| AppError::Calamine(e.to_string()))?;
+    let range = workbook.worksheet_range(sheet)?;
 
     let ws_formulas = workbook.worksheet_formula(sheet).ok();
 

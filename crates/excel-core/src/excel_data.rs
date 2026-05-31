@@ -20,7 +20,7 @@ pub fn append_rows(
         let mut new_data = old_data.clone();
         let sd = new_data
             .get_mut(sheet)
-            .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+            .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
 
         let new_rows: Vec<Vec<CellData>> = data
             .iter()
@@ -43,7 +43,7 @@ pub fn insert_rows(
         let mut new_data = old_data.clone();
         let sd = new_data
             .get_mut(sheet)
-            .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+            .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
 
         let new_rows: Vec<Vec<CellData>> = data
             .iter()
@@ -69,7 +69,7 @@ pub fn delete_rows(
         let mut new_data = old_data.clone();
         let sd = new_data
             .get_mut(sheet)
-            .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+            .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
 
         let start = start_row as usize;
         let end = end_row as usize;
@@ -114,7 +114,7 @@ pub fn sort_sheet(
         let mut new_data = old_data.clone();
         let sd = new_data
             .get_mut(sheet)
-            .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+            .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
 
         if sd.rows.len() > 1 {
             let header = sd.rows[0].clone();
@@ -155,7 +155,7 @@ pub fn dedup_sheet(
         let mut new_data = old_data.clone();
         let sd = new_data
             .get_mut(sheet)
-            .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", sheet)))?;
+            .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
 
         if sd.rows.len() > 1 {
             let header = sd.rows[0].clone();

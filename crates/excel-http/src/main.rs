@@ -5,7 +5,13 @@ async fn main() {
     let app = http::router::create_router();
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
         .await
-        .expect("Failed to bind");
+        .unwrap_or_else(|e| {
+            eprintln!("Failed to bind to 0.0.0.0:3000: {}", e);
+            std::process::exit(1);
+        });
     println!("HTTP server listening on http://0.0.0.0:3000");
-    axum::serve(listener, app).await.expect("Server error");
+    if let Err(e) = axum::serve(listener, app).await {
+        eprintln!("Server error: {}", e);
+        std::process::exit(1);
+    }
 }

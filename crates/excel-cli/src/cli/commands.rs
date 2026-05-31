@@ -388,11 +388,11 @@ fn run_file(args: &FileArgs) -> Result<serde_json::Value> {
     match &args.command {
         FileSub::Create { path, sheet } => {
             let result = excel_write::create_file(path, sheet)?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         FileSub::Info { path } => {
             let info = excel_read::read_file_info(path)?;
-            Ok(serde_json::to_value(info).unwrap())
+            Ok(serde_json::to_value(info).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         FileSub::Backup { path, output } => {
             let hash = security::compute_file_hash(path)?;
@@ -423,15 +423,15 @@ fn run_sheet(args: &SheetArgs) -> Result<serde_json::Value> {
         }
         SheetSub::Add { path, name } => {
             let result = excel_write::add_sheet(path, &params, name)?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         SheetSub::Delete { path, name } => {
             let result = excel_write::delete_sheet(path, &params, name)?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         SheetSub::Rename { path, old, new } => {
             let result = excel_write::rename_sheet(path, &params, old, new)?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
     }
 }
@@ -441,7 +441,7 @@ fn run_cell(args: &CellArgs) -> Result<serde_json::Value> {
         CellSub::Read { path, sheet, cell } => {
             let (row, col) = excel_core::cell_ref::parse_cell_ref(cell)?;
             let data = excel_read::read_cell(path, sheet, row, col)?;
-            Ok(serde_json::to_value(data).unwrap())
+            Ok(serde_json::to_value(data).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         CellSub::Write {
             path,
@@ -458,7 +458,7 @@ fn run_cell(args: &CellArgs) -> Result<serde_json::Value> {
             };
             let cell_value = parse_cell_value(value);
             let result = excel_write::write_cell(path, &params, sheet, row, col, &cell_value)?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
     }
 }
@@ -467,7 +467,7 @@ fn run_range(args: &RangeArgs) -> Result<serde_json::Value> {
     match &args.command {
         RangeSub::Read { path, sheet, range } => {
             let data = excel_read::read_range(path, sheet, range)?;
-            Ok(serde_json::to_value(data).unwrap())
+            Ok(serde_json::to_value(data).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         RangeSub::Write {
             path,
@@ -483,7 +483,7 @@ fn run_range(args: &RangeArgs) -> Result<serde_json::Value> {
                 file_path: path.clone(),
             };
             let result = excel_write::write_range(path, &params, sheet, range, &values)?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         RangeSub::Clear {
             path,
@@ -497,7 +497,7 @@ fn run_range(args: &RangeArgs) -> Result<serde_json::Value> {
                 file_path: path.clone(),
             };
             let result = excel_write::clear_range(path, &params, sheet, range)?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         RangeSub::WriteCsv {
             path,
@@ -512,7 +512,7 @@ fn run_range(args: &RangeArgs) -> Result<serde_json::Value> {
                 file_path: path.clone(),
             };
             let result = excel_write::write_range_from_csv(path, &params, sheet, range, csv)?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
     }
 }
@@ -533,7 +533,7 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 file_path: path.clone(),
             };
             let result = excel_data::append_rows(path, &params, sheet, &cell_values)?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DataSub::InsertRow {
             path,
@@ -550,7 +550,7 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 file_path: path.clone(),
             };
             let result = excel_data::insert_rows(path, &params, sheet, *row, &cell_values)?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DataSub::DeleteRow {
             path,
@@ -564,7 +564,7 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 file_path: path.clone(),
             };
             let result = excel_data::delete_rows(path, &params, sheet, *row, *row)?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DataSub::Filter {
             path,
@@ -580,7 +580,7 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 value: value.clone(),
             }];
             let result = filter_rows_dispatch(path, sheet, &conditions)?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DataSub::Sort {
             path,
@@ -599,7 +599,7 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 file_path: path.clone(),
             };
             let result = sort_sheet_dispatch(path, &params, sheet, &sort_cols)?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DataSub::Dedup {
             path,
@@ -614,11 +614,11 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 file_path: path.clone(),
             };
             let result = dedup_sheet_dispatch(path, &params, sheet, &cols)?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DataSub::Sql { path, sheet, query } => {
             let result = sql_query_dispatch(path, sheet, query)?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
     }
 }
@@ -638,7 +638,7 @@ fn run_formula(args: &FormulaArgs) -> Result<serde_json::Value> {
                 file_path: path.clone(),
             };
             let result = excel_write::set_formula(path, &params, sheet, cell, formula)?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         FormulaSub::Refresh {
             path,
@@ -651,7 +651,7 @@ fn run_formula(args: &FormulaArgs) -> Result<serde_json::Value> {
                 file_path: path.clone(),
             };
             let result = excel_write::refresh_formulas(path, &params, sheet)?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
     }
 }
@@ -666,14 +666,14 @@ fn run_format(args: &FormatArgs) -> Result<serde_json::Value> {
             dry_run,
         } => {
             let style_val: Style = serde_json::from_str(style)
-                .map_err(|e| AppError::Custom(format!("Invalid style JSON: {}", e)))?;
+                .map_err(|e| AppError::Serialize(format!("Invalid style JSON: {}", e)))?;
             let params = SecurityParams {
                 dry_run: *dry_run,
                 create_backup: true,
                 file_path: path.clone(),
             };
             let result = excel_write::set_format(path, &params, sheet, range, &style_val)?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         FormatSub::Merge {
             path,
@@ -687,7 +687,7 @@ fn run_format(args: &FormatArgs) -> Result<serde_json::Value> {
                 file_path: path.clone(),
             };
             let result = excel_write::merge_cells(path, &params, sheet, range, "")?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
     }
 }
@@ -710,10 +710,7 @@ fn run_chart(args: &ChartArgs) -> Result<serde_json::Value> {
                 "area" => ChartType::Area,
                 "scatter" => ChartType::Scatter,
                 _ => {
-                    return Err(AppError::Custom(format!(
-                        "Unknown chart type: {}",
-                        chart_type
-                    )));
+                    return Err(AppError::InvalidChartType(chart_type.clone()));
                 }
             };
             let (r1, c1, _, _) = excel_core::cell_ref::parse_range(range)?;
@@ -732,7 +729,7 @@ fn run_chart(args: &ChartArgs) -> Result<serde_json::Value> {
                 file_path: path.clone(),
             };
             let result = excel_write::add_chart(path, &params, &config)?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
     }
 }
@@ -758,7 +755,7 @@ fn run_vba(args: &VbaArgs) -> Result<serde_json::Value> {
                 file_path: path.clone(),
             };
             let result = vba_util::import_vba(path, &params, &data)?;
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
     }
 }
@@ -771,7 +768,7 @@ fn run_batch(args: &BatchArgs) -> Result<serde_json::Value> {
             dry_run,
         } => {
             let ops: Vec<BatchOperation> = serde_json::from_str(operations)
-                .map_err(|e| AppError::Custom(format!("Invalid operations JSON: {}", e)))?;
+                .map_err(|e| AppError::Serialize(format!("Invalid operations JSON: {}", e)))?;
             let params = SecurityParams {
                 dry_run: *dry_run,
                 create_backup: true,
@@ -783,7 +780,7 @@ fn run_batch(args: &BatchArgs) -> Result<serde_json::Value> {
             {
                 result.diff = Some(diff);
             }
-            Ok(serde_json::to_value(result).unwrap())
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
     }
 }
@@ -797,11 +794,11 @@ fn run_diff(args: &DiffArgs) -> Result<serde_json::Value> {
         } => match sheet {
             Some(s) => {
                 let diff = diff_sheets(old_path, new_path, s)?;
-                Ok(serde_json::to_value(diff).unwrap())
+                Ok(serde_json::to_value(diff).map_err(|e| AppError::Serialize(e.to_string()))?)
             }
             None => {
                 let diff = diff_files(old_path, new_path)?;
-                Ok(serde_json::to_value(diff).unwrap())
+                Ok(serde_json::to_value(diff).map_err(|e| AppError::Serialize(e.to_string()))?)
             }
         },
         DiffSub::Range {
@@ -811,14 +808,14 @@ fn run_diff(args: &DiffArgs) -> Result<serde_json::Value> {
             range,
         } => {
             let diff = diff_range(old_path, new_path, sheet, range)?;
-            Ok(serde_json::to_value(diff).unwrap())
+            Ok(serde_json::to_value(diff).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DiffSub::InstallGitDriver {} => {
-            git_driver::install_git_driver().map_err(AppError::Custom)?;
+            git_driver::install_git_driver()?;
             Ok(serde_json::json!({ "success": true, "message": "Git diff driver installed" }))
         }
         DiffSub::UninstallGitDriver {} => {
-            git_driver::uninstall_git_driver().map_err(AppError::Custom)?;
+            git_driver::uninstall_git_driver()?;
             Ok(serde_json::json!({ "success": true, "message": "Git diff driver uninstalled" }))
         }
     }
@@ -906,7 +903,7 @@ fn sql_query_dispatch(path: &str, sheet: &str, query: &str) -> Result<Vec<Vec<Ce
 
 #[cfg(not(feature = "sql"))]
 fn sql_query_dispatch(_path: &str, _sheet: &str, _query: &str) -> Result<Vec<Vec<CellData>>> {
-    Err(AppError::Custom(
+    Err(AppError::FeatureNotEnabled(
         "SQL queries require the 'sql' feature (enable with --features sql)".into(),
     ))
 }
@@ -926,7 +923,7 @@ fn parse_cell_value(s: &str) -> CellValue {
 
 fn parse_cell_value_grid(s: &str) -> Result<Vec<Vec<CellValue>>> {
     let outer: Vec<Vec<serde_json::Value>> = serde_json::from_str(s)
-        .map_err(|e| AppError::Custom(format!("Invalid data JSON: {}", e)))?;
+        .map_err(|e| AppError::Serialize(format!("Invalid data JSON: {}", e)))?;
     let mut grid = Vec::new();
     for row in outer {
         let mut cells = Vec::new();
@@ -957,6 +954,6 @@ fn parse_filter_op(s: &str) -> Result<FilterOp> {
         "contains" => Ok(FilterOp::Contains),
         "startswith" | "starts_with" => Ok(FilterOp::StartsWith),
         "endswith" | "ends_with" => Ok(FilterOp::EndsWith),
-        _ => Err(AppError::Custom(format!("Unknown filter operator: {}", s))),
+        _ => Err(AppError::InvalidFilterOp(s.into())),
     }
 }

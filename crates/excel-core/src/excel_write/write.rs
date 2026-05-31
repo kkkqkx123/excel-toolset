@@ -220,7 +220,7 @@ pub(crate) fn build_workbook_with_ops(
             let sheet_idx = sheet_names
                 .iter()
                 .position(|n| *n == config.sheet)
-                .ok_or_else(|| AppError::Custom(format!("Sheet '{}' not found", config.sheet)))?;
+                .ok_or_else(|| AppError::SheetNotFound(config.sheet.clone()))?;
             if let Ok(ws) = wb.worksheet_from_index(sheet_idx) {
                 let mut chart = Chart::new(map_chart_type(&config.chart_type));
                 chart
