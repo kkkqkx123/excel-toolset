@@ -1,0 +1,11 @@
+[package]
+name = "excel-dispatch"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+excel-core = { path = "../excel-core" }
+excel-sql = { path = "../excel-sql", optional = true }
+
+[features]
+sql = ["excel-sql"]

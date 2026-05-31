@@ -6,6 +6,7 @@ members = [
     "crates/excel-diff",
     "crates/excel-cli",
     "crates/excel-http",
+    "crates/excel-dispatch",
 ]
 
 [workspace.package]

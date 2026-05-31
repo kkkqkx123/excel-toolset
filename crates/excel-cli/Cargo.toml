@@ -5,11 +5,11 @@ edition.workspace = true
 
 [dependencies]
 excel-core = { path = "../excel-core" }
-excel-sql = { path = "../excel-sql", optional = true }
+excel-dispatch = { path = "../excel-dispatch" }
 excel-diff = { path = "../excel-diff" }
 clap = { version = "4", features = ["derive"] }
 serde_json = "1"
 chrono = "0.4"
 
 [features]
-sql = ["excel-sql"]
+sql = ["excel-dispatch/sql"]
