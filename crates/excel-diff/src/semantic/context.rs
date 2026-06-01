@@ -1,74 +1,11 @@
 use std::collections::HashMap;
 
-use excel_core::types::SheetData;
-
-/// Provides column header context for semantic descriptions.
-///
-/// Maps sheet names to their header row values, allowing
-/// cell descriptions like "Name column" instead of "column A".
-pub struct HeaderContext {
-    headers: HashMap<String, Vec<String>>,
-}
-
-impl HeaderContext {
-    pub fn new(headers: HashMap<String, Vec<String>>) -> Self {
-        HeaderContext { headers }
-    }
-
-    /// Builds a HeaderContext from old and new sheet data maps.
-    /// For each sheet, headers are taken from the first row of either old or new data
-    /// (whichever has a non-empty first row, preferring new).
-    pub fn from_sheet_maps(
-        old: &HashMap<String, SheetData>,
-        new: &HashMap<String, SheetData>,
-    ) -> Self {
-        let mut all_sheets: Vec<String> = old.keys().cloned().collect();
-        for k in new.keys() {
-            if !all_sheets.contains(k) {
-                all_sheets.push(k.clone());
-            }
-        }
-        all_sheets.sort();
-
-        let mut headers = HashMap::new();
-        for sheet in &all_sheets {
-            let h = new
-                .get(sheet)
-                .or_else(|| old.get(sheet))
-                .map(extract_headers)
-                .unwrap_or_default();
-            headers.insert(sheet.clone(), h);
-        }
-        HeaderContext { headers }
-    }
-
-    /// Looks up the header name for a given sheet and column index.
-    pub fn get_header(&self, sheet: &str, col: u16) -> Option<&str> {
-        self.headers
-            .get(sheet)
-            .and_then(|cols| cols.get(col as usize))
-            .filter(|h| !h.is_empty())
-            .map(|s| s.as_str())
-    }
-}
-
-/// Extracts column headers from the first row of sheet data.
-pub fn extract_headers(sheet: &SheetData) -> Vec<String> {
-    sheet
-        .rows
-        .first()
-        .map(|row| {
-            row.iter()
-                .map(|c| c.value.clone().unwrap_or_default())
-                .collect()
-        })
-        .unwrap_or_default()
-}
+use excel_types::SheetData;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use excel_core::types::{CellData, CellDataType};
+    use excel_types::{CellData, CellDataType};
 
     #[test]
     fn test_get_header_found() {

@@ -4,11 +4,13 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+excel-types = { path = "../excel-types" }
 excel-core = { path = "../excel-core" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 [dev-dependencies]
+excel-types = { path = "../excel-types" }
 tempfile = "3"
 rust_xlsxwriter = "0.95"
 

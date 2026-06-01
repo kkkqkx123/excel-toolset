@@ -1,5 +1,6 @@
 use chrono::Utc;
 
+use excel_core::dispatch;
 use excel_core::excel_data;
 use excel_core::excel_read;
 use excel_core::excel_write;
@@ -270,7 +271,7 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 operator: filter_op,
                 value: value.clone(),
             }];
-            let result = excel_dispatch::filter_rows_dispatch(path, sheet, &conditions)?;
+            let result = dispatch::filter_rows_dispatch(path, sheet, &conditions)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DataSub::Sort {
@@ -289,7 +290,7 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 create_backup: true,
                 file_path: path.clone(),
             };
-            let result = excel_dispatch::sort_sheet_dispatch(path, &params, sheet, &sort_cols)?;
+            let result = dispatch::sort_sheet_dispatch(path, &params, sheet, &sort_cols)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DataSub::Dedup {
@@ -304,11 +305,11 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 create_backup: true,
                 file_path: path.clone(),
             };
-            let result = excel_dispatch::dedup_sheet_dispatch(path, &params, sheet, &cols)?;
+            let result = dispatch::dedup_sheet_dispatch(path, &params, sheet, &cols)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DataSub::Sql { path, sheet, query } => {
-            let result = excel_dispatch::sql_query_dispatch(path, sheet, query)?;
+            let result = dispatch::sql_query_dispatch(path, sheet, query)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
     }

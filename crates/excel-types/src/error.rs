@@ -2,10 +2,6 @@ use std::io;
 
 use thiserror::Error;
 
-/// Main application error type.
-///
-/// All crate-internal functions return `Result<T, AppError>`. Variants
-/// have semantic `error_code()` for front-end programmatic handling.
 #[derive(Debug, Error)]
 pub enum AppError {
     #[error("IO error: {0}")]
@@ -55,7 +51,6 @@ pub enum AppError {
 }
 
 impl AppError {
-    /// Semantic error code for front-end programmatic handling.
     pub fn error_code(&self) -> &'static str {
         match self {
             AppError::Io(_) => "IO_ERROR",
@@ -77,5 +72,4 @@ impl AppError {
     }
 }
 
-/// Convenience alias for `Result<T, AppError>`.
 pub type Result<T> = std::result::Result<T, AppError>;

@@ -3,7 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
-use excel_core::types::{AppError, Result};
+use excel_types::{AppError, Result};
 
 const GITATTR_ENTRY: &str = "*.xlsx diff=excel-diff\n";
 const GITATTR_PATTERN: &str = "*.xlsx diff=excel-diff";

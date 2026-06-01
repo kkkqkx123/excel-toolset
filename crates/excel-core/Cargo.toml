@@ -4,6 +4,8 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+excel-types = { path = "../excel-types" }
+excel-sql = { path = "../excel-sql", optional = true }
 calamine = "0.35"
 rust_xlsxwriter = "0.95"
 serde = { version = "1", features = ["derive"] }
@@ -12,3 +14,6 @@ sha2 = "0.11"
 chrono = { version = "0.4", features = ["serde"] }
 csv = "1.4"
 thiserror.workspace = true
+
+[features]
+sql = ["excel-sql"]

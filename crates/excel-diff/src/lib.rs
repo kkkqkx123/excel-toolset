@@ -13,7 +13,7 @@ pub use file_diff::diff_files;
 pub use range_diff::diff_range;
 pub use sheet_diff::diff_sheets;
 
-use excel_core::types::{CellDiff, SheetData};
+use excel_types::{CellDiff, SheetData};
 
 pub fn compute_diffs(old_data: &SheetData, new_data: &SheetData) -> Vec<CellDiff> {
     engine::compute_cell_diffs(old_data, new_data)
@@ -22,7 +22,7 @@ pub fn compute_diffs(old_data: &SheetData, new_data: &SheetData) -> Vec<CellDiff
 #[cfg(test)]
 mod tests {
     use super::*;
-    use excel_core::types::{CellData, CellDataType};
+    use excel_types::{CellData, CellDataType, DiffType};
 
     #[test]
     fn test_compute_diffs_delegates_to_engine() {
@@ -44,7 +44,7 @@ mod tests {
         };
         let diffs = compute_diffs(&old, &new);
         assert_eq!(diffs.len(), 1);
-        assert_eq!(diffs[0].diff_type, excel_core::types::DiffType::Modify);
+        assert_eq!(diffs[0].diff_type, DiffType::Modify);
     }
 
     #[test]

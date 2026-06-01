@@ -1,4 +1,4 @@
-use excel_core::types::{AppError, CellData, CellDataType, SheetData};
+use excel_types::{AppError, CellData, CellDataType, SheetData};
 
 use crate::converter::{cell_to_duckdb_type, cell_to_duckdb_value, collect_row_types};
 use crate::utils::sanitize_column_name;

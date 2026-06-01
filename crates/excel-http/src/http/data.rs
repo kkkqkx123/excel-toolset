@@ -1,6 +1,7 @@
 use axum::Json;
 use serde::Deserialize;
 
+use excel_core::dispatch;
 use excel_core::excel_data;
 use excel_core::helpers;
 use excel_core::types::*;
@@ -127,7 +128,7 @@ pub async fn data_filter(Json(req): Json<FilterReq>) -> Json<ApiResponse<Vec<Vec
         operator: filter_op,
         value: req.value,
     }];
-    match excel_dispatch::filter_rows_dispatch(&req.path, &req.sheet, &conditions) {
+    match dispatch::filter_rows_dispatch(&req.path, &req.sheet, &conditions) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
     }
@@ -143,7 +144,7 @@ pub async fn data_sort(Json(req): Json<SortReq>) -> Json<ApiResponse<WriteResult
         create_backup: true,
         file_path: req.path.clone(),
     };
-    match excel_dispatch::sort_sheet_dispatch(&req.path, &params, &req.sheet, &sort_cols) {
+    match dispatch::sort_sheet_dispatch(&req.path, &params, &req.sheet, &sort_cols) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
     }
@@ -156,14 +157,14 @@ pub async fn data_dedup(Json(req): Json<DedupReq>) -> Json<ApiResponse<WriteResu
         create_backup: true,
         file_path: req.path.clone(),
     };
-    match excel_dispatch::dedup_sheet_dispatch(&req.path, &params, &req.sheet, &cols) {
+    match dispatch::dedup_sheet_dispatch(&req.path, &params, &req.sheet, &cols) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
     }
 }
 
 pub async fn data_sql(Json(req): Json<SqlReq>) -> Json<ApiResponse<Vec<Vec<CellData>>>> {
-    match excel_dispatch::sql_query_dispatch(&req.path, &req.sheet, &req.query) {
+    match dispatch::sql_query_dispatch(&req.path, &req.sheet, &req.query) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
     }

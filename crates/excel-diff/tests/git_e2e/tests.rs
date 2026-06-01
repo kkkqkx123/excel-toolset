@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use excel_diff::git_driver;
-use excel_core::types::{CellData, CellDataType, DiffType};
+use excel_types::{CellData, CellDataType, DiffType, SheetData};
 use fixtures::*;
 use helpers::*;
 
@@ -388,7 +388,7 @@ fn test_diff_formula_text_change() {
 
 #[test]
 fn test_diff_formula_passive_value_change() {
-    let old_sheet = excel_core::types::SheetData {
+    let old_sheet = SheetData {
         name: "Sheet1".into(),
         rows: vec![
             vec![

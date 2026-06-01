@@ -61,7 +61,6 @@ pub struct RangeDiff {
     pub cell_diffs: Vec<CellDiff>,
 }
 
-// Kept for compatibility with existing types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RowDiff {
     pub row_index: u32,

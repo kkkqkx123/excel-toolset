@@ -1,5 +1,4 @@
-use excel_core::excel_read;
-use excel_core::types::{AppError, FilterCondition, FilterOp};
+use excel_types::{AppError, CellData, CellDataType, FilterCondition, FilterOp, SheetData};
 
 use crate::converter::QueryResult;
 use crate::db::{create_conn, load_sheet_to_db};
@@ -52,9 +51,9 @@ fn query_to_query_result(
             let mut cells = Vec::with_capacity(col_count);
             for i in 0..col_count {
                 let val: Option<String> = row.get(i).ok().flatten();
-                cells.push(excel_core::types::CellData {
+                cells.push(CellData {
                     value: val,
-                    data_type: excel_core::types::CellDataType::String,
+                    data_type: CellDataType::String,
                     formula: None,
                 });
             }
@@ -75,29 +74,30 @@ fn query_to_query_result(
     })
 }
 
-pub fn sql_query(path: &str, sql: &str, has_header: bool) -> Result<QueryResult, AppError> {
-    let sheets = excel_read::list_sheets(path)?;
+pub fn sql_query_on_data(
+    data: &[SheetData],
+    sql: &str,
+    has_header: bool,
+) -> Result<QueryResult, AppError> {
     let db = create_conn().map_err(|e| AppError::DuckDb(e.to_string()))?;
 
-    for sheet in &sheets {
-        let data = excel_read::read_sheet_all(path, sheet)?;
-        load_sheet_to_db(&db, sheet, &data, has_header)?;
+    for sheet in data {
+        load_sheet_to_db(&db, &sheet.name, sheet, has_header)?;
     }
 
     let mut stmt = db.prepare(sql).map_err(|e| AppError::DuckDb(e.to_string()))?;
     query_to_query_result(&mut stmt)
 }
 
-pub fn filter_rows(
-    path: &str,
+pub fn filter_rows_on_data(
+    data: &SheetData,
     sheet: &str,
     conditions: &[FilterCondition],
     has_header: bool,
 ) -> Result<QueryResult, AppError> {
-    let data = excel_read::read_sheet_all(path, sheet)?;
     let db = create_conn().map_err(|e| AppError::DuckDb(e.to_string()))?;
 
-    load_sheet_to_db(&db, sheet, &data, has_header)?;
+    load_sheet_to_db(&db, sheet, data, has_header)?;
 
     if conditions.is_empty() {
         let sql = format!(
@@ -127,9 +127,9 @@ pub fn filter_rows(
             let mut cells = Vec::with_capacity(col_count);
             for i in 0..col_count {
                 let val: Option<String> = row.get(i).ok().flatten();
-                cells.push(excel_core::types::CellData {
+                cells.push(CellData {
                     value: val,
-                    data_type: excel_core::types::CellDataType::String,
+                    data_type: CellDataType::String,
                     formula: None,
                 });
             }

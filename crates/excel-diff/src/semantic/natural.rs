@@ -1,4 +1,4 @@
-use excel_core::types::DiffSummary;
+use excel_types::DiffSummary;
 
 use super::context::HeaderContext;
 use super::grouper::LogicalOperation;

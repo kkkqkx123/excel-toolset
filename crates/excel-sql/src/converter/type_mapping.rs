@@ -1,4 +1,4 @@
-use excel_core::types::CellDataType;
+use excel_types::CellDataType;
 
 pub fn cell_to_duckdb_type(dt: &CellDataType) -> &'static str {
     match dt {

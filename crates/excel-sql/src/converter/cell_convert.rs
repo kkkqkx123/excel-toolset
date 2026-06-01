@@ -1,4 +1,4 @@
-use excel_core::types::{CellData, CellDataType};
+use excel_types::{CellData, CellDataType};
 
 #[derive(Debug, Clone)]
 pub struct QueryResult {

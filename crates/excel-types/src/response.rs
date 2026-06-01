@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-use crate::types::diff::FileDiff;
-use crate::types::error::AppError;
-use crate::types::meta::BackupInfo;
+use crate::diff::FileDiff;
+use crate::error::AppError;
+use crate::meta::BackupInfo;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiResponse<T: Serialize> {

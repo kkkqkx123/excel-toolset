@@ -229,7 +229,7 @@ where
     })
 }
 
-fn write_sheet_data(ws: &mut Worksheet, data: &SheetData) -> Result<()> {
+pub(crate) fn write_sheet_data(ws: &mut Worksheet, data: &SheetData) -> Result<()> {
     for (ri, row) in data.rows.iter().enumerate() {
         for (ci, cell) in row.iter().enumerate() {
             if let Some(ref formula) = cell.formula {

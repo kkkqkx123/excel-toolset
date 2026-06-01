@@ -1,6 +1,6 @@
 use excel_core::cell_ref;
 use excel_core::excel_read::read_range;
-use excel_core::types::{CellDiff, DiffType, RangeDiff, Result};
+use excel_types::{CellDiff, DiffType, RangeDiff, Result};
 
 use crate::helpers::classify_diff;
 

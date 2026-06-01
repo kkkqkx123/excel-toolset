@@ -1,4 +1,4 @@
-use excel_core::types::{DiffType, Result, SheetDiff};
+use excel_types::{DiffType, Result, SheetDiff};
 
 use crate::engine::compute_cell_diffs;
 use crate::helpers::{all_cells_as_diff, read_all_sheets_to_map};

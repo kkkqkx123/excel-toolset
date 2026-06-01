@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 
-use crate::types::cell::CellValue;
-use crate::types::diff::FileDiff;
-use crate::types::filter::SortColumn;
-use crate::types::meta::BackupInfo;
-use crate::types::style::{ChartConfig, Style};
+use crate::cell::CellValue;
+use crate::diff::FileDiff;
+use crate::filter::SortColumn;
+use crate::meta::BackupInfo;
+use crate::style::{ChartConfig, Style};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WriteResult {
