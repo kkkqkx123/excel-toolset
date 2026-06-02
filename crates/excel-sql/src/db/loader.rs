@@ -1,6 +1,8 @@
 use excel_types::{AppError, CellData, CellDataType, SheetData};
 
-use crate::converter::{cell_to_duckdb_type, cell_to_duckdb_value, collect_row_types};
+use crate::converter::{
+    cell_to_duckdb_type, cell_to_duckdb_value, collect_row_types, infer_column_types,
+};
 use crate::utils::sanitize_column_name;
 
 pub fn create_table(
@@ -46,7 +48,11 @@ pub fn create_table_with_header(
                 .filter(|v| !v.is_empty())
                 .map(sanitize_column_name)
                 .unwrap_or_else(|| format!("c{}", i));
-            format!("\"{}\" {}", col_name.replace('"', "\"\""), cell_to_duckdb_type(dt))
+            format!(
+                "\"{}\" {}",
+                col_name.replace('"', "\"\""),
+                cell_to_duckdb_type(dt)
+            )
         })
         .collect();
     let escaped_name = name.replace('"', "\"\"");
@@ -90,8 +96,8 @@ pub fn batch_insert_rows(
         let params: Vec<duckdb::types::Value> = (0..max_cols)
             .map(|i| {
                 row.get(i)
-                .map(cell_to_duckdb_value)
-                .unwrap_or(duckdb::types::Value::Null)
+                    .map(cell_to_duckdb_value)
+                    .unwrap_or(duckdb::types::Value::Null)
             })
             .collect();
         stmt.execute(duckdb::params_from_iter(params.iter()))
@@ -115,10 +121,9 @@ pub fn batch_insert_rows_with_id(
         return Ok(());
     }
 
-    let placeholders: Vec<String> =
-        std::iter::once("?1".to_string())
-            .chain((0..max_cols).map(|i| format!("?{}", i + 2)))
-            .collect();
+    let placeholders: Vec<String> = std::iter::once("?1".to_string())
+        .chain((0..max_cols).map(|i| format!("?{}", i + 2)))
+        .collect();
     let escaped_name = name.replace('"', "\"\"");
     let sql = format!(
         r#"INSERT INTO "{}" VALUES ({})"#,
@@ -157,7 +162,7 @@ pub fn load_sheet_to_db(
     }
 
     let type_rows = collect_row_types(&data.rows);
-    let col_types = crate::converter::type_mapping::infer_column_types(&type_rows);
+    let col_types = infer_column_types(&type_rows);
 
     if has_header {
         let header = &data.rows[0];
@@ -193,8 +198,16 @@ pub fn load_sheet_with_row_id(
         return Ok(());
     }
 
+    let type_rows = collect_row_types(rows_to_load);
+    let col_types = infer_column_types(&type_rows);
     let col_defs: Vec<String> = std::iter::once("row_id INTEGER".to_string())
-        .chain((0..max_cols).map(|i| format!("c{} VARCHAR", i)))
+        .chain((0..max_cols).map(|i| {
+            let t = col_types
+                .get(i)
+                .map(cell_to_duckdb_type)
+                .unwrap_or("VARCHAR");
+            format!("c{} {t}", i)
+        }))
         .collect();
     let escaped_name = name.replace('"', "\"\"");
     let create_sql = format!(

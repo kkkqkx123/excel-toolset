@@ -3,3 +3,5 @@
 **/Cargo.lock
 
 .translator
+
+repomix-output.xml

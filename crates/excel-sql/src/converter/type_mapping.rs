@@ -17,10 +17,11 @@ pub fn infer_column_types(data: &[Vec<CellDataType>]) -> Vec<CellDataType> {
     for (col, col_type) in col_types.iter_mut().enumerate().take(max_cols) {
         for row in data {
             if let Some(dt) = row.get(col)
-                && !matches!(dt, CellDataType::Empty) {
-                    *col_type = dt.clone();
-                    break;
-                }
+                && !matches!(dt, CellDataType::Empty)
+            {
+                *col_type = dt.clone();
+                break;
+            }
         }
     }
 

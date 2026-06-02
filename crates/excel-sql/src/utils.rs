@@ -1,7 +1,13 @@
 pub fn sanitize_column_name(name: &str) -> String {
     let sanitized: String = name
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     if sanitized.is_empty() || sanitized.starts_with(|c: char| c.is_ascii_digit()) {
         format!("col_{}", sanitized)
