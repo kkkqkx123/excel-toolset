@@ -7,33 +7,45 @@ pub struct QueryResult {
     pub row_count: usize,
 }
 
-pub fn cell_to_duckdb_value(cell: &CellData) -> duckdb::types::Value {
+pub fn cell_to_duckdb_value(cell: &CellData) -> Result<duckdb::types::Value, String> {
     match cell.data_type {
-        CellDataType::Empty | CellDataType::Error => duckdb::types::Value::Null,
-        CellDataType::Int => cell
-            .value
-            .as_deref()
-            .and_then(|v| v.parse::<i64>().ok())
-            .map(duckdb::types::Value::BigInt)
-            .unwrap_or(duckdb::types::Value::Null),
-        CellDataType::Float => cell
-            .value
-            .as_deref()
-            .and_then(|v| v.parse::<f64>().ok())
-            .map(duckdb::types::Value::Double)
-            .unwrap_or(duckdb::types::Value::Null),
+        CellDataType::Empty | CellDataType::Error => Ok(duckdb::types::Value::Null),
+
+        CellDataType::Int => {
+            if let Some(value_str) = cell.value.as_deref() {
+                value_str
+                    .parse::<i64>()
+                    .map(duckdb::types::Value::BigInt)
+                    .map_err(|e| format!("Failed to parse '{}' as Int: {}", value_str, e))
+            } else {
+                Ok(duckdb::types::Value::Null)
+            }
+        }
+
+        CellDataType::Float => {
+            if let Some(value_str) = cell.value.as_deref() {
+                value_str
+                    .parse::<f64>()
+                    .map(duckdb::types::Value::Double)
+                    .map_err(|e| format!("Failed to parse '{}' as Float: {}", value_str, e))
+            } else {
+                Ok(duckdb::types::Value::Null)
+            }
+        }
+
         CellDataType::Bool => {
             let b = cell
                 .value
                 .as_deref()
-                .is_some_and(|v| v == "true" || v == "1" || v == "True" || v == "TRUE");
-            duckdb::types::Value::Boolean(b)
+                .is_some_and(|v| matches!(v.to_lowercase().as_str(), "true" | "1" | "yes"));
+            Ok(duckdb::types::Value::Boolean(b))
         }
-        CellDataType::DateTime | CellDataType::String => cell
+
+        CellDataType::DateTime | CellDataType::String => Ok(cell
             .value
             .as_deref()
             .map(|v| duckdb::types::Value::Text(v.to_string()))
-            .unwrap_or(duckdb::types::Value::Null),
+            .unwrap_or(duckdb::types::Value::Null)),
     }
 }
 

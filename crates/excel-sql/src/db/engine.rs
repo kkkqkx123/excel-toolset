@@ -33,7 +33,7 @@ impl ExcelQueryEngine {
     }
 
     pub fn load_sheet(
-        &self,
+        &mut self,
         name: &str,
         data: &SheetData,
         has_header: bool,
@@ -41,11 +41,11 @@ impl ExcelQueryEngine {
         load_sheet_to_db(&self.conn, name, data, has_header)
     }
 
-    pub fn load_with_header(&self, name: &str, data: &SheetData) -> Result<(), AppError> {
+    pub fn load_with_header(&mut self, name: &str, data: &SheetData) -> Result<(), AppError> {
         self.load_sheet(name, data, true)
     }
 
-    pub fn load_without_header(&self, name: &str, data: &SheetData) -> Result<(), AppError> {
+    pub fn load_without_header(&mut self, name: &str, data: &SheetData) -> Result<(), AppError> {
         self.load_sheet(name, data, false)
     }
 

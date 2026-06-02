@@ -16,14 +16,14 @@ pub fn sanitize_column_name(name: &str) -> String {
     }
 }
 
-pub fn validate_column_index(col: u16, max_cols: usize) -> Result<(), String> {
+pub fn validate_column_index(col: u16, max_cols: usize) -> crate::SqlResult<()> {
     if (col as usize) < max_cols {
         Ok(())
     } else {
-        Err(format!(
+        Err(excel_types::AppError::InvalidArgument(format!(
             "Column index {} out of bounds (max {})",
             col,
             max_cols.saturating_sub(1)
-        ))
+        )))
     }
 }

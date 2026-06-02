@@ -92,14 +92,21 @@ pub fn batch_insert_rows(
         .prepare(&sql)
         .map_err(|e| AppError::DuckDb(e.to_string()))?;
 
-    for row in rows {
-        let params: Vec<duckdb::types::Value> = (0..max_cols)
-            .map(|i| {
-                row.get(i)
-                    .map(cell_to_duckdb_value)
-                    .unwrap_or(duckdb::types::Value::Null)
-            })
-            .collect();
+    for (row_idx, row) in rows.iter().enumerate() {
+        let mut params: Vec<duckdb::types::Value> = Vec::with_capacity(max_cols);
+        for i in 0..max_cols {
+            let v = match row.get(i).map(cell_to_duckdb_value) {
+                Some(Ok(v)) => v,
+                Some(Err(msg)) => {
+                    return Err(AppError::DuckDb(format!(
+                        "Row {} col {}: {}",
+                        row_idx, i, msg
+                    )));
+                }
+                None => duckdb::types::Value::Null,
+            };
+            params.push(v);
+        }
         stmt.execute(duckdb::params_from_iter(params.iter()))
             .map_err(|e| AppError::DuckDb(e.to_string()))?;
     }
@@ -138,10 +145,13 @@ pub fn batch_insert_rows_with_id(
     for (idx, row) in rows.iter().enumerate() {
         let mut params: Vec<duckdb::types::Value> = vec![duckdb::types::Value::BigInt(idx as i64)];
         for i in 0..max_cols {
-            let v = row
-                .get(i)
-                .map(cell_to_duckdb_value)
-                .unwrap_or(duckdb::types::Value::Null);
+            let v = match row.get(i).map(cell_to_duckdb_value) {
+                Some(Ok(v)) => v,
+                Some(Err(msg)) => {
+                    return Err(AppError::DuckDb(format!("Row {} col {}: {}", idx, i, msg)));
+                }
+                None => duckdb::types::Value::Null,
+            };
             params.push(v);
         }
         stmt.execute(duckdb::params_from_iter(params.iter()))

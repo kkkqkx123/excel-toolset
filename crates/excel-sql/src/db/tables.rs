@@ -12,16 +12,10 @@ fn escape_name(name: &str) -> String {
 }
 
 pub fn table_exists(db: &duckdb::Connection, name: &str) -> Result<bool, AppError> {
-    let escaped = escape_name(name);
-    let sql = format!(
-        r#"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{}'"#,
-        escaped
-    );
-
+    let sql = r#"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?"#;
     let count: i64 = db
-        .query_row(&sql, [], |row| row.get(0))
+        .query_row(sql, [name], |row| row.get(0))
         .map_err(|e| AppError::DuckDb(e.to_string()))?;
-
     Ok(count > 0)
 }
 
@@ -50,21 +44,17 @@ pub fn drop_table(db: &duckdb::Connection, name: &str) -> Result<(), AppError> {
 }
 
 pub fn get_table_schema(db: &duckdb::Connection, name: &str) -> Result<Vec<ColumnInfo>, AppError> {
-    let escaped = escape_name(name);
-    let sql = format!(
-        r#"SELECT column_name, data_type, is_nullable 
+    let sql = r#"SELECT column_name, data_type, is_nullable 
            FROM information_schema.columns 
-           WHERE table_name = '{}' 
-           ORDER BY ordinal_position"#,
-        escaped
-    );
+           WHERE table_name = ? 
+           ORDER BY ordinal_position"#;
 
     let mut stmt = db
-        .prepare(&sql)
+        .prepare(sql)
         .map_err(|e| AppError::DuckDb(e.to_string()))?;
 
     let columns = stmt
-        .query_map([], |row| {
+        .query_map([name], |row| {
             let nullable_str: String = row.get(2)?;
             Ok(ColumnInfo {
                 name: row.get(0)?,

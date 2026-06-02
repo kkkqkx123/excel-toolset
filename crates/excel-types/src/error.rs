@@ -28,6 +28,9 @@ pub enum AppError {
     #[error("Invalid range: {0}")]
     InvalidRange(String),
 
+    #[error("Invalid argument: {0}")]
+    InvalidArgument(String),
+
     #[error("Unknown filter operator: {0}")]
     InvalidFilterOp(String),
 
@@ -61,6 +64,7 @@ impl AppError {
             AppError::CellNotFound(..) => "CELL_NOT_FOUND",
             AppError::InvalidCellRef(_) => "INVALID_CELL_REF",
             AppError::InvalidRange(_) => "INVALID_RANGE",
+            AppError::InvalidArgument(_) => "INVALID_ARGUMENT",
             AppError::InvalidFilterOp(_) => "INVALID_FILTER_OP",
             AppError::InvalidChartType(_) => "INVALID_CHART_TYPE",
             AppError::VbaNotSupported(_) => "VBA_NOT_SUPPORTED",
