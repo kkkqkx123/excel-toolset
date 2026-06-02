@@ -1,5 +1,5 @@
 pub mod cell_ref;
-pub mod dispatch;
+pub mod api;
 pub mod excel_data;
 pub mod excel_read;
 pub mod excel_write;
