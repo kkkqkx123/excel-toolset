@@ -33,6 +33,8 @@ pub enum CellValue {
     Number(f64),
     Bool(bool),
     DateTime(NaiveDateTime),
+    /// Excel error value, e.g. "#DIV/0!", "#N/A", "#REF!"
+    Error(String),
     Empty,
 }
 

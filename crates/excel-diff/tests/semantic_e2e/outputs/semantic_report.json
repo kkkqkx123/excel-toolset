@@ -1,0 +1,8 @@
+{
+  "detail_sentences": [
+    "Cell B2 in \"Sheet1\": added as new_val",
+    "Cell A1 in \"Sheet1\": changed from 10 to 20"
+  ],
+  "operations_count": 2,
+  "summary": "Total 2 changes"
+}

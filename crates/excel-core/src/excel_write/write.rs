@@ -10,6 +10,20 @@ use crate::types::*;
 use super::chart::map_chart_type;
 use super::style::build_format;
 
+/// Map an Excel error string to a formula that produces the same error.
+/// rust_xlsxwriter has no public API for writing error cells directly,
+/// so we use formula workarounds where possible and fall back to string otherwise.
+fn error_to_formula(val: &str) -> Option<String> {
+    match val {
+        "#DIV/0!" => Some("1/0".to_string()),
+        "#N/A" => Some("NA()".to_string()),
+        "#NUM!" => Some("SQRT(-1)".to_string()),
+        "#VALUE!" => Some("\"TEXT\"+1".to_string()),
+        // #NAME?, #NULL!, #REF!, #GETTING_DATA — no reliable formula → fallback to string
+        _ => None,
+    }
+}
+
 pub(crate) fn modify_file<F>(
     path: &str,
     params: &SecurityParams,
@@ -134,6 +148,15 @@ pub(crate) fn write_cell_data(
                 let b = val == "true" || val == "1" || val == "True";
                 ws.write_boolean(row, col, b).map_err(AppError::Xlsx)?;
             }
+            CellDataType::Error => {
+                // Write error values as formulas where possible; fall back to string.
+                if let Some(formula) = error_to_formula(val) {
+                    ws.write_formula(row, col, formula.as_str())
+                        .map_err(AppError::Xlsx)?;
+                } else {
+                    ws.write_string(row, col, val).map_err(AppError::Xlsx)?;
+                }
+            }
             _ => {
                 ws.write_string(row, col, val).map_err(AppError::Xlsx)?;
             }
@@ -162,6 +185,10 @@ pub(crate) fn write_cell_with_format(
                     ws.write_string_with_format(row, col, val, fmt)
                         .map_err(AppError::Xlsx)?;
                 }
+            }
+            CellDataType::Error => {
+                ws.write_string_with_format(row, col, val, fmt)
+                    .map_err(AppError::Xlsx)?;
             }
             _ => {
                 ws.write_string_with_format(row, col, val, fmt)

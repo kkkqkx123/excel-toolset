@@ -1,0 +1,2 @@
+Total 3 changes: 0 added, 3 deleted, 0 modified, 0 passive
+Sheet "OldSheet" deleted (2 rows, 3 cells)

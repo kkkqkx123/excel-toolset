@@ -1,0 +1,2 @@
+Total 4 changes: 4 added, 0 deleted, 0 modified, 0 passive
+Sheet "NewSheet" added with 2 rows and 4 cells

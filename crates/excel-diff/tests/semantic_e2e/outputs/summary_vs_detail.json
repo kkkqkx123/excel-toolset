@@ -1,0 +1,34 @@
+{
+  "file_hash_match": false,
+  "sheet_diffs": [
+    {
+      "sheet_name": "S",
+      "row_count_diff": 0,
+      "col_count_diff": 0,
+      "cell_diffs": [
+        {
+          "row": 0,
+          "col": 0,
+          "cell_ref": "A1",
+          "diff_type": "Modify",
+          "old_value": "a",
+          "new_value": "b"
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "cell_ref": "B1",
+          "diff_type": "Add",
+          "new_value": "new"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "adds": 1,
+    "deletes": 0,
+    "modifies": 1,
+    "passives": 0,
+    "total_changes": 2
+  }
+}

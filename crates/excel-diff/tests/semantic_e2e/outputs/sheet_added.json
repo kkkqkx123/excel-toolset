@@ -1,0 +1,47 @@
+{
+  "file_hash_match": false,
+  "sheet_diffs": [
+    {
+      "sheet_name": "NewSheet",
+      "row_count_diff": 2,
+      "col_count_diff": 2,
+      "cell_diffs": [
+        {
+          "row": 0,
+          "col": 0,
+          "cell_ref": "A1",
+          "diff_type": "Add",
+          "new_value": "Name"
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "cell_ref": "B1",
+          "diff_type": "Add",
+          "new_value": "Value"
+        },
+        {
+          "row": 1,
+          "col": 0,
+          "cell_ref": "A2",
+          "diff_type": "Add",
+          "new_value": "Alice"
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "cell_ref": "B2",
+          "diff_type": "Add",
+          "new_value": "100"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "adds": 4,
+    "deletes": 0,
+    "modifies": 0,
+    "passives": 0,
+    "total_changes": 4
+  }
+}

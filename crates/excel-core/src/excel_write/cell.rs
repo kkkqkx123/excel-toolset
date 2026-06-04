@@ -75,7 +75,7 @@ pub(crate) fn set_formula(
     ensure_dimensions(sd, row as usize, col as usize);
     sd.rows[row as usize][col as usize] = CellData {
         value: None,
-        data_type: CellDataType::String,
+        data_type: CellDataType::Empty,
         formula: Some(formula.to_string()),
     };
     Ok(())

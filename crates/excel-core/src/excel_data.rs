@@ -284,6 +284,11 @@ fn cell_value_to_data(val: &CellValue) -> CellData {
             data_type: CellDataType::DateTime,
             formula: None,
         },
+        CellValue::Error(e) => CellData {
+            value: Some(e.clone()),
+            data_type: CellDataType::Error,
+            formula: None,
+        },
         CellValue::Empty => CellData {
             value: None,
             data_type: CellDataType::Empty,

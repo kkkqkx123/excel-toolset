@@ -148,11 +148,11 @@ fn data_to_cell_data(cell: &Data, formula: Option<String>) -> CellData {
         },
         Data::DurationIso(s) => CellData {
             value: Some(s.clone()),
-            data_type: CellDataType::Float,
+            data_type: CellDataType::String,
             formula,
         },
         Data::Error(e) => CellData {
-            value: Some(format!("{:?}", e)),
+            value: Some(format!("{}", e)),
             data_type: CellDataType::Error,
             formula,
         },

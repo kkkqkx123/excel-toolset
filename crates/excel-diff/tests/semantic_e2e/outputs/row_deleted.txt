@@ -1,0 +1,2 @@
+Total 2 changes: 0 added, 2 deleted, 0 modified, 0 passive
+Delete row 2 in "Data": A2=DeletedRow, B2=99

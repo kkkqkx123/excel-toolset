@@ -177,7 +177,7 @@ fn value_to_string(value: &calamine::Data) -> String {
         calamine::Data::Int(i) => i.to_string(),
         calamine::Data::Bool(b) => b.to_string(),
         calamine::Data::DateTime(dt) => dt.to_string(),
-        calamine::Data::Error(e) => format!("ERROR: {:?}", e),
+        calamine::Data::Error(e) => format!("{}", e),
         _ => String::new(),
     }
 }
