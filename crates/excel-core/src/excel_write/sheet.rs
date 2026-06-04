@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::types::*;
 
-pub fn add(data: &mut HashMap<String, SheetData>, name: &str) -> Result<()> {
+pub(crate) fn add(data: &mut HashMap<String, SheetData>, name: &str) -> Result<()> {
     if data.contains_key(name) {
         return Err(AppError::SheetAlreadyExists(name.into()));
     }
@@ -16,7 +16,7 @@ pub fn add(data: &mut HashMap<String, SheetData>, name: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn delete(data: &mut HashMap<String, SheetData>, name: &str) -> Result<()> {
+pub(crate) fn delete(data: &mut HashMap<String, SheetData>, name: &str) -> Result<()> {
     if !data.contains_key(name) {
         return Err(AppError::SheetNotFound(name.into()));
     }
@@ -24,7 +24,7 @@ pub fn delete(data: &mut HashMap<String, SheetData>, name: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn rename(data: &mut HashMap<String, SheetData>, old_name: &str, new_name: &str) -> Result<()> {
+pub(crate) fn rename(data: &mut HashMap<String, SheetData>, old_name: &str, new_name: &str) -> Result<()> {
     if !data.contains_key(old_name) {
         return Err(AppError::SheetNotFound(old_name.into()));
     }
@@ -38,7 +38,7 @@ pub fn rename(data: &mut HashMap<String, SheetData>, old_name: &str, new_name: &
     Ok(())
 }
 
-pub fn sort(
+pub(crate) fn sort(
     data: &mut HashMap<String, SheetData>,
     sheet: &str,
     columns: &[SortColumn],
@@ -72,7 +72,7 @@ pub fn sort(
     Ok(())
 }
 
-pub fn dedup(data: &mut HashMap<String, SheetData>, sheet: &str, columns: &[u16]) -> Result<()> {
+pub(crate) fn dedup(data: &mut HashMap<String, SheetData>, sheet: &str, columns: &[u16]) -> Result<()> {
     let sd = data
         .get_mut(sheet)
         .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;

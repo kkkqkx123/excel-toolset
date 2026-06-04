@@ -16,7 +16,54 @@ pub(crate) fn modify_file<F>(
     modifier: F,
 ) -> Result<WriteResult>
 where
-    F: FnOnce(&HashMap<String, SheetData>, &mut Workbook) -> Result<HashMap<String, SheetData>>,
+    F: FnOnce(&HashMap<String, SheetData>) -> Result<HashMap<String, SheetData>>,
+{
+    let old_hash = compute_file_hash(path).map_err(AppError::Io)?;
+
+    let backup_info = if params.create_backup {
+        Some(create_backup(path, &old_hash).map_err(AppError::Io)?)
+    } else {
+        None
+    };
+
+    let old_data = read_all_sheets_to_map(path)?;
+    let new_data = modifier(&old_data)?;
+
+    // Build workbook ONCE from the final modified data
+    let mut wb = Workbook::new();
+    for (name, data) in &new_data {
+        let ws = wb.add_worksheet();
+        ws.set_name(name).map_err(AppError::Xlsx)?;
+        write_sheet_data(ws, data)?;
+    }
+
+    let new_hash = if params.dry_run {
+        old_hash.clone()
+    } else {
+        wb.save(path).map_err(AppError::Xlsx)?;
+        compute_file_hash(path).map_err(AppError::Io)?
+    };
+
+    Ok(WriteResult {
+        success: true,
+        message: String::new(),
+        backup_info,
+        old_hash,
+        new_hash,
+        diff: None,
+    })
+}
+
+/// Variant of `modify_file` for operations that need direct workbook-level access
+/// (e.g., set_format, merge_cells, add_chart). Pre-builds the workbook from old data
+/// and passes it to the modifier. The modifier returns () and mutates the workbook in place.
+pub(crate) fn modify_file_with_wb<F>(
+    path: &str,
+    params: &SecurityParams,
+    modifier: F,
+) -> Result<WriteResult>
+where
+    F: FnOnce(&HashMap<String, SheetData>, &mut Workbook) -> Result<()>,
 {
     let old_hash = compute_file_hash(path).map_err(AppError::Io)?;
 
@@ -35,7 +82,7 @@ where
         write_sheet_data(ws, data)?;
     }
 
-    let _new_data = modifier(&old_data, &mut wb)?;
+    modifier(&old_data, &mut wb)?;
 
     let new_hash = if params.dry_run {
         old_hash.clone()

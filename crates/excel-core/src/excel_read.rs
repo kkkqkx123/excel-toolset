@@ -4,7 +4,7 @@ use calamine::{Data, Reader, Xlsx, open_workbook};
 
 use crate::cell_ref;
 use crate::security::compute_file_hash;
-use crate::types::{AppError, CellData, CellDataType, FileInfo, Result, SheetData, Style};
+use crate::types::{AppError, CellData, CellDataType, FileInfo, Result, SheetData};
 
 pub fn read_file_info(path: &str) -> Result<FileInfo> {
     let sheets = list_sheets(path)?;
@@ -76,20 +76,6 @@ pub fn read_formula(path: &str, sheet: &str, cell_spec: &str) -> Result<Option<S
     let formulas = workbook.worksheet_formula(sheet)?;
 
     Ok(formulas.get_value((row, col as u32)).map(|s| s.to_string()))
-}
-
-pub fn read_style(_path: &str, _sheet: &str, _cell_spec: &str) -> Result<Style> {
-    Ok(Style {
-        font_name: None,
-        font_size: None,
-        bold: None,
-        italic: None,
-        font_color: None,
-        background_color: None,
-        border: None,
-        horizontal_align: None,
-        vertical_align: None,
-    })
 }
 
 pub fn read_sheet_all(path: &str, sheet: &str) -> Result<SheetData> {

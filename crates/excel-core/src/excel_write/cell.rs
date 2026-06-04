@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use crate::cell_ref;
 use crate::types::*;
 
-use super::data::{cell_value_to_data, ensure_dimensions};
+use super::util::{cell_value_to_data, ensure_dimensions};
 
-pub fn write(
+pub(crate) fn write(
     data: &mut HashMap<String, SheetData>,
     sheet: &str,
     row: u32,
@@ -20,7 +20,7 @@ pub fn write(
     Ok(())
 }
 
-pub fn write_range(
+pub(crate) fn write_range(
     data: &mut HashMap<String, SheetData>,
     sheet: &str,
     range: &str,
@@ -41,7 +41,7 @@ pub fn write_range(
     Ok(())
 }
 
-pub fn clear_range(data: &mut HashMap<String, SheetData>, sheet: &str, range: &str) -> Result<()> {
+pub(crate) fn clear_range(data: &mut HashMap<String, SheetData>, sheet: &str, range: &str) -> Result<()> {
     let (r_start, r_end, c_start, c_end) = cell_ref::parse_range_normalized(range)?;
     let sd = data
         .get_mut(sheet)
@@ -81,7 +81,7 @@ pub fn set_formula(
     Ok(())
 }
 
-pub fn insert_rows(
+pub(crate) fn insert_rows(
     data: &mut HashMap<String, SheetData>,
     sheet: &str,
     at_row: u32,
@@ -101,7 +101,7 @@ pub fn insert_rows(
     Ok(())
 }
 
-pub fn delete_rows(
+pub(crate) fn delete_rows(
     data: &mut HashMap<String, SheetData>,
     sheet: &str,
     start_row: u32,
@@ -121,7 +121,7 @@ pub fn delete_rows(
     Ok(())
 }
 
-pub fn append_rows(
+pub(crate) fn append_rows(
     data: &mut HashMap<String, SheetData>,
     sheet: &str,
     grid: &[Vec<CellValue>],
