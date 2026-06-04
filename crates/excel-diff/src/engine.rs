@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::helpers::format_cell_ref;
 use excel_types::{CellDiff, DiffType, SheetData, SheetDiff};
 
 pub fn compute_cell_diffs(old_data: &SheetData, new_data: &SheetData) -> Vec<CellDiff> {
@@ -101,28 +102,10 @@ pub fn diff_sheet_maps(
     diffs
 }
 
-fn format_cell_ref(row: usize, col: usize) -> String {
-    let col_name = index_to_col(col);
-    let row_num = row + 1;
-    format!("{}{}", col_name, row_num)
-}
-
-fn index_to_col(index: usize) -> String {
-    let mut col = String::new();
-    let mut n = index + 1;
-
-    while n > 0 {
-        n -= 1;
-        col.insert(0, ((n % 26) as u8 + b'A') as char);
-        n /= 26;
-    }
-
-    col
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::helpers::index_to_col;
     use excel_types::{CellData, CellDataType};
     use std::collections::HashMap;
 
@@ -290,6 +273,103 @@ mod tests {
         let diffs = diff_sheet_maps(&old, &new);
         assert_eq!(diffs.len(), 1);
         assert_eq!(diffs[0].row_count_diff, 1);
+    }
+
+    #[test]
+    fn test_diff_sheet_maps_add_sheet_col_count() {
+        let old = HashMap::new();
+
+        let mut new = HashMap::new();
+        new.insert(
+            "S1".into(),
+            SheetData {
+                name: "S1".into(),
+                rows: vec![
+                    vec![CellData {
+                        value: Some("h1".into()),
+                        data_type: CellDataType::String,
+                        formula: None,
+                    }],
+                    vec![
+                        CellData {
+                            value: Some("h2".into()),
+                            data_type: CellDataType::String,
+                            formula: None,
+                        },
+                        CellData {
+                            value: Some("h3".into()),
+                            data_type: CellDataType::String,
+                            formula: None,
+                        },
+                    ],
+                ],
+            },
+        );
+
+        let diffs = diff_sheet_maps(&old, &new);
+        assert_eq!(diffs.len(), 1);
+        assert_eq!(diffs[0].col_count_diff, 2);
+        assert_eq!(diffs[0].row_count_diff, 2);
+    }
+
+    #[test]
+    fn test_diff_sheet_maps_delete_sheet_col_count() {
+        let mut old = HashMap::new();
+        old.insert(
+            "S1".into(),
+            SheetData {
+                name: "S1".into(),
+                rows: vec![vec![CellData {
+                    value: Some("x".into()),
+                    data_type: CellDataType::String,
+                    formula: None,
+                }]],
+            },
+        );
+
+        let new = HashMap::new();
+
+        let diffs = diff_sheet_maps(&old, &new);
+        assert_eq!(diffs.len(), 1);
+        assert_eq!(diffs[0].col_count_diff, -1);
+        assert_eq!(diffs[0].row_count_diff, -1);
+    }
+
+    #[test]
+    fn test_index_to_col_single_letter() {
+        assert_eq!(index_to_col(0), "A");
+        assert_eq!(index_to_col(25), "Z");
+    }
+
+    #[test]
+    fn test_index_to_col_multi_letter() {
+        assert_eq!(index_to_col(26), "AA");
+        assert_eq!(index_to_col(701), "ZZ");
+        assert_eq!(index_to_col(702), "AAA");
+    }
+
+    #[test]
+    fn test_format_cell_ref() {
+        assert_eq!(format_cell_ref(0, 0), "A1");
+        assert_eq!(format_cell_ref(0, 26), "AA1");
+        assert_eq!(format_cell_ref(99, 0), "A100");
+    }
+
+    #[test]
+    fn test_diff_sheet_maps_same_sheets_both_exist_no_changes() {
+        let old_data = sheet_data_with_values(&["a"]);
+        let new_data = sheet_data_with_values(&["a"]);
+
+        let mut old = HashMap::new();
+        old.insert("S1".into(), old_data);
+        let mut new = HashMap::new();
+        new.insert("S1".into(), new_data);
+
+        let diffs = diff_sheet_maps(&old, &new);
+        assert_eq!(diffs.len(), 1);
+        assert!(diffs[0].cell_diffs.is_empty());
+        assert_eq!(diffs[0].row_count_diff, 0);
+        assert_eq!(diffs[0].col_count_diff, 0);
     }
 
     fn empty_sheet() -> SheetData {

@@ -4,9 +4,11 @@ use crate::cell_ref;
 use crate::types::*;
 
 use super::chart::map_chart_type;
-use super::util::{cell_value_to_data, ensure_dimensions};
 use super::style::build_format;
-use super::write::{modify_file, modify_file_with_wb, write_cell_data, write_cell_with_format, write_sheet_data};
+use super::util::{cell_value_to_data, ensure_dimensions};
+use super::write::{
+    modify_file, modify_file_with_wb, write_cell_data, write_cell_with_format, write_sheet_data,
+};
 
 pub fn add_sheet(path: &str, params: &SecurityParams, sheet: &str) -> Result<WriteResult> {
     modify_file(path, params, |old_data| {

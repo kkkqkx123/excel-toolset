@@ -115,9 +115,9 @@ pub fn group_diffs(diff: &FileDiff) -> GroupedDiffs {
         // Otherwise handle normally
         else {
             // Only emit SheetResized if there are no Add/Delete diffs that would be handled above
-            if (sheet_diff.row_count_diff != 0 || sheet_diff.col_count_diff != 0) 
-               && add_diffs.is_empty() 
-               && delete_diffs.is_empty()
+            if (sheet_diff.row_count_diff != 0 || sheet_diff.col_count_diff != 0)
+                && add_diffs.is_empty()
+                && delete_diffs.is_empty()
             {
                 ops.push(LogicalOperation::SheetResized {
                     sheet: sheet_diff.sheet_name.clone(),
@@ -138,7 +138,9 @@ pub fn group_diffs(diff: &FileDiff) -> GroupedDiffs {
 
             for (row, diffs) in &rows_by_diff {
                 let all_add = diffs.iter().all(|d| matches!(d.diff_type, DiffType::Add));
-                let all_delete = diffs.iter().all(|d| matches!(d.diff_type, DiffType::Delete));
+                let all_delete = diffs
+                    .iter()
+                    .all(|d| matches!(d.diff_type, DiffType::Delete));
 
                 if all_add && diffs.len() > 1 {
                     let entries = diffs
@@ -509,5 +511,105 @@ mod tests {
             }
             other => panic!("expected CellModified, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_resize_not_emitted_when_adds_present() {
+        let cells = vec![cell_diff(2, 0, "A3", DiffType::Add, None, Some("New"))];
+        let diff = make_file_diff(vec![sheet_diff("S", cells, 1, 0)]);
+        let ops = group_diffs(&diff);
+        let has_resize = ops
+            .iter()
+            .any(|op| matches!(op, LogicalOperation::SheetResized { .. }));
+        assert!(
+            !has_resize,
+            "SheetResized should not be emitted when Add diffs exist"
+        );
+    }
+
+    #[test]
+    fn test_single_cell_add_does_not_give_row_added() {
+        let cells = vec![cell_diff(0, 2, "C1", DiffType::Add, None, Some("X"))];
+        let diff = make_file_diff(vec![sheet_diff("S", cells, 0, 1)]);
+        let ops = group_diffs(&diff);
+        let has_row_added = ops
+            .iter()
+            .any(|op| matches!(op, LogicalOperation::RowAdded { .. }));
+        assert!(!has_row_added);
+        assert!(
+            ops.iter()
+                .any(|op| matches!(op, LogicalOperation::CellModified { .. }))
+        );
+    }
+
+    #[test]
+    fn test_single_cell_delete_does_not_give_row_deleted() {
+        let cells = vec![cell_diff(1, 0, "A2", DiffType::Delete, Some("X"), None)];
+        let diff = make_file_diff(vec![sheet_diff("S", cells, -1, 0)]);
+        let ops = group_diffs(&diff);
+        let has_row_del = ops
+            .iter()
+            .any(|op| matches!(op, LogicalOperation::RowDeleted { .. }));
+        assert!(!has_row_del);
+    }
+
+    #[test]
+    fn test_passive_diffs_in_other_branch() {
+        let cells = vec![CellDiff {
+            row: 0,
+            col: 0,
+            cell_ref: "A1".into(),
+            diff_type: DiffType::Passive,
+            old_value: Some("10".into()),
+            new_value: Some("20".into()),
+            old_formula: Some("=B1+1".into()),
+            new_formula: Some("=B1+1".into()),
+        }];
+        let diff = make_file_diff(vec![sheet_diff("S", cells, 0, 0)]);
+        let ops = group_diffs(&diff);
+        assert_eq!(ops.len(), 1);
+        assert!(matches!(ops[0], LogicalOperation::CellPassive { .. }));
+    }
+
+    #[test]
+    fn test_mixed_row_adds_and_mods_in_same_sheet() {
+        let cells = vec![
+            cell_diff(0, 0, "A1", DiffType::Add, None, Some("X")),
+            cell_diff(0, 1, "B1", DiffType::Add, None, Some("Y")),
+            cell_diff(1, 0, "A2", DiffType::Modify, Some("old"), Some("new")),
+        ];
+        let diff = make_file_diff(vec![sheet_diff("S", cells, 1, 0)]);
+        let ops = group_diffs(&diff);
+        // Row 0 has 2 adds -> RowAdded; Row 1 has 1 modify -> CellModified
+        assert_eq!(ops.len(), 2);
+        assert!(matches!(ops[0], LogicalOperation::RowAdded { .. }));
+        assert!(matches!(ops[1], LogicalOperation::CellModified { .. }));
+    }
+
+    #[test]
+    fn test_partial_row_delete_and_add_in_same_row_yields_individual() {
+        let cells = vec![
+            cell_diff(0, 0, "A1", DiffType::Delete, Some("X"), None),
+            cell_diff(0, 1, "B1", DiffType::Add, None, Some("Y")),
+        ];
+        let diff = make_file_diff(vec![sheet_diff("S", cells, 0, 0)]);
+        let ops = group_diffs(&diff);
+        // Same row, mixed add+delete -> individual CellModified
+        assert_eq!(ops.len(), 2);
+    }
+
+    #[test]
+    fn test_sheet_added_threshold_not_met_when_row_count_diff_mismatch() {
+        let cells = vec![
+            cell_diff(0, 0, "A1", DiffType::Add, None, Some("A")),
+            cell_diff(1, 0, "A2", DiffType::Add, None, Some("B")),
+        ];
+        // row_count_diff = 1 but max_row_index = 1 -> expected 2 but actual 1
+        let diff = make_file_diff(vec![sheet_diff("S", cells, 1, 0)]);
+        let ops = group_diffs(&diff);
+        assert!(
+            !ops.iter()
+                .any(|op| matches!(op, LogicalOperation::SheetAdded { .. }))
+        );
     }
 }

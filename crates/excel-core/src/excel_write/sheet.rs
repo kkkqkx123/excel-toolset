@@ -24,7 +24,11 @@ pub(crate) fn delete(data: &mut HashMap<String, SheetData>, name: &str) -> Resul
     Ok(())
 }
 
-pub(crate) fn rename(data: &mut HashMap<String, SheetData>, old_name: &str, new_name: &str) -> Result<()> {
+pub(crate) fn rename(
+    data: &mut HashMap<String, SheetData>,
+    old_name: &str,
+    new_name: &str,
+) -> Result<()> {
     if !data.contains_key(old_name) {
         return Err(AppError::SheetNotFound(old_name.into()));
     }
@@ -72,7 +76,11 @@ pub(crate) fn sort(
     Ok(())
 }
 
-pub(crate) fn dedup(data: &mut HashMap<String, SheetData>, sheet: &str, columns: &[u16]) -> Result<()> {
+pub(crate) fn dedup(
+    data: &mut HashMap<String, SheetData>,
+    sheet: &str,
+    columns: &[u16],
+) -> Result<()> {
     let sd = data
         .get_mut(sheet)
         .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;

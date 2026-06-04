@@ -277,7 +277,6 @@ fn expand_range(range: &str) -> Vec<String> {
     cells
 }
 
-
 fn parse_cell_ref(ref_str: &str) -> Option<(usize, usize)> {
     let chars: Vec<char> = ref_str.chars().collect();
     let mut col_end = 0;
@@ -520,6 +519,38 @@ mod tests {
 
         let chain = tracker.get_dependency_chain("A1");
         assert!(chain.is_none());
+    }
+
+    #[test]
+    fn test_dependency_chain_multi_cell_cycle_returns_none() {
+        let mut deps = HashMap::new();
+        deps.insert("A1".into(), ["B1".into()].into());
+        deps.insert("B1".into(), ["A1".into()].into());
+        let tracker = FormulaTracker { dependencies: deps };
+
+        let chain = tracker.get_dependency_chain("A1");
+        assert!(
+            chain.is_none(),
+            "multi-cell cycle should return None: {:?}",
+            chain
+        );
+    }
+
+    #[test]
+    fn test_dependency_chain_deep_chain_succeeds() {
+        let mut deps = HashMap::new();
+        deps.insert("C5".into(), ["C4".into()].into());
+        deps.insert("C4".into(), ["C3".into()].into());
+        deps.insert("C3".into(), ["C2".into()].into());
+        let tracker = FormulaTracker { dependencies: deps };
+
+        let chain = tracker.get_dependency_chain("C5");
+        assert!(chain.is_some());
+        let chain_str = chain.unwrap();
+        assert!(chain_str.contains("C5"));
+        assert!(chain_str.contains("C4"));
+        assert!(chain_str.contains("C3"));
+        assert!(chain_str.contains("C2"));
     }
 
     #[test]

@@ -41,7 +41,11 @@ pub(crate) fn write_range(
     Ok(())
 }
 
-pub(crate) fn clear_range(data: &mut HashMap<String, SheetData>, sheet: &str, range: &str) -> Result<()> {
+pub(crate) fn clear_range(
+    data: &mut HashMap<String, SheetData>,
+    sheet: &str,
+    range: &str,
+) -> Result<()> {
     let (r_start, r_end, c_start, c_end) = cell_ref::parse_range_normalized(range)?;
     let sd = data
         .get_mut(sheet)

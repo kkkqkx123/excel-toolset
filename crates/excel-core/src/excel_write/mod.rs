@@ -7,10 +7,10 @@ mod batch;
 mod cell;
 mod chart;
 mod csv;
-mod util;
 mod ops;
 mod sheet;
 mod style;
+mod util;
 mod write;
 
 // Re-export

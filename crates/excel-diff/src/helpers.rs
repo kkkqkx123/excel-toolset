@@ -79,13 +79,13 @@ pub fn read_all_sheets_to_map(path: &str) -> Result<HashMap<String, SheetData>> 
     Ok(sheets)
 }
 
-fn format_cell_ref(row: usize, col: usize) -> String {
+pub fn format_cell_ref(row: usize, col: usize) -> String {
     let col_name = index_to_col(col);
     let row_num = row + 1;
     format!("{}{}", col_name, row_num)
 }
 
-fn index_to_col(index: usize) -> String {
+pub fn index_to_col(index: usize) -> String {
     let mut col = String::new();
     let mut n = index + 1;
 
@@ -218,5 +218,70 @@ mod tests {
     fn test_read_all_sheets_to_map_returns_error_on_bad_path() {
         let result = read_all_sheets_to_map("nonexistent_file.xlsx");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_classify_old_formula_new_no_formula_same_value() {
+        let old = formula_cell("10", "=A1+1");
+        let new = cell("10");
+        // Currently: same value → NoChange (formula removal not considered a diff alone)
+        assert_eq!(classify_diff(Some(&old), Some(&new)), DiffType::NoChange);
+    }
+
+    #[test]
+    fn test_classify_old_formula_new_no_formula_diff_value() {
+        let old = formula_cell("10", "=A1+1");
+        let new = cell("20");
+        // Diff value with mixed formula presence → Modify
+        assert_eq!(classify_diff(Some(&old), Some(&new)), DiffType::Modify);
+    }
+
+    #[test]
+    fn test_classify_old_no_formula_new_formula() {
+        let old = cell("10");
+        let new = formula_cell("10", "=A1+1");
+        // Currently: same value → NoChange
+        assert_eq!(classify_diff(Some(&old), Some(&new)), DiffType::NoChange);
+    }
+
+    #[test]
+    fn test_classify_formula_same_value_same_formula() {
+        let old = formula_cell("10", "=A1+1");
+        let new = formula_cell("10", "=A1+1");
+        assert_eq!(classify_diff(Some(&old), Some(&new)), DiffType::NoChange);
+    }
+
+    #[test]
+    fn test_all_cells_as_diff_add_with_formulas() {
+        let data = SheetData {
+            name: "S".into(),
+            rows: vec![vec![formula_cell("10", "=A2+1")]],
+        };
+        let diffs = all_cells_as_diff(&data, DiffType::Add);
+        assert_eq!(diffs.len(), 1);
+        assert!(diffs[0].new_formula.is_some());
+        assert_eq!(diffs[0].new_formula.as_deref(), Some("=A2+1"));
+        assert!(diffs[0].old_formula.is_none());
+    }
+
+    #[test]
+    fn test_all_cells_as_diff_delete_with_formulas() {
+        let data = SheetData {
+            name: "S".into(),
+            rows: vec![vec![formula_cell("10", "=A2+1")]],
+        };
+        let diffs = all_cells_as_diff(&data, DiffType::Delete);
+        assert_eq!(diffs.len(), 1);
+        assert!(diffs[0].old_formula.is_some());
+        assert_eq!(diffs[0].old_formula.as_deref(), Some("=A2+1"));
+        assert!(diffs[0].new_formula.is_none());
+    }
+
+    #[test]
+    fn test_classify_both_none_skip() {
+        assert_eq!(
+            classify_diff(Some(&cell("A")), Some(&cell("A"))),
+            DiffType::NoChange
+        );
     }
 }
