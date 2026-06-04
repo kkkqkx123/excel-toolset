@@ -2,7 +2,7 @@ use crate::formula_tracker::FormulaTracker;
 use excel_types::FileDiff;
 use serde_json::Value;
 
-pub fn to_api_response(diff: &FileDiff, _tracker: Option<&FormulaTracker>) -> Value {
+pub fn to_api_response(diff: &FileDiff, tracker: Option<&FormulaTracker>) -> Value {
     let response = serde_json::json!({
         "success": true,
         "file_hash_match": diff.file_hash_match,
@@ -13,14 +13,18 @@ pub fn to_api_response(diff: &FileDiff, _tracker: Option<&FormulaTracker>) -> Va
                 "row_count_diff": sheet.row_count_diff,
                 "col_count_diff": sheet.col_count_diff,
                 "cell_diffs": sheet.cell_diffs.iter().map(|cell| {
-                    serde_json::json!({
+                    let mut cell_json = serde_json::json!({
                         "cell_ref": cell.cell_ref,
                         "diff_type": format!("{:?}", cell.diff_type),
                         "old_value": cell.old_value,
                         "new_value": cell.new_value,
                         "old_formula": cell.old_formula,
                         "new_formula": cell.new_formula,
-                    })
+                    });
+                    if let Some(t) = tracker && let Some(chain) = t.get_dependency_chain(&cell.cell_ref) {
+                        cell_json["dependency_chain"] = serde_json::Value::String(chain);
+                    }
+                    cell_json
                 }).collect::<Vec<_>>()
             })
         }).collect::<Vec<_>>()

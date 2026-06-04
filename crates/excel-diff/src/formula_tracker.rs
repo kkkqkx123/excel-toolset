@@ -43,6 +43,9 @@ impl FormulaTracker {
     }
 
     pub fn get_dependency_chain(&self, cell_ref: &str) -> Option<String> {
+        if !self.dependencies.contains_key(cell_ref) {
+            return None;
+        }
         let mut chain = Vec::new();
         let mut visited = HashSet::new();
 
@@ -135,7 +138,22 @@ pub fn strip_all_sheet_prefixes(formula: &str) -> String {
             }
 
             if j < chars.len() && chars[j] == '!' {
-                i = j + 1;
+                let mut name_start = j;
+                while name_start > i && chars[name_start - 1].is_alphanumeric() {
+                    name_start -= 1;
+                }
+                if name_start < j {
+                    while i < name_start {
+                        result.push(chars[i]);
+                        i += 1;
+                    }
+                    i = j + 1;
+                } else {
+                    while i <= j {
+                        result.push(chars[i]);
+                        i += 1;
+                    }
+                }
             } else {
                 while i < j {
                     result.push(chars[i]);
@@ -160,7 +178,7 @@ fn try_match_cell_with_len(chars: &[char], pos: usize) -> Option<(String, usize)
     let start = pos;
     let mut i = pos;
 
-    let has_dollar_prefix = if i < chars.len() && chars[i] == '$' {
+    let _has_dollar_prefix = if i < chars.len() && chars[i] == '$' {
         i += 1;
         true
     } else {
@@ -171,7 +189,7 @@ fn try_match_cell_with_len(chars: &[char], pos: usize) -> Option<(String, usize)
         i += 1;
     }
 
-    let has_dollar_middle = if i < chars.len() && chars[i] == '$' {
+    let _has_dollar_middle = if i < chars.len() && chars[i] == '$' {
         i += 1;
         true
     } else {
@@ -182,7 +200,7 @@ fn try_match_cell_with_len(chars: &[char], pos: usize) -> Option<(String, usize)
         i += 1;
     }
 
-    let has_dollar_suffix = if i < chars.len() && chars[i] == '$' {
+    let _has_dollar_suffix = if i < chars.len() && chars[i] == '$' {
         i += 1;
         true
     } else {
@@ -221,7 +239,7 @@ fn try_match_range(chars: &[char], pos: usize) -> Option<String> {
 
     i += 1;
 
-    let (end_cell, end_len) = try_match_cell_with_len(chars, i)?;
+    let (end_cell, _end_len) = try_match_cell_with_len(chars, i)?;
 
     Some(format!("{}:{}", start_cell, end_cell))
 }
@@ -247,8 +265,8 @@ fn expand_range(range: &str) -> Vec<String> {
 
     let mut cells = Vec::new();
 
-    for row in start_row..=end_row {
-        for col in start_col..=end_col {
+    for row in start_row.min(end_row)..=start_row.max(end_row) {
+        for col in start_col.min(end_col)..=start_col.max(end_col) {
             let col_name = index_to_col(col);
             let row_num = row + 1;
             cells.push(format!("{}{}", col_name, row_num));
@@ -257,6 +275,7 @@ fn expand_range(range: &str) -> Vec<String> {
 
     cells
 }
+
 
 fn parse_cell_ref(ref_str: &str) -> Option<(usize, usize)> {
     let chars: Vec<char> = ref_str.chars().collect();

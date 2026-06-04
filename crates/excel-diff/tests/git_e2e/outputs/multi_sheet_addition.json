@@ -27,27 +27,6 @@
         {
           "cell_ref": "A1",
           "col": 0,
-          "diff_type": "Add",
-          "new_value": "Q1",
-          "row": 0
-        },
-        {
-          "cell_ref": "B1",
-          "col": 1,
-          "diff_type": "Add",
-          "new_value": "1000",
-          "row": 0
-        }
-      ],
-      "col_count_diff": 2,
-      "row_count_diff": 1,
-      "sheet_name": "Revenue"
-    },
-    {
-      "cell_diffs": [
-        {
-          "cell_ref": "A1",
-          "col": 0,
           "diff_type": "Delete",
           "old_value": "Name",
           "row": 0
@@ -91,6 +70,27 @@
       "col_count_diff": -2,
       "row_count_diff": -3,
       "sheet_name": "Sheet1"
+    },
+    {
+      "cell_diffs": [
+        {
+          "cell_ref": "A1",
+          "col": 0,
+          "diff_type": "Add",
+          "new_value": "Q1",
+          "row": 0
+        },
+        {
+          "cell_ref": "B1",
+          "col": 1,
+          "diff_type": "Add",
+          "new_value": "1000",
+          "row": 0
+        }
+      ],
+      "col_count_diff": 2,
+      "row_count_diff": 1,
+      "sheet_name": "Revenue"
     }
   ],
   "summary": {

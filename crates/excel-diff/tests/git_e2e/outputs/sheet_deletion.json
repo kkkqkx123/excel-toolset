@@ -4,27 +4,6 @@
     {
       "cell_diffs": [
         {
-          "cell_ref": "A1",
-          "col": 0,
-          "diff_type": "Delete",
-          "old_value": "Note",
-          "row": 0
-        },
-        {
-          "cell_ref": "A2",
-          "col": 0,
-          "diff_type": "Delete",
-          "old_value": "extra",
-          "row": 1
-        }
-      ],
-      "col_count_diff": -1,
-      "row_count_diff": -2,
-      "sheet_name": "Extra"
-    },
-    {
-      "cell_diffs": [
-        {
           "cell_ref": "A3",
           "col": 0,
           "diff_type": "Add",
@@ -42,6 +21,27 @@
       "col_count_diff": 0,
       "row_count_diff": 1,
       "sheet_name": "Sheet1"
+    },
+    {
+      "cell_diffs": [
+        {
+          "cell_ref": "A1",
+          "col": 0,
+          "diff_type": "Delete",
+          "old_value": "Note",
+          "row": 0
+        },
+        {
+          "cell_ref": "A2",
+          "col": 0,
+          "diff_type": "Delete",
+          "old_value": "extra",
+          "row": 1
+        }
+      ],
+      "col_count_diff": -1,
+      "row_count_diff": -2,
+      "sheet_name": "Extra"
     }
   ],
   "summary": {

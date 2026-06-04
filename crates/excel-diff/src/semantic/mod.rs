@@ -32,14 +32,25 @@ pub fn to_natural_text(
 
     match verbosity {
         Verbosity::Summary => {
-            format!(
-                "Total {} changes: {} added, {} deleted, {} modified, {} passive",
-                diff.summary.total_changes,
-                diff.summary.adds,
-                diff.summary.deletes,
-                diff.summary.modifies,
-                diff.summary.passives
-            )
+            let mut parts = Vec::new();
+            if diff.summary.adds > 0 {
+                parts.push(format!("{} added", diff.summary.adds));
+            }
+            if diff.summary.deletes > 0 {
+                parts.push(format!("{} deleted", diff.summary.deletes));
+            }
+            if diff.summary.modifies > 0 {
+                parts.push(format!("{} modified", diff.summary.modifies));
+            }
+            if diff.summary.passives > 0 {
+                parts.push(format!("{} passive", diff.summary.passives));
+            }
+            let detail = if parts.is_empty() {
+                "no changes".to_string()
+            } else {
+                parts.join(", ")
+            };
+            format!("Total {} changes: {}", diff.summary.total_changes, detail)
         }
         Verbosity::Detail => {
             let mut text = format!(

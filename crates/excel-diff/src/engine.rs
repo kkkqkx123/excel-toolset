@@ -245,7 +245,8 @@ mod tests {
             },
         );
 
-        let diffs = diff_sheet_maps(&old, &new);
+        let mut diffs = diff_sheet_maps(&old, &new);
+        diffs.sort_by(|a, b| a.sheet_name.cmp(&b.sheet_name));
         assert_eq!(diffs.len(), 2);
         assert_eq!(diffs[1].sheet_name, "S2");
         assert!(!diffs[1].cell_diffs.is_empty());
@@ -260,7 +261,8 @@ mod tests {
         let mut new = HashMap::new();
         new.insert("S1".into(), empty_sheet());
 
-        let diffs = diff_sheet_maps(&old, &new);
+        let mut diffs = diff_sheet_maps(&old, &new);
+        diffs.sort_by(|a, b| a.sheet_name.cmp(&b.sheet_name));
         assert_eq!(diffs.len(), 2);
         assert_eq!(diffs[1].sheet_name, "S2");
     }
