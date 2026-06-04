@@ -53,7 +53,7 @@ pub fn diff_sheet_maps(
 ) -> Vec<SheetDiff> {
     let mut diffs = Vec::new();
 
-    let all_sheet_names: std::collections::HashSet<_> = old.keys().chain(new.keys()).collect();
+    let all_sheet_names: std::collections::BTreeSet<_> = old.keys().chain(new.keys()).collect();
 
     for sheet_name in all_sheet_names {
         let old_sheet = old.get(sheet_name);

@@ -62,7 +62,7 @@ pub(crate) fn clear_range(data: &mut HashMap<String, SheetData>, sheet: &str, ra
     Ok(())
 }
 
-pub fn set_formula(
+pub(crate) fn set_formula(
     data: &mut HashMap<String, SheetData>,
     sheet: &str,
     cell: &str,

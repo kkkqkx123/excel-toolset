@@ -1,12 +1,12 @@
-pub mod api_response;
-pub mod engine;
-pub mod file_diff;
-pub mod formula_tracker;
+mod api_response;
+mod engine;
+mod file_diff;
+mod formula_tracker;
 pub mod git_driver;
-pub mod helpers;
-pub mod range_diff;
+mod helpers;
+mod range_diff;
 pub mod semantic;
-pub mod sheet_diff;
+mod sheet_diff;
 pub mod summarize;
 
 pub use file_diff::diff_files;

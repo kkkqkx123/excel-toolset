@@ -1,3 +1,4 @@
+#![expect(dead_code)]
 use std::collections::{HashMap, HashSet};
 
 use excel_types::SheetData;

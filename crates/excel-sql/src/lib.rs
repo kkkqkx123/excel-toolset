@@ -1,9 +1,9 @@
-pub mod config;
+mod config;
 mod converter;
 mod db;
-pub mod error;
+mod error;
 mod ops;
-pub mod utils;
+mod utils;
 
 pub use config::SqlConfig;
 pub use converter::QueryResult;

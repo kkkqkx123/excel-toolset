@@ -16,6 +16,7 @@ pub fn sanitize_column_name(name: &str) -> String {
     }
 }
 
+#[expect(dead_code)]
 pub fn validate_column_index(col: u16, max_cols: usize) -> crate::SqlResult<()> {
     if (col as usize) < max_cols {
         Ok(())
