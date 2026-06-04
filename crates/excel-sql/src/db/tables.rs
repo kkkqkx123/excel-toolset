@@ -85,3 +85,89 @@ pub fn table_row_count(db: &duckdb::Connection, name: &str) -> Result<usize, App
         .map_err(|e| AppError::DuckDb(e.to_string()))?;
     Ok(count as usize)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::conn::create_conn;
+
+    fn setup_table(db: &duckdb::Connection) {
+        db.execute_batch(r#"CREATE TABLE "test_tbl" (c0 INTEGER, c1 VARCHAR)"#)
+            .unwrap();
+        db.execute_batch(r#"INSERT INTO "test_tbl" VALUES (1, 'a'), (2, 'b')"#)
+            .unwrap();
+    }
+
+    #[test]
+    fn test_table_exists_true() {
+        let conn = create_conn().unwrap();
+        setup_table(&conn);
+        assert!(table_exists(&conn, "test_tbl").unwrap());
+    }
+
+    #[test]
+    fn test_table_exists_false() {
+        let conn = create_conn().unwrap();
+        assert!(!table_exists(&conn, "nonexistent").unwrap());
+    }
+
+    #[test]
+    fn test_list_tables() {
+        let conn = create_conn().unwrap();
+        assert!(list_tables(&conn).unwrap().is_empty());
+
+        setup_table(&conn);
+        let tables = list_tables(&conn).unwrap();
+        assert_eq!(tables, vec!["test_tbl"]);
+    }
+
+    #[test]
+    fn test_drop_table() {
+        let conn = create_conn().unwrap();
+        setup_table(&conn);
+        assert!(table_exists(&conn, "test_tbl").unwrap());
+        drop_table(&conn, "test_tbl").unwrap();
+        assert!(!table_exists(&conn, "test_tbl").unwrap());
+    }
+
+    #[test]
+    fn test_drop_table_nonexistent() {
+        let conn = create_conn().unwrap();
+        drop_table(&conn, "nonexistent").unwrap(); // should not panic
+    }
+
+    #[test]
+    fn test_get_table_schema() {
+        let conn = create_conn().unwrap();
+        setup_table(&conn);
+        let schema = get_table_schema(&conn, "test_tbl").unwrap();
+        assert_eq!(schema.len(), 2);
+        assert_eq!(schema[0].name, "c0");
+        assert_eq!(schema[1].name, "c1");
+    }
+
+    #[test]
+    fn test_table_row_count() {
+        let conn = create_conn().unwrap();
+        setup_table(&conn);
+        assert_eq!(table_row_count(&conn, "test_tbl").unwrap(), 2);
+    }
+
+    #[test]
+    fn test_clear_database() {
+        let conn = create_conn().unwrap();
+        setup_table(&conn);
+        clear_database(&conn).unwrap();
+        assert!(list_tables(&conn).unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_escape_name() {
+        let conn = create_conn().unwrap();
+        // Table name with quotes
+        let sql = r#"CREATE TABLE "quo""te" (c0 INTEGER)"#;
+        conn.execute_batch(sql).unwrap();
+        assert!(table_exists(&conn, "quo\"te").unwrap());
+        drop_table(&conn, "quo\"te").unwrap();
+    }
+}

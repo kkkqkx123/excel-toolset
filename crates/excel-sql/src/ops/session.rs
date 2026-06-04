@@ -99,3 +99,97 @@ impl QuerySession {
         crate::db::tables::list_tables(&self.conn)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use excel_types::{CellData, FilterOp, CellDataType::*};
+
+    fn make_cell(value: Option<&str>, dt: excel_types::CellDataType) -> CellData {
+        CellData { value: value.map(|s| s.to_string()), data_type: dt, formula: None }
+    }
+
+    fn sheet1() -> SheetData {
+        SheetData {
+            name: "s1".to_string(),
+            rows: vec![
+                vec![make_cell(Some("x"), String)],
+                vec![make_cell(Some("y"), String)],
+            ],
+        }
+    }
+
+    fn sheet2() -> SheetData {
+        SheetData {
+            name: "s2".to_string(),
+            rows: vec![
+                vec![make_cell(Some("1"), Int)],
+                vec![make_cell(Some("2"), Int)],
+            ],
+        }
+    }
+
+    #[test]
+    fn test_session_new() {
+        let session = QuerySession::new().expect("Should create session");
+        assert!(session.list_tables().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_session_load_and_query() {
+        let mut session = QuerySession::new().unwrap();
+        session.load_sheet("s1", &sheet1(), false).unwrap();
+        let result = session.query("SELECT * FROM \"s1\"").unwrap();
+        assert_eq!(result.row_count, 2);
+    }
+
+    #[test]
+    fn test_session_deduplicates_loads() {
+        let mut session = QuerySession::new().unwrap();
+        session.load_sheet("s1", &sheet1(), false).unwrap();
+        session.load_sheet("s1", &sheet1(), false).unwrap(); // should be no-op
+        let tables = session.list_tables().unwrap();
+        assert_eq!(tables.len(), 1);
+    }
+
+    #[test]
+    fn test_session_sql_query_on_data() {
+        let mut session = QuerySession::new().unwrap();
+        let result = session
+            .sql_query_on_data(&[sheet1(), sheet2()], "SELECT COUNT(*) AS cnt FROM \"s2\"", false)
+            .unwrap();
+        assert_eq!(result.row_count, 1);
+    }
+
+    #[test]
+    fn test_session_filter_rows_on_data() {
+        let mut session = QuerySession::new().unwrap();
+        let cond = FilterCondition { column: 0, operator: FilterOp::Eq, value: "x".into() };
+        let result = session
+            .filter_rows_on_data(&sheet1(), "s1", &[cond], false)
+            .unwrap();
+        assert_eq!(result.row_count, 1);
+    }
+
+    #[test]
+    fn test_session_clear() {
+        let mut session = QuerySession::new().unwrap();
+        session.load_sheet("s1", &sheet1(), false).unwrap();
+        assert!(!session.list_tables().unwrap().is_empty());
+        session.clear().unwrap();
+        assert!(session.list_tables().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_session_ensure_sheet_loaded() {
+        let mut session = QuerySession::new().unwrap();
+        session.ensure_sheet_loaded(&sheet1(), false).unwrap();
+        assert!(session.table_exists("s1").unwrap());
+    }
+
+    #[test]
+    fn test_session_table_exists() {
+        let session = QuerySession::new().unwrap();
+        assert!(!session.table_exists("nonexistent").unwrap());
+    }
+}

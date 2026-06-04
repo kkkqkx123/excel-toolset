@@ -168,3 +168,101 @@ pub fn dedup_sheet_on_data(data: &SheetData, columns: &[u16]) -> Result<SheetDat
         create_conn().map_err(|e| AppError::DuckDb(format!("Failed to create connection: {e}")))?;
     dedup_sheet_on_data_impl(&mut db, data, columns)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use excel_types::CellData;
+    use excel_types::CellDataType::*;
+
+    fn make_cell(value: Option<&str>, dt: excel_types::CellDataType) -> CellData {
+        CellData { value: value.map(|s| s.to_string()), data_type: dt, formula: None }
+    }
+
+    #[test]
+    fn test_sort_sheet_on_data_single_row() {
+        let data = SheetData {
+            name: "t".to_string(),
+            rows: vec![vec![make_cell(Some("x"), String)]],
+        };
+        let result = sort_sheet_on_data(&data, &[]).unwrap();
+        assert_eq!(result.rows.len(), 1);
+    }
+
+    #[test]
+    fn test_sort_sheet_on_data_ascending() {
+        let data = SheetData {
+            name: "t".to_string(),
+            rows: vec![
+                vec![make_cell(Some("3"), Int)],
+                vec![make_cell(Some("1"), Int)],
+                vec![make_cell(Some("2"), Int)],
+            ],
+        };
+        let sort = SortColumn { column: 0, descending: false };
+        let result = sort_sheet_on_data(&data, &[sort]).unwrap();
+        let vals: Vec<&str> = result.rows.iter().map(|r| r[0].value.as_deref().unwrap()).collect();
+        assert_eq!(vals, vec!["1", "2", "3"]);
+    }
+
+    #[test]
+    fn test_sort_sheet_on_data_descending() {
+        let data = SheetData {
+            name: "t".to_string(),
+            rows: vec![
+                vec![make_cell(Some("a"), String)],
+                vec![make_cell(Some("c"), String)],
+                vec![make_cell(Some("b"), String)],
+            ],
+        };
+        let sort = SortColumn { column: 0, descending: true };
+        let result = sort_sheet_on_data(&data, &[sort]).unwrap();
+        let vals: Vec<&str> = result.rows.iter().map(|r| r[0].value.as_deref().unwrap()).collect();
+        assert_eq!(vals, vec!["c", "b", "a"]);
+    }
+
+    #[test]
+    fn test_dedup_sheet_on_data_all_columns() {
+        let data = SheetData {
+            name: "t".to_string(),
+            rows: vec![
+                vec![make_cell(Some("h"), String)], // header
+                vec![make_cell(Some("a"), String)],
+                vec![make_cell(Some("b"), String)],
+                vec![make_cell(Some("a"), String)], // duplicate
+            ],
+        };
+        let result = dedup_sheet_on_data(&data, &[]).unwrap();
+        // Header + 2 unique rows = 3
+        assert_eq!(result.rows.len(), 3);
+        assert_eq!(result.rows[0][0].value.as_deref(), Some("h"));
+    }
+
+    #[test]
+    fn test_dedup_sheet_on_data_specific_columns() {
+        let data = SheetData {
+            name: "t".to_string(),
+            rows: vec![
+                vec![make_cell(Some("hdr"), String), make_cell(Some("ignored"), String)],
+                vec![make_cell(Some("a"), String), make_cell(Some("x"), String)],
+                vec![make_cell(Some("a"), String), make_cell(Some("y"), String)], // dup on col 0 only
+            ],
+        };
+        let result = dedup_sheet_on_data(&data, &[0]).unwrap();
+        assert_eq!(result.rows.len(), 2); // header + first row
+    }
+
+    #[test]
+    fn test_dedup_sheet_on_data_no_duplicates() {
+        let data = SheetData {
+            name: "t".to_string(),
+            rows: vec![
+                vec![make_cell(Some("h"), String)],
+                vec![make_cell(Some("a"), String)],
+                vec![make_cell(Some("b"), String)],
+            ],
+        };
+        let result = dedup_sheet_on_data(&data, &[]).unwrap();
+        assert_eq!(result.rows.len(), 3);
+    }
+}

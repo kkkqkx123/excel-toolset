@@ -232,3 +232,161 @@ pub fn load_sheet_with_row_id(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::conn::create_conn;
+    use crate::db::tables::{get_table_schema, table_exists, table_row_count};
+
+    fn make_cell(value: Option<&str>, dt: CellDataType) -> CellData {
+        CellData { value: value.map(|s| s.to_string()), data_type: dt, formula: None }
+    }
+
+    #[test]
+    fn test_create_table_no_columns() {
+        let conn = create_conn().unwrap();
+        create_table(&conn, "empty", &[]).unwrap();
+        assert!(table_exists(&conn, "empty").unwrap());
+        // Table should exist with zero columns
+    }
+
+    #[test]
+    fn test_create_table_basic() {
+        let conn = create_conn().unwrap();
+        create_table(&conn, "nums", &[CellDataType::Int, CellDataType::Float]).unwrap();
+        let schema = get_table_schema(&conn, "nums").unwrap();
+        assert_eq!(schema.len(), 2);
+        assert_eq!(schema[0].name, "c0");
+        assert_eq!(schema[0].data_type, "INTEGER");
+        assert_eq!(schema[1].name, "c1");
+        assert_eq!(schema[1].data_type, "DOUBLE");
+    }
+
+    #[test]
+    fn test_create_table_with_header() {
+        let conn = create_conn().unwrap();
+        let header = vec![
+            make_cell(Some("Name"), CellDataType::String),
+            make_cell(Some("Age"), CellDataType::Int),
+        ];
+        create_table_with_header(
+            &conn,
+            "people",
+            &[CellDataType::String, CellDataType::Int],
+            &header,
+        )
+        .unwrap();
+        let schema = get_table_schema(&conn, "people").unwrap();
+        assert_eq!(schema[0].name, "Name");
+        assert_eq!(schema[1].name, "Age");
+    }
+
+    #[test]
+    fn test_create_table_with_header_empty_cell_defaults_to_cN() {
+        let conn = create_conn().unwrap();
+        let header = vec![
+            make_cell(Some("Name"), CellDataType::String),
+            make_cell(None, CellDataType::Empty),
+        ];
+        create_table_with_header(
+            &conn,
+            "t",
+            &[CellDataType::String, CellDataType::Int],
+            &header,
+        )
+        .unwrap();
+        let schema = get_table_schema(&conn, "t").unwrap();
+        assert_eq!(schema[0].name, "Name");
+        assert_eq!(schema[1].name, "c1");
+    }
+
+    #[test]
+    fn test_batch_insert_rows() {
+        let conn = create_conn().unwrap();
+        create_table(&conn, "t", &[CellDataType::Int, CellDataType::String]).unwrap();
+        let rows = vec![
+            vec![make_cell(Some("1"), CellDataType::Int), make_cell(Some("a"), CellDataType::String)],
+            vec![make_cell(Some("2"), CellDataType::Int), make_cell(Some("b"), CellDataType::String)],
+        ];
+        batch_insert_rows(&conn, "t", &rows).unwrap();
+        assert_eq!(table_row_count(&conn, "t").unwrap(), 2);
+    }
+
+    #[test]
+    fn test_batch_insert_rows_empty_yields_ok() {
+        let conn = create_conn().unwrap();
+        create_table(&conn, "t", &[CellDataType::Int]).unwrap();
+        batch_insert_rows(&conn, "t", &[]).unwrap();
+        assert_eq!(table_row_count(&conn, "t").unwrap(), 0);
+    }
+
+    #[test]
+    fn test_batch_insert_rows_with_id() {
+        let conn = create_conn().unwrap();
+        conn.execute_batch(r#"CREATE TABLE "t" (row_id INTEGER, c0 VARCHAR)"#).unwrap();
+        let rows = vec![
+            vec![make_cell(Some("x"), CellDataType::String)],
+            vec![make_cell(Some("y"), CellDataType::String)],
+        ];
+        batch_insert_rows_with_id(&conn, "t", &rows).unwrap();
+        assert_eq!(table_row_count(&conn, "t").unwrap(), 2);
+    }
+
+    #[test]
+    fn test_load_sheet_to_db_with_header() {
+        let conn = create_conn().unwrap();
+        let data = SheetData {
+            name: "sheet1".to_string(),
+            rows: vec![
+                vec![make_cell(Some("ColA"), CellDataType::String), make_cell(Some("ColB"), CellDataType::String)],
+                vec![make_cell(Some("v1"), CellDataType::String), make_cell(Some("v2"), CellDataType::String)],
+            ],
+        };
+        load_sheet_to_db(&conn, "sheet1", &data, true).unwrap();
+        assert_eq!(table_row_count(&conn, "sheet1").unwrap(), 1);
+        let schema = get_table_schema(&conn, "sheet1").unwrap();
+        assert_eq!(schema[0].name, "ColA");
+        assert_eq!(schema[1].name, "ColB");
+    }
+
+    #[test]
+    fn test_load_sheet_to_db_without_header() {
+        let conn = create_conn().unwrap();
+        let data = SheetData {
+            name: "sheet1".to_string(),
+            rows: vec![
+                vec![make_cell(Some("1"), CellDataType::Int), make_cell(Some("x"), CellDataType::String)],
+            ],
+        };
+        load_sheet_to_db(&conn, "sheet1", &data, false).unwrap();
+        assert_eq!(table_row_count(&conn, "sheet1").unwrap(), 1);
+        let schema = get_table_schema(&conn, "sheet1").unwrap();
+        assert_eq!(schema[0].name, "c0");
+    }
+
+    #[test]
+    fn test_load_sheet_to_db_empty_data() {
+        let conn = create_conn().unwrap();
+        let data = SheetData {
+            name: "empty".to_string(),
+            rows: vec![],
+        };
+        load_sheet_to_db(&conn, "empty", &data, true).unwrap();
+        assert!(!table_exists(&conn, "empty").unwrap());
+    }
+
+    #[test]
+    fn test_load_sheet_with_row_id() {
+        let conn = create_conn().unwrap();
+        let data = SheetData {
+            name: "s".to_string(),
+            rows: vec![
+                vec![make_cell(Some("a"), CellDataType::String)],
+                vec![make_cell(Some("b"), CellDataType::String)],
+            ],
+        };
+        load_sheet_with_row_id(&conn, "s", &data, false).unwrap();
+        assert_eq!(table_row_count(&conn, "s").unwrap(), 2);
+    }
+}

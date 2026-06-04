@@ -87,3 +87,116 @@ pub fn infer_column_types(data: &[Vec<CellDataType>]) -> Vec<CellDataType> {
 
     col_types
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cell_to_duckdb_type() {
+        use excel_types::CellDataType::*;
+        assert_eq!(cell_to_duckdb_type(&Int), "INTEGER");
+        assert_eq!(cell_to_duckdb_type(&Float), "DOUBLE");
+        assert_eq!(cell_to_duckdb_type(&Bool), "BOOLEAN");
+        assert_eq!(cell_to_duckdb_type(&DateTime), "TIMESTAMP");
+        assert_eq!(cell_to_duckdb_type(&String), "VARCHAR");
+        assert_eq!(cell_to_duckdb_type(&Error), "VARCHAR");
+        assert_eq!(cell_to_duckdb_type(&Empty), "VARCHAR");
+    }
+
+    #[test]
+    fn test_combine_types_empty() {
+        use excel_types::CellDataType::*;
+        assert_eq!(combine_types(&Empty, &Int), Int);
+        assert_eq!(combine_types(&String, &Empty), String);
+        assert_eq!(combine_types(&Empty, &Empty), Empty);
+    }
+
+    #[test]
+    fn test_combine_types_string_dominates() {
+        use excel_types::CellDataType::*;
+        assert_eq!(combine_types(&String, &Int), String);
+        assert_eq!(combine_types(&Float, &String), String);
+        assert_eq!(combine_types(&String, &Bool), String);
+        assert_eq!(combine_types(&DateTime, &String), String);
+    }
+
+    #[test]
+    fn test_combine_types_promotion_chain() {
+        use excel_types::CellDataType::*;
+        // Bool + Int → Int
+        assert_eq!(combine_types(&Bool, &Int), Int);
+        // Int + Float → Float
+        assert_eq!(combine_types(&Int, &Float), Float);
+        // Float + DateTime → DateTime
+        assert_eq!(combine_types(&Float, &DateTime), DateTime);
+        // Bool + DateTime → DateTime
+        assert_eq!(combine_types(&Bool, &DateTime), DateTime);
+        // Int + DateTime → DateTime
+        assert_eq!(combine_types(&DateTime, &Int), DateTime);
+    }
+
+    #[test]
+    fn test_combine_types_same_type() {
+        use excel_types::CellDataType::*;
+        assert_eq!(combine_types(&Int, &Int), Int);
+        assert_eq!(combine_types(&Float, &Float), Float);
+        assert_eq!(combine_types(&Bool, &Bool), Bool);
+        assert_eq!(combine_types(&DateTime, &DateTime), DateTime);
+    }
+
+    #[test]
+    fn test_infer_column_types_empty() {
+        let result = infer_column_types(&[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_infer_column_types_single_row() {
+        use excel_types::CellDataType::*;
+        let data = vec![vec![Int, Float, Bool, String]];
+        let result = infer_column_types(&data);
+        assert_eq!(result, vec![Int, Float, Bool, String]);
+    }
+
+    #[test]
+    fn test_infer_column_types_mixed_types() {
+        use excel_types::CellDataType::*;
+        let data = vec![
+            vec![Int, Bool, Float],
+            vec![Float, Int, Int],
+        ];
+        let result = infer_column_types(&data);
+        assert_eq!(result, vec![Float, Int, Float]);
+    }
+
+    #[test]
+    fn test_infer_column_types_empty_cells_skipped() {
+        use excel_types::CellDataType::*;
+        let data = vec![
+            vec![Int, Empty],
+            vec![Empty, Float],
+        ];
+        let result = infer_column_types(&data);
+        assert_eq!(result, vec![Int, Float]);
+    }
+
+    #[test]
+    fn test_infer_column_types_all_empty_defaults_to_string() {
+        use excel_types::CellDataType::*;
+        let data = vec![vec![Empty, Empty]];
+        let result = infer_column_types(&data);
+        assert_eq!(result, vec![String, String]);
+    }
+
+    #[test]
+    fn test_infer_column_types_uneven_rows() {
+        use excel_types::CellDataType::*;
+        let data = vec![
+            vec![Int, Float],
+            vec![Int],
+        ];
+        let result = infer_column_types(&data);
+        assert_eq!(result, vec![Int, Float]);
+    }
+}
