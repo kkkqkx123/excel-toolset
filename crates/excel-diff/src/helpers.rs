@@ -1,8 +1,102 @@
 use std::collections::HashMap;
 
-use excel_core::cell_ref;
 use excel_core::excel_read;
 use excel_types::{CellData, CellDiff, DiffType, Result, SheetData};
+
+pub fn classify_diff(old_cell: Option<&CellData>, new_cell: Option<&CellData>) -> DiffType {
+    match (old_cell, new_cell) {
+        (None, None) => DiffType::NoChange,
+        (None, Some(_)) => DiffType::Add,
+        (Some(_), None) => DiffType::Delete,
+        (Some(old), Some(new)) => {
+            if old.formula.is_some() && new.formula.is_some() {
+                if old.formula == new.formula {
+                    if old.value != new.value {
+                        return DiffType::Passive;
+                    }
+                    return DiffType::NoChange;
+                }
+                return DiffType::Modify;
+            }
+
+            if old.value == new.value {
+                return DiffType::NoChange;
+            }
+
+            DiffType::Modify
+        }
+    }
+}
+
+pub fn all_cells_as_diff(sheet: &SheetData, diff_type: DiffType) -> Vec<CellDiff> {
+    let mut diffs = Vec::new();
+
+    for (row_idx, row) in sheet.rows.iter().enumerate() {
+        for (col_idx, cell) in row.iter().enumerate() {
+            let cell_ref = format_cell_ref(row_idx, col_idx);
+
+            diffs.push(CellDiff {
+                row: row_idx as u32,
+                col: col_idx as u16,
+                cell_ref,
+                diff_type: diff_type.clone(),
+                old_value: if diff_type == DiffType::Delete {
+                    cell.value.clone()
+                } else {
+                    None
+                },
+                new_value: if diff_type == DiffType::Add {
+                    cell.value.clone()
+                } else {
+                    None
+                },
+                old_formula: if diff_type == DiffType::Delete {
+                    cell.formula.clone()
+                } else {
+                    None
+                },
+                new_formula: if diff_type == DiffType::Add {
+                    cell.formula.clone()
+                } else {
+                    None
+                },
+            });
+        }
+    }
+
+    diffs
+}
+
+pub fn read_all_sheets_to_map(path: &str) -> Result<HashMap<String, SheetData>> {
+    let sheet_names = excel_read::list_sheets(path)?;
+    let mut sheets = HashMap::new();
+
+    for sheet_name in &sheet_names {
+        let sheet = excel_read::read_sheet_all(path, sheet_name)?;
+        sheets.insert(sheet_name.clone(), sheet);
+    }
+
+    Ok(sheets)
+}
+
+fn format_cell_ref(row: usize, col: usize) -> String {
+    let col_name = index_to_col(col);
+    let row_num = row + 1;
+    format!("{}{}", col_name, row_num)
+}
+
+fn index_to_col(index: usize) -> String {
+    let mut col = String::new();
+    let mut n = index + 1;
+
+    while n > 0 {
+        n -= 1;
+        col.insert(0, ((n % 26) as u8 + b'A') as char);
+        n /= 26;
+    }
+
+    col
+}
 
 #[cfg(test)]
 mod tests {

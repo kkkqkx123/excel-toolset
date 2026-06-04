@@ -46,7 +46,7 @@ pub async fn batch_modify(Json(req): Json<BatchModifyReq>) -> impl IntoResponse 
             excel_diff::semantic::to_natural_text(
                 diff,
                 None,
-                excel_diff::semantic::Verbosity::Detailed,
+                excel_diff::semantic::Verbosity::Detail,
             )
         } else {
             "Batch modify completed (no changes detected).".to_string()

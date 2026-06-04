@@ -4,11 +4,116 @@ pub mod natural;
 
 use excel_types::FileDiff;
 
-use super::grouper::GroupedDiffs;
+use crate::semantic::grouper::{GroupedDiffs, LogicalOperation, group_diffs};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Verbosity {
+    Summary,
+    Detail,
+}
+
+#[derive(Debug, Clone)]
+pub struct SemanticReport {
+    pub summary: String,
+    pub operations: GroupedDiffs,
+    pub detail_sentences: Vec<String>,
+}
+
+pub fn to_natural_text(
+    diff: &FileDiff,
+    _headers: Option<&crate::semantic::context::HeaderContext>,
+    verbosity: Verbosity,
+) -> String {
+    let ops = group_diffs(diff);
+
+    if ops.is_empty() {
+        return "No changes".to_string();
+    }
+
+    match verbosity {
+        Verbosity::Summary => {
+            format!(
+                "Total {} changes: {} added, {} deleted, {} modified, {} passive",
+                diff.summary.total_changes,
+                diff.summary.adds,
+                diff.summary.deletes,
+                diff.summary.modifies,
+                diff.summary.passives
+            )
+        }
+        Verbosity::Detail => {
+            let mut text = format!(
+                "Total {} changes: {} added, {} deleted, {} modified, {} passive",
+                diff.summary.total_changes,
+                diff.summary.adds,
+                diff.summary.deletes,
+                diff.summary.modifies,
+                diff.summary.passives
+            );
+
+            for op in &ops {
+                text.push_str(&format!("\n{}", natural::format_operation(op, None)));
+            }
+
+            text
+        }
+    }
+}
+
+pub fn to_semantic_report(
+    diff: &FileDiff,
+    _headers: Option<&crate::semantic::context::HeaderContext>,
+) -> SemanticReport {
+    let ops = group_diffs(diff);
+
+    if ops.is_empty() {
+        return SemanticReport {
+            summary: "No changes".to_string(),
+            operations: vec![],
+            detail_sentences: vec![],
+        };
+    }
+
+    let detail_sentences = ops
+        .iter()
+        .map(|op| natural::format_operation(op, None))
+        .collect();
+
+    SemanticReport {
+        summary: format!("Total {} changes", diff.summary.total_changes),
+        operations: ops,
+        detail_sentences,
+    }
+}
+
+pub fn enrich_headers(
+    mut ops: GroupedDiffs,
+    headers: Option<&crate::semantic::context::HeaderContext>,
+    _diff: &FileDiff,
+) -> GroupedDiffs {
+    if let Some(ctx) = headers {
+        for op in &mut ops {
+            match op {
+                LogicalOperation::CellModified {
+                    sheet, col, header, ..
+                }
+                | LogicalOperation::CellPassive {
+                    sheet, col, header, ..
+                } => {
+                    *header = ctx.get_header(sheet, *col as usize).map(|s| s.to_string());
+                }
+                _ => {}
+            }
+        }
+    }
+
+    ops
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::semantic::context::HeaderContext;
     use excel_types::{CellDiff, DiffSummary, DiffType, SheetDiff};
 
     fn make_diff(sheet_diffs: Vec<SheetDiff>, modifies: usize) -> FileDiff {

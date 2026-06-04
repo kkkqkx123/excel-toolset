@@ -5,7 +5,7 @@ use std::path::Path;
 use sha2::{Digest, Sha256};
 
 use crate::file_util::{append_timestamp, copy_file, ensure_parent_dir};
-use crate::types::BackupInfo;
+use crate::types::{BackupInfo, SecurityParams};
 
 pub fn compute_file_hash(path: impl AsRef<Path>) -> io::Result<String> {
     let file = fs::File::open(path)?;
@@ -58,6 +58,19 @@ pub fn rollback(backup_info: &BackupInfo, original_path: impl AsRef<Path>) -> io
     }
     copy_file(backup_path, original_path)?;
     Ok(())
+}
+
+pub fn create_backup_if_needed(params: &SecurityParams) -> io::Result<Option<BackupInfo>> {
+    if !params.create_backup {
+        return Ok(None);
+    }
+
+    if params.file_path.is_empty() {
+        return Ok(None);
+    }
+
+    let backup = create_backup(&params.file_path, "write")?;
+    Ok(Some(backup))
 }
 
 #[cfg(test)]

@@ -18,6 +18,19 @@ pub struct WriteResult {
     pub diff: Option<FileDiff>,
 }
 
+impl WriteResult {
+    pub fn dry_run_success() -> Self {
+        Self {
+            success: true,
+            message: "Dry run completed successfully".to_string(),
+            backup_info: None,
+            old_hash: String::new(),
+            new_hash: String::new(),
+            diff: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum BatchOperation {

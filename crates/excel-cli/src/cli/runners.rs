@@ -469,7 +469,7 @@ fn run_batch(args: &BatchArgs, format: &str) -> Result<serde_json::Value> {
                     parts.push(result.message.clone());
                 }
                 if let Some(ref diff) = result.diff {
-                    parts.push(semantic::to_natural_text(diff, None, Verbosity::Detailed));
+                    parts.push(semantic::to_natural_text(diff, None, Verbosity::Detail));
                 }
                 let text = if parts.is_empty() {
                     "Batch modify completed.".to_string()
@@ -505,7 +505,7 @@ fn run_diff(args: &DiffArgs, format: &str) -> Result<serde_json::Value> {
             };
 
             if format == "text" {
-                let text = semantic::to_natural_text(&diff, None, Verbosity::Detailed);
+                let text = semantic::to_natural_text(&diff, None, Verbosity::Detail);
                 Ok(serde_json::json!({"raw_text": text}))
             } else {
                 Ok(serde_json::to_value(diff).map_err(|e| AppError::Serialize(e.to_string()))?)
@@ -531,7 +531,7 @@ fn run_diff(args: &DiffArgs, format: &str) -> Result<serde_json::Value> {
                     sheet_diffs: vec![sd],
                     summary,
                 };
-                let text = semantic::to_natural_text(&fd, None, Verbosity::Detailed);
+                let text = semantic::to_natural_text(&fd, None, Verbosity::Detail);
                 Ok(serde_json::json!({"raw_text": text}))
             } else {
                 Ok(serde_json::to_value(diff).map_err(|e| AppError::Serialize(e.to_string()))?)

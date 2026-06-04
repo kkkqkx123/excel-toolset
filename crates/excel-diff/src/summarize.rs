@@ -1,5 +1,30 @@
 use excel_types::{DiffSummary, DiffType, SheetDiff};
 
+pub fn summarize(sheet_diffs: &[SheetDiff]) -> DiffSummary {
+    let mut summary = DiffSummary {
+        adds: 0,
+        deletes: 0,
+        modifies: 0,
+        passives: 0,
+        total_changes: 0,
+    };
+
+    for sheet_diff in sheet_diffs {
+        for cell_diff in &sheet_diff.cell_diffs {
+            match cell_diff.diff_type {
+                DiffType::Add => summary.adds += 1,
+                DiffType::Delete => summary.deletes += 1,
+                DiffType::Modify => summary.modifies += 1,
+                DiffType::Passive => summary.passives += 1,
+                DiffType::NoChange => continue,
+            }
+            summary.total_changes += 1;
+        }
+    }
+
+    summary
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

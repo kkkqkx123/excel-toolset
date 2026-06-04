@@ -3,7 +3,10 @@ use axum::{
     routing::{get, post},
 };
 
-use super::{batch, cell, chart, data, diff, file, format, formula, health, range, sheet, vba};
+use super::{
+    batch, cell, chart, comments, conditional_format, data, diff, file, format, formula,
+    formula_analysis, health, named_ranges, range, search, sheet, vba,
+};
 
 pub fn create_router() -> Router {
     Router::new()
@@ -37,9 +40,51 @@ pub fn create_router() -> Router {
         .route("/api/data/sql", post(data::data_sql))
         .route("/api/formula/set", post(formula::formula_set))
         .route("/api/formula/refresh", post(formula::formula_refresh))
+        .route(
+            "/api/formula/trace_dependencies",
+            post(formula_analysis::trace_dependencies),
+        )
+        .route(
+            "/api/formula/explain",
+            post(formula_analysis::explain_formula),
+        )
+        .route(
+            "/api/formula/explain_logic",
+            post(formula_analysis::explain_formula_logic),
+        )
+        .route("/api/search/workbook", post(search::search_workbook))
+        .route("/api/search/sheet", post(search::search_sheet))
         .route("/api/format/set", post(format::format_set))
         .route("/api/cell/merge", post(format::cell_merge))
         .route("/api/chart/create", post(chart::chart_create))
+        .route("/api/comments/get", post(comments::get_comment))
+        .route("/api/comments/add", post(comments::add_comment))
+        .route("/api/comments/update", post(comments::update_comment))
+        .route("/api/comments/delete", post(comments::delete_comment))
+        .route(
+            "/api/named_ranges/list/{path}",
+            get(named_ranges::list_named_ranges),
+        )
+        .route(
+            "/api/named_ranges/get_value",
+            post(named_ranges::get_named_range_value),
+        )
+        .route(
+            "/api/named_ranges/create",
+            post(named_ranges::create_named_range),
+        )
+        .route(
+            "/api/named_ranges/delete",
+            post(named_ranges::delete_named_range),
+        )
+        .route(
+            "/api/conditional_format/add",
+            post(conditional_format::add_conditional_format),
+        )
+        .route(
+            "/api/conditional_format/remove",
+            post(conditional_format::remove_conditional_format),
+        )
         .route("/api/vba/export", post(vba::vba_export))
         .route("/api/vba/import", post(vba::vba_import))
         .route("/api/diff/file", post(diff::diff_file))

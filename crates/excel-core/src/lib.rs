@@ -1,10 +1,15 @@
 pub mod api;
 pub mod cell_ref;
+pub mod comments;
+pub mod conditional_format;
 pub mod excel_data;
 pub mod excel_read;
 pub mod excel_write;
 pub mod file_util;
+pub mod formula_analysis;
 pub mod helpers;
+pub mod named_ranges;
+pub mod search;
 pub mod security;
 pub mod types;
 pub mod vba_util;

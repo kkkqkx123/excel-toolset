@@ -51,6 +51,15 @@ pub enum AppError {
 
     #[error("{0}")]
     Custom(String),
+
+    #[error("Read error: {0}")]
+    Read(String),
+
+    #[error("Write error: {0}")]
+    Write(String),
+
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
 }
 
 impl AppError {
@@ -72,6 +81,9 @@ impl AppError {
             AppError::DuckDb(_) => "DUCKDB_ERROR",
             AppError::Serialize(_) => "SERIALIZE_ERROR",
             AppError::Custom(_) => "CUSTOM_ERROR",
+            AppError::Read(_) => "READ_ERROR",
+            AppError::Write(_) => "WRITE_ERROR",
+            AppError::InvalidInput(_) => "INVALID_INPUT",
         }
     }
 }

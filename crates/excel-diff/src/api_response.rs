@@ -1,9 +1,38 @@
-use excel_types::{DiffType, FileDiff, SheetDiff};
+use crate::formula_tracker::FormulaTracker;
+use excel_types::FileDiff;
+use serde_json::Value;
+
+pub fn to_api_response(diff: &FileDiff, _tracker: Option<&FormulaTracker>) -> Value {
+    let response = serde_json::json!({
+        "success": true,
+        "file_hash_match": diff.file_hash_match,
+        "summary": diff.summary,
+        "sheets": diff.sheet_diffs.iter().map(|sheet| {
+            serde_json::json!({
+                "sheet_name": sheet.sheet_name,
+                "row_count_diff": sheet.row_count_diff,
+                "col_count_diff": sheet.col_count_diff,
+                "cell_diffs": sheet.cell_diffs.iter().map(|cell| {
+                    serde_json::json!({
+                        "cell_ref": cell.cell_ref,
+                        "diff_type": format!("{:?}", cell.diff_type),
+                        "old_value": cell.old_value,
+                        "new_value": cell.new_value,
+                        "old_formula": cell.old_formula,
+                        "new_formula": cell.new_formula,
+                    })
+                }).collect::<Vec<_>>()
+            })
+        }).collect::<Vec<_>>()
+    });
+
+    response
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use excel_types::{CellDiff, DiffSummary};
+    use excel_types::{CellDiff, DiffSummary, DiffType, SheetDiff};
     use std::collections::HashMap;
 
     fn make_diff(file_hash_match: bool, cell_diffs: Vec<CellDiff>) -> FileDiff {

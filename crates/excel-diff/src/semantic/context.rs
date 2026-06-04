@@ -2,6 +2,63 @@ use std::collections::HashMap;
 
 use excel_types::SheetData;
 
+#[derive(Debug, Clone)]
+pub struct HeaderContext {
+    headers: HashMap<String, Vec<String>>,
+}
+
+impl HeaderContext {
+    pub fn new(headers: HashMap<String, Vec<String>>) -> Self {
+        HeaderContext { headers }
+    }
+
+    pub fn get_header(&self, sheet_name: &str, col: usize) -> Option<&str> {
+        self.headers
+            .get(sheet_name)
+            .and_then(|headers| headers.get(col))
+            .map(|h| h.as_str())
+            .filter(|h| !h.is_empty())
+    }
+
+    pub fn from_sheet_maps(
+        old: &HashMap<String, SheetData>,
+        new: &HashMap<String, SheetData>,
+    ) -> Self {
+        let mut headers = HashMap::new();
+
+        for sheet_name in old.keys().chain(new.keys()) {
+            if let Some(new_sheet) = new.get(sheet_name) {
+                let sheet_headers = extract_headers(new_sheet);
+                if !sheet_headers.is_empty() {
+                    headers.insert(sheet_name.clone(), sheet_headers);
+                    continue;
+                }
+            }
+
+            if let Some(old_sheet) = old.get(sheet_name) {
+                let sheet_headers = extract_headers(old_sheet);
+                if !sheet_headers.is_empty() {
+                    headers.insert(sheet_name.clone(), sheet_headers);
+                }
+            }
+        }
+
+        HeaderContext { headers }
+    }
+}
+
+pub fn extract_headers(sheet: &SheetData) -> Vec<String> {
+    sheet
+        .rows
+        .first()
+        .map(|row| {
+            row.iter()
+                .filter_map(|cell| cell.value.as_ref().filter(|v| !v.is_empty()).cloned())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,7 +1,315 @@
 use std::collections::{HashMap, HashSet};
 
-use excel_core::cell_ref;
 use excel_types::SheetData;
+
+#[derive(Debug, Clone, Default)]
+pub struct FormulaTracker {
+    pub dependencies: HashMap<String, HashSet<String>>,
+}
+
+impl FormulaTracker {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn build_from_sheet(sheet: &SheetData) -> Self {
+        let mut tracker = Self::new();
+
+        for (row_idx, row) in sheet.rows.iter().enumerate() {
+            for (col_idx, cell) in row.iter().enumerate() {
+                if let Some(formula) = &cell.formula {
+                    let cell_ref = format_cell_ref(row_idx, col_idx);
+                    let refs = extract_cell_refs(formula);
+                    if !refs.is_empty() {
+                        tracker.dependencies.insert(cell_ref, refs);
+                    }
+                }
+            }
+        }
+
+        tracker
+    }
+
+    pub fn is_passive_change(
+        &self,
+        _cell_ref: &str,
+        old_formula: Option<&str>,
+        new_formula: Option<&str>,
+    ) -> bool {
+        match (old_formula, new_formula) {
+            (Some(of), Some(nf)) => of == nf,
+            _ => false,
+        }
+    }
+
+    pub fn get_dependency_chain(&self, cell_ref: &str) -> Option<String> {
+        let mut chain = Vec::new();
+        let mut visited = HashSet::new();
+
+        if self.build_chain_recursive(cell_ref, &mut chain, &mut visited) {
+            Some(chain.join(" -> "))
+        } else {
+            None
+        }
+    }
+
+    fn build_chain_recursive(
+        &self,
+        cell_ref: &str,
+        chain: &mut Vec<String>,
+        visited: &mut HashSet<String>,
+    ) -> bool {
+        if visited.contains(cell_ref) {
+            return false;
+        }
+
+        visited.insert(cell_ref.to_string());
+        chain.push(cell_ref.to_string());
+
+        if let Some(deps) = self.dependencies.get(cell_ref) {
+            for dep in deps {
+                if !self.build_chain_recursive(dep, chain, visited) {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+}
+
+pub fn extract_cell_refs(formula: &str) -> HashSet<String> {
+    let mut refs = HashSet::new();
+    let formula = strip_all_sheet_prefixes(formula);
+
+    if !formula.starts_with('=') {
+        return refs;
+    }
+
+    let formula = &formula[1..];
+    let chars: Vec<char> = formula.chars().collect();
+    let mut i = 0;
+
+    while i < chars.len() {
+        if let Some(range) = try_match_range(&chars, i) {
+            for cell in expand_range(&range) {
+                refs.insert(cell);
+            }
+            i += range.len();
+        } else if let Some((cell_ref, match_len)) = try_match_cell_with_len(&chars, i) {
+            refs.insert(cell_ref);
+            i += match_len;
+        } else {
+            i += 1;
+        }
+    }
+
+    refs
+}
+
+pub fn strip_all_sheet_prefixes(formula: &str) -> String {
+    let mut result = String::new();
+    let mut i = 0;
+    let chars: Vec<char> = formula.chars().collect();
+
+    while i < chars.len() {
+        if chars[i] == '\'' {
+            let end = match chars[i + 1..].iter().position(|&c| c == '\'') {
+                Some(pos) => i + 1 + pos,
+                None => {
+                    result.push(chars[i]);
+                    i += 1;
+                    continue;
+                }
+            };
+            if end + 1 < chars.len() && chars[end + 1] == '!' {
+                i = end + 2;
+            } else {
+                result.push(chars[i]);
+                i += 1;
+            }
+        } else {
+            let mut j = i;
+            while j < chars.len() && chars[j] != '!' && chars[j] != '\'' {
+                j += 1;
+            }
+
+            if j < chars.len() && chars[j] == '!' {
+                i = j + 1;
+            } else {
+                while i < j {
+                    result.push(chars[i]);
+                    i += 1;
+                }
+            }
+        }
+    }
+
+    result
+}
+
+pub fn try_match_cell(chars: &[char], pos: usize) -> Option<String> {
+    try_match_cell_with_len(chars, pos).map(|(s, _)| s)
+}
+
+fn try_match_cell_with_len(chars: &[char], pos: usize) -> Option<(String, usize)> {
+    if pos >= chars.len() {
+        return None;
+    }
+
+    let start = pos;
+    let mut i = pos;
+
+    let has_dollar_prefix = if i < chars.len() && chars[i] == '$' {
+        i += 1;
+        true
+    } else {
+        false
+    };
+
+    while i < chars.len() && chars[i].is_ascii_alphabetic() {
+        i += 1;
+    }
+
+    let has_dollar_middle = if i < chars.len() && chars[i] == '$' {
+        i += 1;
+        true
+    } else {
+        false
+    };
+
+    while i < chars.len() && chars[i].is_ascii_digit() {
+        i += 1;
+    }
+
+    let has_dollar_suffix = if i < chars.len() && chars[i] == '$' {
+        i += 1;
+        true
+    } else {
+        false
+    };
+
+    let match_len = i - start;
+
+    if i > start {
+        let has_letters = chars[start..i].iter().any(|c| c.is_ascii_alphabetic());
+        let has_digits = chars[start..i].iter().any(|c| c.is_ascii_digit());
+
+        if has_letters && has_digits {
+            let result: String = chars[start..i].iter().collect();
+            Some((result.replace('$', ""), match_len))
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+fn try_match_range(chars: &[char], pos: usize) -> Option<String> {
+    if pos >= chars.len() {
+        return None;
+    }
+
+    let (start_cell, start_len) = try_match_cell_with_len(chars, pos)?;
+
+    let mut i = pos + start_len;
+
+    if i >= chars.len() || chars[i] != ':' {
+        return None;
+    }
+
+    i += 1;
+
+    let (end_cell, end_len) = try_match_cell_with_len(chars, i)?;
+
+    Some(format!("{}:{}", start_cell, end_cell))
+}
+
+fn expand_range(range: &str) -> Vec<String> {
+    let parts: Vec<&str> = range.split(':').collect();
+    if parts.len() != 2 {
+        return Vec::new();
+    }
+
+    let start = parts[0];
+    let end = parts[1];
+
+    let (start_row, start_col) = match parse_cell_ref(start) {
+        Some(coords) => coords,
+        None => return Vec::new(),
+    };
+
+    let (end_row, end_col) = match parse_cell_ref(end) {
+        Some(coords) => coords,
+        None => return Vec::new(),
+    };
+
+    let mut cells = Vec::new();
+
+    for row in start_row..=end_row {
+        for col in start_col..=end_col {
+            let col_name = index_to_col(col);
+            let row_num = row + 1;
+            cells.push(format!("{}{}", col_name, row_num));
+        }
+    }
+
+    cells
+}
+
+fn parse_cell_ref(ref_str: &str) -> Option<(usize, usize)> {
+    let chars: Vec<char> = ref_str.chars().collect();
+    let mut col_end = 0;
+
+    while col_end < chars.len() && chars[col_end].is_ascii_alphabetic() {
+        col_end += 1;
+    }
+
+    if col_end == 0 || col_end >= chars.len() {
+        return None;
+    }
+
+    let col_str: String = chars[..col_end].iter().collect();
+    let col = col_str_to_index(&col_str)?;
+
+    let row_str: String = chars[col_end..].iter().collect();
+    let row: usize = row_str.parse().ok()?;
+
+    Some((row - 1, col))
+}
+
+fn col_str_to_index(col_str: &str) -> Option<usize> {
+    let mut index = 0;
+
+    for c in col_str.chars() {
+        if !c.is_ascii_alphabetic() {
+            return None;
+        }
+        index = index * 26 + (c.to_ascii_uppercase() as usize - 'A' as usize + 1);
+    }
+
+    Some(index - 1)
+}
+
+fn format_cell_ref(row: usize, col: usize) -> String {
+    let col_name = index_to_col(col);
+    let row_num = row + 1;
+    format!("{}{}", col_name, row_num)
+}
+
+fn index_to_col(index: usize) -> String {
+    let mut col = String::new();
+    let mut n = index + 1;
+
+    while n > 0 {
+        n -= 1;
+        col.insert(0, ((n % 26) as u8 + b'A') as char);
+        n /= 26;
+    }
+
+    col
+}
 
 #[cfg(test)]
 mod tests {

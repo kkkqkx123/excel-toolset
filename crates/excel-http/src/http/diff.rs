@@ -47,7 +47,7 @@ pub async fn diff_file(Json(req): Json<DiffFileReq>) -> impl IntoResponse {
     match diff_result {
         Ok(diff) => {
             if req.format == "text" {
-                let text = semantic::to_natural_text(&diff, None, Verbosity::Detailed);
+                let text = semantic::to_natural_text(&diff, None, Verbosity::Detail);
                 Ok((
                     StatusCode::OK,
                     [("content-type", "text/plain; charset=utf-8")],
@@ -103,7 +103,7 @@ pub async fn handle_diff_range(Json(req): Json<DiffRangeReq>) -> impl IntoRespon
                     sheet_diffs: vec![sd],
                     summary,
                 };
-                let text = semantic::to_natural_text(&fd, None, Verbosity::Detailed);
+                let text = semantic::to_natural_text(&fd, None, Verbosity::Detail);
                 Ok((
                     StatusCode::OK,
                     [("content-type", "text/plain; charset=utf-8")],

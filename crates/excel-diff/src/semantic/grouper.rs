@@ -2,6 +2,192 @@ use std::collections::BTreeMap;
 
 use excel_types::{CellDiff, DiffType, FileDiff};
 
+#[derive(Debug, Clone)]
+pub struct CellEntry {
+    pub cell_ref: String,
+    pub col: u16,
+    pub value: String,
+}
+
+#[derive(Debug, Clone)]
+pub enum LogicalOperation {
+    SheetResized {
+        sheet: String,
+        row_delta: i32,
+        col_delta: i32,
+    },
+    SheetAdded {
+        sheet: String,
+        row_count: u32,
+        cell_count: usize,
+    },
+    SheetDeleted {
+        sheet: String,
+        row_count: u32,
+        cell_count: usize,
+    },
+    RowAdded {
+        sheet: String,
+        row: u32,
+        entries: Vec<CellEntry>,
+    },
+    RowDeleted {
+        sheet: String,
+        row: u32,
+        entries: Vec<CellEntry>,
+    },
+    CellModified {
+        sheet: String,
+        cell_ref: String,
+        col: u16,
+        header: Option<String>,
+        old_value: Option<String>,
+        new_value: Option<String>,
+        old_formula: Option<String>,
+        new_formula: Option<String>,
+    },
+    CellPassive {
+        sheet: String,
+        cell_ref: String,
+        col: u16,
+        header: Option<String>,
+        old_value: Option<String>,
+        new_value: Option<String>,
+        old_formula: Option<String>,
+        new_formula: Option<String>,
+    },
+}
+
+pub type GroupedDiffs = Vec<LogicalOperation>;
+
+pub fn group_diffs(diff: &FileDiff) -> GroupedDiffs {
+    let mut ops = Vec::new();
+
+    for sheet_diff in &diff.sheet_diffs {
+        if sheet_diff.row_count_diff != 0 || sheet_diff.col_count_diff != 0 {
+            ops.push(LogicalOperation::SheetResized {
+                sheet: sheet_diff.sheet_name.clone(),
+                row_delta: sheet_diff.row_count_diff,
+                col_delta: sheet_diff.col_count_diff,
+            });
+        }
+
+        let rows_by_diff: BTreeMap<u32, Vec<&CellDiff>> = sheet_diff
+            .cell_diffs
+            .iter()
+            .filter(|d| matches!(d.diff_type, DiffType::Add | DiffType::Delete))
+            .fold(BTreeMap::new(), |mut acc, d| {
+                acc.entry(d.row).or_default().push(d);
+                acc
+            });
+
+        for (row, diffs) in &rows_by_diff {
+            let all_add = diffs.iter().all(|d| matches!(d.diff_type, DiffType::Add));
+            let all_delete = diffs
+                .iter()
+                .all(|d| matches!(d.diff_type, DiffType::Delete));
+
+            if all_add && diffs.len() > 1 {
+                let entries = diffs
+                    .iter()
+                    .map(|d| CellEntry {
+                        cell_ref: d.cell_ref.clone(),
+                        col: d.col,
+                        value: d.new_value.clone().unwrap_or_default(),
+                    })
+                    .collect();
+                ops.push(LogicalOperation::RowAdded {
+                    sheet: sheet_diff.sheet_name.clone(),
+                    row: *row,
+                    entries,
+                });
+            } else if all_delete && diffs.len() > 1 {
+                let entries = diffs
+                    .iter()
+                    .map(|d| CellEntry {
+                        cell_ref: d.cell_ref.clone(),
+                        col: d.col,
+                        value: d.old_value.clone().unwrap_or_default(),
+                    })
+                    .collect();
+                ops.push(LogicalOperation::RowDeleted {
+                    sheet: sheet_diff.sheet_name.clone(),
+                    row: *row,
+                    entries,
+                });
+            } else {
+                for diff in diffs {
+                    match diff.diff_type {
+                        DiffType::Add | DiffType::Delete => {
+                            ops.push(LogicalOperation::CellModified {
+                                sheet: sheet_diff.sheet_name.clone(),
+                                cell_ref: diff.cell_ref.clone(),
+                                col: diff.col,
+                                header: None,
+                                old_value: diff.old_value.clone(),
+                                new_value: diff.new_value.clone(),
+                                old_formula: diff.old_formula.clone(),
+                                new_formula: diff.new_formula.clone(),
+                            })
+                        }
+                        DiffType::Modify => ops.push(LogicalOperation::CellModified {
+                            sheet: sheet_diff.sheet_name.clone(),
+                            cell_ref: diff.cell_ref.clone(),
+                            col: diff.col,
+                            header: None,
+                            old_value: diff.old_value.clone(),
+                            new_value: diff.new_value.clone(),
+                            old_formula: diff.old_formula.clone(),
+                            new_formula: diff.new_formula.clone(),
+                        }),
+                        DiffType::Passive => ops.push(LogicalOperation::CellPassive {
+                            sheet: sheet_diff.sheet_name.clone(),
+                            cell_ref: diff.cell_ref.clone(),
+                            col: diff.col,
+                            header: None,
+                            old_value: diff.old_value.clone(),
+                            new_value: diff.new_value.clone(),
+                            old_formula: diff.old_formula.clone(),
+                            new_formula: diff.new_formula.clone(),
+                        }),
+                        DiffType::NoChange => {}
+                    }
+                }
+            }
+        }
+
+        for diff in &sheet_diff.cell_diffs {
+            if !matches!(diff.diff_type, DiffType::Add | DiffType::Delete) {
+                match diff.diff_type {
+                    DiffType::Modify => ops.push(LogicalOperation::CellModified {
+                        sheet: sheet_diff.sheet_name.clone(),
+                        cell_ref: diff.cell_ref.clone(),
+                        col: diff.col,
+                        header: None,
+                        old_value: diff.old_value.clone(),
+                        new_value: diff.new_value.clone(),
+                        old_formula: diff.old_formula.clone(),
+                        new_formula: diff.new_formula.clone(),
+                    }),
+                    DiffType::Passive => ops.push(LogicalOperation::CellPassive {
+                        sheet: sheet_diff.sheet_name.clone(),
+                        cell_ref: diff.cell_ref.clone(),
+                        col: diff.col,
+                        header: None,
+                        old_value: diff.old_value.clone(),
+                        new_value: diff.new_value.clone(),
+                        old_formula: diff.old_formula.clone(),
+                        new_formula: diff.new_formula.clone(),
+                    }),
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    ops
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
