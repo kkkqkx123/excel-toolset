@@ -2,7 +2,6 @@ use regex::Regex;
 use serde::Serialize;
 use std::collections::HashSet;
 
-use crate::cell_ref;
 use crate::excel_read;
 use crate::types::*;
 use calamine::Reader;
@@ -51,7 +50,7 @@ pub fn trace_dependencies(path: &str, sheet: &str, cell: &str) -> Result<Depende
         .worksheet_formula(sheet)
         .map_err(|_e| AppError::SheetNotFound(sheet.to_string()))?;
 
-    let (row, col) = cell_ref::parse_cell_ref(cell)?;
+    let (row, col) = crate::utils::cell_ref::parse_cell_ref(cell)?;
 
     let formula = ws_formulas
         .get_value((row, col as u32))
@@ -182,7 +181,7 @@ fn find_direct_dependents(path: &str, sheet: &str, cell: &str) -> Result<Vec<Str
         .worksheet_range(sheet)
         .map_err(|_e| AppError::SheetNotFound(sheet.to_string()))?;
 
-    let (target_row, target_col) = cell_ref::parse_cell_ref(cell)?;
+    let (target_row, target_col) = crate::utils::cell_ref::parse_cell_ref(cell)?;
 
     for row in 0..range.height() {
         for col in 0..range.width() {
@@ -198,11 +197,11 @@ fn find_direct_dependents(path: &str, sheet: &str, cell: &str) -> Result<Vec<Str
                     let ref_cell = parts[1];
 
                     if ref_sheet == sheet
-                        && let Ok((r, c)) = cell_ref::parse_cell_ref(ref_cell)
+                        && let Ok((r, c)) = crate::utils::cell_ref::parse_cell_ref(ref_cell)
                         && r == target_row
                         && c == target_col
                     {
-                        let cell_addr = cell_ref::format_cell_ref(row as u32, col as u16);
+                        let cell_addr = crate::utils::cell_ref::format_cell_ref(row as u32, col as u16);
                         dependents.push(format!("{}!{}", sheet, cell_addr));
                     }
                 }
@@ -260,8 +259,8 @@ pub fn explain_formula(
 ) -> Result<FormulaExplanation> {
     let formula = excel_read::read_formula(path, sheet, cell)?.ok_or_else(|| {
         AppError::CellNotFound(
-            cell_ref::parse_cell_ref(cell).unwrap().0,
-            cell_ref::parse_cell_ref(cell).unwrap().1,
+            crate::utils::cell_ref::parse_cell_ref(cell).unwrap().0,
+            crate::utils::cell_ref::parse_cell_ref(cell).unwrap().1,
         )
     })?;
 
@@ -441,8 +440,8 @@ pub fn explain_formula_logic(
 ) -> Result<FormulaLogicExplanation> {
     let formula = excel_read::read_formula(path, sheet, cell)?.ok_or_else(|| {
         AppError::CellNotFound(
-            cell_ref::parse_cell_ref(cell).unwrap().0,
-            cell_ref::parse_cell_ref(cell).unwrap().1,
+            crate::utils::cell_ref::parse_cell_ref(cell).unwrap().0,
+            crate::utils::cell_ref::parse_cell_ref(cell).unwrap().1,
         )
     })?;
 
@@ -454,8 +453,8 @@ pub fn explain_formula_logic(
     let calculation_result = if let Ok(cell_data) = excel_read::read_cell(
         path,
         sheet,
-        cell_ref::parse_cell_ref(cell)?.0,
-        cell_ref::parse_cell_ref(cell)?.1,
+        crate::utils::cell_ref::parse_cell_ref(cell)?.0,
+        crate::utils::cell_ref::parse_cell_ref(cell)?.1,
     ) {
         match cell_data.data_type {
             CellDataType::Float | CellDataType::Int | CellDataType::Bool => cell_data.value,

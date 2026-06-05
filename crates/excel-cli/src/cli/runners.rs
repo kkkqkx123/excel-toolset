@@ -1,13 +1,13 @@
 use chrono::Utc;
 
 use excel_core::api;
-use excel_core::excel_data;
+use excel_core::data_ops;
 use excel_core::excel_read;
 use excel_core::excel_write;
-use excel_core::helpers;
+use excel_core::utils::helpers;
 use excel_core::security;
 use excel_core::types::*;
-use excel_core::vba_util;
+use excel_core::features::vba_util;
 use excel_diff::diff_files;
 use excel_diff::diff_range;
 use excel_diff::diff_sheets;
@@ -124,7 +124,7 @@ fn run_sheet(args: &SheetArgs) -> Result<serde_json::Value> {
 fn run_cell(args: &CellArgs) -> Result<serde_json::Value> {
     match &args.command {
         CellSub::Read { path, sheet, cell } => {
-            let (row, col) = excel_core::cell_ref::parse_cell_ref(cell)?;
+            let (row, col) = excel_core::utils::cell_ref::parse_cell_ref(cell)?;
             let data = excel_read::read_cell(path, sheet, row, col)?;
             Ok(serde_json::to_value(data).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
@@ -135,7 +135,7 @@ fn run_cell(args: &CellArgs) -> Result<serde_json::Value> {
             value,
             dry_run,
         } => {
-            let (row, col) = excel_core::cell_ref::parse_cell_ref(cell)?;
+            let (row, col) = excel_core::utils::cell_ref::parse_cell_ref(cell)?;
             let params = SecurityParams {
                 dry_run: *dry_run,
                 create_backup: true,
@@ -221,7 +221,7 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 create_backup: true,
                 file_path: path.clone(),
             };
-            let result = excel_data::append_rows(path, &params, sheet, &cell_values)?;
+            let result = data_ops::append_rows(path, &params, sheet, &cell_values)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DataSub::InsertRow {
@@ -242,7 +242,7 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 create_backup: true,
                 file_path: path.clone(),
             };
-            let result = excel_data::insert_rows(path, &params, sheet, *row, &cell_values)?;
+            let result = data_ops::insert_rows(path, &params, sheet, *row, &cell_values)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DataSub::DeleteRow {
@@ -256,7 +256,7 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 create_backup: true,
                 file_path: path.clone(),
             };
-            let result = excel_data::delete_rows(path, &params, sheet, *row, *row)?;
+            let result = data_ops::delete_rows(path, &params, sheet, *row, *row)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DataSub::Filter {
@@ -396,7 +396,7 @@ fn run_chart(args: &ChartArgs) -> Result<serde_json::Value> {
             dry_run,
         } => {
             let ct = helpers::chart_type_from_str(chart_type)?;
-            let (r1, c1, _, _) = excel_core::cell_ref::parse_range(range)?;
+            let (r1, c1, _, _) = excel_core::utils::cell_ref::parse_range(range)?;
             let config = ChartConfig {
                 chart_type: ct,
                 title: title.clone(),

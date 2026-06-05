@@ -1,4 +1,4 @@
-use excel_core::cell_ref;
+use excel_core::utils::cell_ref;
 use excel_core::excel_read::read_range;
 use excel_types::{CellData, CellDiff, DiffType, RangeDiff, Result};
 

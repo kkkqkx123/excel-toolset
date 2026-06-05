@@ -116,7 +116,7 @@ pub fn search_sheet(path: &str, sheet: &str, query: &SearchQuery) -> Result<Sear
             if value_match.is_some() || formula_match.is_some() {
                 let context = get_context(&range, row, col);
 
-                let cell_addr = crate::cell_ref::format_cell_ref(row as u32, col as u16);
+                let cell_addr = crate::utils::cell_ref::format_cell_ref(row as u32, col as u16);
 
                 matches.push(SearchMatch {
                     sheet: sheet.to_string(),

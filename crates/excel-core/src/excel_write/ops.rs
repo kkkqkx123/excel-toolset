@@ -1,6 +1,6 @@
 use rust_xlsxwriter::{Chart, Format, Workbook};
 
-use crate::cell_ref;
+use crate::utils::cell_ref;
 use crate::types::*;
 
 use super::chart::map_chart_type;

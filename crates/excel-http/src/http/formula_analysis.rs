@@ -1,7 +1,7 @@
 use axum::Json;
 use serde::Deserialize;
 
-use excel_core::formula_analysis;
+use excel_core::features::formula_analysis;
 use excel_core::types::*;
 
 #[derive(Deserialize)]

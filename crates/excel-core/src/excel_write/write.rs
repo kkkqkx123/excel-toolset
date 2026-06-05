@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use rust_xlsxwriter::{Chart, Format, Workbook, Worksheet};
 
-use crate::cell_ref;
+use crate::utils::cell_ref;
 use crate::excel_read::read_all_sheets_to_map;
 use crate::security::{compute_file_hash, create_backup};
 use crate::types::*;

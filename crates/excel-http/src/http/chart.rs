@@ -2,7 +2,7 @@ use axum::Json;
 use serde::Deserialize;
 
 use excel_core::excel_write;
-use excel_core::helpers;
+use excel_core::utils::helpers;
 use excel_core::types::*;
 
 #[derive(Deserialize)]
@@ -21,7 +21,7 @@ pub async fn chart_create(Json(req): Json<ChartCreateReq>) -> Json<ApiResponse<W
         Ok(t) => t,
         Err(e) => return Json(ApiResponse::err(e)),
     };
-    let (r1, c1, _, _) = match excel_core::cell_ref::parse_range(&req.range) {
+    let (r1, c1, _, _) = match excel_core::utils::cell_ref::parse_range(&req.range) {
         Ok(v) => v,
         Err(e) => return Json(ApiResponse::err(e)),
     };

@@ -2,7 +2,7 @@ use axum::Json;
 use serde::Deserialize;
 
 use excel_core::types::*;
-use excel_core::vba_util;
+use excel_core::features::vba_util;
 
 #[derive(Deserialize)]
 pub struct VbaExportReq {

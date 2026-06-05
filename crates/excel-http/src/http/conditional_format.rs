@@ -1,7 +1,7 @@
 use axum::Json;
 use serde::Deserialize;
 
-use excel_core::conditional_format;
+use excel_core::features::conditional_format;
 use excel_core::types::*;
 
 #[derive(Deserialize)]

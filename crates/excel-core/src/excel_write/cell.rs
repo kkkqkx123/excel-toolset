@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::cell_ref;
+use crate::utils::cell_ref;
 use crate::types::*;
 
 use super::util::{cell_value_to_data, ensure_dimensions};

@@ -13,7 +13,7 @@ pub struct Comment {
 }
 
 pub fn get_comment(path: &str, sheet: &str, cell: &str) -> Result<Option<Comment>> {
-    let (row, col) = crate::cell_ref::parse_cell_ref(cell)?;
+    let (row, col) = crate::utils::cell_ref::parse_cell_ref(cell)?;
 
     let mut zipfile = zip::ZipArchive::new(BufReader::new(File::open(path)?))
         .map_err(|e| AppError::Read(e.to_string()))?;
@@ -53,7 +53,7 @@ fn parse_comment_xml(xml: &str, target_row: u32, target_col: u16) -> Option<Stri
                     None => continue,
                 };
                 let ref_text = &comment_block[ref_start + 5..ref_end];
-                if let Ok((row, col)) = crate::cell_ref::parse_cell_ref(ref_text)
+                if let Ok((row, col)) = crate::utils::cell_ref::parse_cell_ref(ref_text)
                     && row == target_row
                     && col == target_col
                     && let Some(text_start) = comment_block.find("<text>")

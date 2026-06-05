@@ -32,7 +32,7 @@ pub fn add_conditional_format(
 
     security::create_backup_if_needed(params)?;
 
-    let (r1, c1, r2, c2) = crate::cell_ref::parse_range(range)?;
+    let (r1, c1, r2, c2) = crate::utils::cell_ref::parse_range(range)?;
 
     let mut workbook = rust_xlsxwriter::Workbook::new();
     let worksheet = workbook
@@ -116,7 +116,7 @@ pub fn remove_conditional_format(
 
     security::create_backup_if_needed(params)?;
 
-    let (_r1, _c1, _r2, _c2) = crate::cell_ref::parse_range(range)?;
+    let (_r1, _c1, _r2, _c2) = crate::utils::cell_ref::parse_range(range)?;
 
     let mut workbook = rust_xlsxwriter::Workbook::new();
     let _worksheet = workbook

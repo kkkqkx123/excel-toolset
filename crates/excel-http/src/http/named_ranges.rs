@@ -1,7 +1,7 @@
 use axum::{Json, extract::Path};
 use serde::Deserialize;
 
-use excel_core::named_ranges;
+use excel_core::features::named_ranges;
 use excel_core::types::*;
 
 #[derive(Deserialize)]

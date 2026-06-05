@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 use excel_core::excel_read;
 use excel_core::excel_write;
-use excel_core::helpers;
+use excel_core::utils::helpers;
 use excel_core::types::*;
 
 #[derive(Deserialize)]

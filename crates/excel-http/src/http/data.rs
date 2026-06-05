@@ -2,8 +2,8 @@ use axum::Json;
 use serde::Deserialize;
 
 use excel_core::api;
-use excel_core::excel_data;
-use excel_core::helpers;
+use excel_core::data_ops;
+use excel_core::utils::helpers;
 use excel_core::types::*;
 
 #[derive(Deserialize)]
@@ -82,7 +82,7 @@ pub async fn data_append_row(Json(req): Json<RowOpReq>) -> Json<ApiResponse<Writ
         create_backup: true,
         file_path: req.path.clone(),
     };
-    match excel_data::append_rows(&req.path, &params, &req.sheet, &row) {
+    match data_ops::append_rows(&req.path, &params, &req.sheet, &row) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
     }
@@ -100,7 +100,7 @@ pub async fn data_insert_row(Json(req): Json<InsertRowReq>) -> Json<ApiResponse<
         create_backup: true,
         file_path: req.path.clone(),
     };
-    match excel_data::insert_rows(&req.path, &params, &req.sheet, req.row, &row) {
+    match data_ops::insert_rows(&req.path, &params, &req.sheet, req.row, &row) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
     }
@@ -112,7 +112,7 @@ pub async fn data_delete_row(Json(req): Json<DeleteRowReq>) -> Json<ApiResponse<
         create_backup: true,
         file_path: req.path.clone(),
     };
-    match excel_data::delete_rows(&req.path, &params, &req.sheet, req.row, req.row) {
+    match data_ops::delete_rows(&req.path, &params, &req.sheet, req.row, req.row) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
     }

@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 use excel_core::excel_read;
 use excel_core::excel_write;
-use excel_core::helpers;
+use excel_core::utils::helpers;
 use excel_core::types::*;
 
 #[derive(Deserialize)]
@@ -19,7 +19,7 @@ pub struct CellWriteReq {
 pub async fn cell_read(
     Path((path, sheet, cell)): Path<(String, String, String)>,
 ) -> Json<ApiResponse<CellData>> {
-    let (row, col) = match excel_core::cell_ref::parse_cell_ref(&cell) {
+    let (row, col) = match excel_core::utils::cell_ref::parse_cell_ref(&cell) {
         Ok(v) => v,
         Err(e) => return Json(ApiResponse::err(e)),
     };
@@ -30,7 +30,7 @@ pub async fn cell_read(
 }
 
 pub async fn cell_write(Json(req): Json<CellWriteReq>) -> Json<ApiResponse<WriteResult>> {
-    let (row, col) = match excel_core::cell_ref::parse_cell_ref(&req.cell) {
+    let (row, col) = match excel_core::utils::cell_ref::parse_cell_ref(&req.cell) {
         Ok(v) => v,
         Err(e) => return Json(ApiResponse::err(e)),
     };

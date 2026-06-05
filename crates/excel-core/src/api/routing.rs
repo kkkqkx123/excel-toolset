@@ -1,4 +1,4 @@
-use crate::excel_data;
+use crate::data_ops;
 use crate::types::*;
 
 #[cfg(feature = "sql")]
@@ -16,7 +16,7 @@ fn write_workbook(path: &str, data: &std::collections::HashMap<String, SheetData
     for (name, sd) in data {
         let ws = wb.add_worksheet();
         ws.set_name(name).map_err(AppError::Xlsx)?;
-        excel_data::write_sheet_data(ws, sd)?;
+        data_ops::write_sheet_data(ws, sd)?;
     }
     wb.save(path).map_err(AppError::Xlsx)?;
     Ok(())
@@ -28,7 +28,7 @@ pub fn filter_rows(
     sheet: &str,
     conditions: &[FilterCondition],
 ) -> Result<Vec<Vec<CellData>>> {
-    excel_data::filter_rows(path, sheet, conditions)
+    data_ops::filter_rows(path, sheet, conditions)
 }
 
 #[cfg(feature = "sql")]
@@ -49,7 +49,7 @@ pub fn sort_sheet(
     sheet: &str,
     sort_columns: &[SortColumn],
 ) -> Result<WriteResult> {
-    excel_data::sort_sheet(path, params, sheet, sort_columns)
+    data_ops::sort_sheet(path, params, sheet, sort_columns)
 }
 
 #[cfg(feature = "sql")]
@@ -118,7 +118,7 @@ pub fn dedup_sheet(
     sheet: &str,
     columns: &[u16],
 ) -> Result<WriteResult> {
-    excel_data::dedup_sheet(path, params, sheet, columns)
+    data_ops::dedup_sheet(path, params, sheet, columns)
 }
 
 #[cfg(feature = "sql")]

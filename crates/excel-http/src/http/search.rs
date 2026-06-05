@@ -1,7 +1,7 @@
 use axum::Json;
 use serde::Deserialize;
 
-use excel_core::search::{self, MatchType, SearchQuery, SearchType};
+use excel_core::features::search::{self, MatchType, SearchQuery, SearchType};
 use excel_core::types::*;
 
 #[derive(Deserialize)]
