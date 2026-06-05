@@ -1,0 +1,4 @@
+Total 10 changes: 6 added, 4 deleted, 0 modified, 0 passive
+Sheet "Expenses" deleted (1 rows, 2 cells)
+Sheet "Revenue" deleted (1 rows, 2 cells)
+Sheet "Sheet1" added with 3 rows and 6 cells

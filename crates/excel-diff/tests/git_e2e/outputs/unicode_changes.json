@@ -1,0 +1,27 @@
+{
+  "file_hash_match": false,
+  "sheet_diffs": [
+    {
+      "cell_diffs": [
+        {
+          "cell_ref": "A4",
+          "col": 0,
+          "diff_type": "Modify",
+          "new_value": "English",
+          "old_value": "한국어",
+          "row": 3
+        }
+      ],
+      "col_count_diff": 0,
+      "row_count_diff": 0,
+      "sheet_name": "Sheet1"
+    }
+  ],
+  "summary": {
+    "adds": 0,
+    "deletes": 0,
+    "modifies": 1,
+    "passives": 0,
+    "total_changes": 1
+  }
+}

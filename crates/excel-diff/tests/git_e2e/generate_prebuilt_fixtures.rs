@@ -1,3 +1,15 @@
+// Generate prebuilt test fixtures for git e2e tests
+//
+// This example program generates Excel files that are used by git driver integration tests.
+// These prebuilt files are stored in tests/git_e2e/fixtures/ and are loaded directly by tests
+// that simulate real git diff driver scenarios.
+//
+// Usage:
+//   cargo run --example generate_prebuilt_fixtures
+//
+// Note: Most tests use dynamic fixture creation (fixtures.rs), but git driver tests need
+// prebuilt files to simulate the git diff protocol accurately.
+
 fn main() {
     let out_dir = std::env::args().nth(1).map_or_else(
         || {

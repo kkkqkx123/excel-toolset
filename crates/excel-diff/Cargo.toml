@@ -15,5 +15,5 @@ tempfile = "3"
 rust_xlsxwriter.workspace = true
 
 [[example]]
-name = "gen_fixtures"
-path = "tests/git_e2e/gen_fixtures.rs"
+name = "generate_prebuilt_fixtures"
+path = "tests/git_e2e/generate_prebuilt_fixtures.rs"

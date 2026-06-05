@@ -308,6 +308,10 @@ pub enum DiffSub {
         sheet: String,
         range: String,
     },
+    /// Special command for git diff driver integration.
+    /// Automatically reads file paths from environment variables (GIT_DIFF_PATH_OLD, GIT_DIFF_PATH_NEW)
+    /// or from command line arguments.
+    GitDriver,
     InstallGitDriver {},
     UninstallGitDriver {},
 }

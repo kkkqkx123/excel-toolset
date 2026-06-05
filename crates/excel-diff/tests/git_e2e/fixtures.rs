@@ -103,3 +103,51 @@ pub fn create_formulas_passive_change_xlsx(path: &std::path::Path) {
     ws.write_formula(2, 1, "=SUM(B1:B2)").unwrap();
     wb.save(path).unwrap();
 }
+
+pub fn create_large_xlsx(path: &std::path::Path) {
+    let mut wb = rust_xlsxwriter::Workbook::new();
+    let ws = wb.add_worksheet();
+    ws.set_name("Sheet1").unwrap();
+    ws.write_string(0, 0, "ID").unwrap();
+    ws.write_string(0, 1, "Name").unwrap();
+    ws.write_string(0, 2, "Value").unwrap();
+
+    for i in 1..=100 {
+        let row = i as u32;
+        ws.write_number(row, 0, i as f64).unwrap();
+        ws.write_string(row, 1, &format!("Item {}", i)).unwrap();
+        ws.write_number(row, 2, (i * 10) as f64).unwrap();
+    }
+    wb.save(path).unwrap();
+}
+
+pub fn create_large_modified_xlsx(path: &std::path::Path) {
+    let mut wb = rust_xlsxwriter::Workbook::new();
+    let ws = wb.add_worksheet();
+    ws.set_name("Sheet1").unwrap();
+    ws.write_string(0, 0, "ID").unwrap();
+    ws.write_string(0, 1, "Name").unwrap();
+    ws.write_string(0, 2, "Value").unwrap();
+
+    for i in 1..=100 {
+        let row = i as u32;
+        ws.write_number(row, 0, i as f64).unwrap();
+        ws.write_string(row, 1, &format!("Item {}", i)).unwrap();
+        // Modify values for some rows
+        let value = if i % 10 == 0 { (i * 15) as f64 } else { (i * 10) as f64 };
+        ws.write_number(row, 2, value).unwrap();
+    }
+    wb.save(path).unwrap();
+}
+
+pub fn create_unicode_xlsx(path: &std::path::Path, values: &[&str]) {
+    let mut wb = rust_xlsxwriter::Workbook::new();
+    let ws = wb.add_worksheet();
+    ws.set_name("Sheet1").unwrap();
+    ws.write_string(0, 0, "Language").unwrap();
+
+    for (i, value) in values.iter().enumerate() {
+        ws.write_string((i + 1) as u32, 0, *value).unwrap();
+    }
+    wb.save(path).unwrap();
+}

@@ -12,6 +12,7 @@ use excel_diff::diff_files;
 use excel_diff::diff_range;
 use excel_diff::diff_sheets;
 use excel_diff::git_driver;
+use excel_diff::get_git_diff_file_paths;
 use excel_diff::semantic::{self, Verbosity};
 use excel_diff::summarize;
 
@@ -536,6 +537,20 @@ fn run_diff(args: &DiffArgs, format: &str) -> Result<serde_json::Value> {
             } else {
                 Ok(serde_json::to_value(diff).map_err(|e| AppError::Serialize(e.to_string()))?)
             }
+        }
+        DiffSub::GitDriver => {
+            // Get file paths from environment variables or command line arguments
+            let (old_path, new_path) = get_git_diff_file_paths()?;
+
+            // Perform diff and output in text format (required by git diff driver)
+            let diff = diff_files(&old_path, &new_path)?;
+
+            // Git diff driver expects text output, not JSON
+            let text = semantic::to_natural_text(&diff, None, Verbosity::Detail);
+            println!("{}", text);
+            
+            // Return empty JSON since we already printed the text
+            Ok(serde_json::json!({}))
         }
         DiffSub::InstallGitDriver {} => {
             git_driver::install_git_driver()?;
