@@ -5,3 +5,8 @@ pub mod cell;
 pub mod range;
 pub mod batch;
 pub mod diff;
+pub mod chart;
+pub mod comments;
+pub mod named_ranges;
+pub mod search;
+pub mod vba;

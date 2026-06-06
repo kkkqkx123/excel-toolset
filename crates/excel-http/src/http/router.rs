@@ -4,10 +4,9 @@ use axum::{
 };
 
 use super::{
-    handlers::{batch, cell, diff, file, health, range, sheet},
+    handler::{batch, cell, chart, comments, diff, file, health, named_ranges, range, search, sheet, vba},
     data_operations::{filter, rows, sql},
     formula::{analysis, basic},
-    advanced::{chart, comments, named_ranges, search, vba},
     formatting::{cell_format, conditional, merge},
 };
 
