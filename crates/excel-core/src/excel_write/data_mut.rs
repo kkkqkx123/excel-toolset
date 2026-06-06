@@ -2,7 +2,7 @@ use crate::types::*;
 
 use super::core::{cell_value_to_data, ensure_dimensions};
 
-pub fn write(
+pub(crate) fn write(
     data: &mut std::collections::HashMap<String, SheetData>,
     sheet: &str,
     row: u32,
@@ -17,7 +17,7 @@ pub fn write(
     Ok(())
 }
 
-pub fn write_range(
+pub(crate) fn write_range(
     data: &mut std::collections::HashMap<String, SheetData>,
     sheet: &str,
     range_spec: &str,
@@ -39,7 +39,7 @@ pub fn write_range(
     Ok(())
 }
 
-pub fn clear_range(
+pub(crate) fn clear_range(
     data: &mut std::collections::HashMap<String, SheetData>,
     sheet: &str,
     range_spec: &str,
@@ -66,7 +66,7 @@ pub fn clear_range(
     Ok(())
 }
 
-pub fn set_formula(
+pub(crate) fn set_formula(
     data: &mut std::collections::HashMap<String, SheetData>,
     sheet: &str,
     cell_spec: &str,
@@ -86,7 +86,7 @@ pub fn set_formula(
     Ok(())
 }
 
-pub fn insert_rows(
+pub(crate) fn insert_rows(
     data: &mut std::collections::HashMap<String, SheetData>,
     sheet: &str,
     at_row: u32,
@@ -111,7 +111,7 @@ pub fn insert_rows(
     Ok(())
 }
 
-pub fn delete_rows(
+pub(crate) fn delete_rows(
     data: &mut std::collections::HashMap<String, SheetData>,
     sheet: &str,
     start_row: u32,
@@ -133,7 +133,7 @@ pub fn delete_rows(
     Ok(())
 }
 
-pub fn append_rows(
+pub(crate) fn append_rows(
     data: &mut std::collections::HashMap<String, SheetData>,
     sheet: &str,
     new_rows: &[Vec<CellValue>],

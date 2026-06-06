@@ -27,6 +27,10 @@ pub enum Commands {
     Diff(DiffArgs),
     Batch(BatchArgs),
     Rollback(RollbackArgs),
+    Comments(CommentsArgs),
+    NamedRange(NamedRangeArgs),
+    Search(SearchArgs),
+    ConditionalFormat(ConditionalFormatArgs),
 }
 
 #[derive(clap::Args)]
@@ -222,6 +226,37 @@ pub enum FormulaSub {
         #[arg(long)]
         dry_run: bool,
     },
+    Read {
+        path: String,
+        sheet: String,
+        cell: String,
+    },
+    CalcMode {
+        path: String,
+        #[arg(long, default_value = "auto")]
+        mode: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    Trace {
+        path: String,
+        sheet: String,
+        cell: String,
+    },
+    Explain {
+        path: String,
+        sheet: String,
+        cell: String,
+        #[arg(long, default_value = "en")]
+        language: String,
+    },
+    ExplainLogic {
+        path: String,
+        sheet: String,
+        cell: String,
+        #[arg(long, default_value = "en")]
+        language: String,
+    },
 }
 
 #[derive(clap::Args)]
@@ -286,6 +321,9 @@ pub enum VbaSub {
         #[arg(long)]
         dry_run: bool,
     },
+    Has {
+        path: String,
+    },
 }
 
 #[derive(clap::Args)]
@@ -337,4 +375,143 @@ pub enum BatchSub {
 pub struct RollbackArgs {
     pub path: String,
     pub backup_path: String,
+}
+
+// ── Comments ──
+
+#[derive(clap::Args)]
+pub struct CommentsArgs {
+    #[command(subcommand)]
+    pub command: CommentsSub,
+}
+
+#[derive(Subcommand)]
+pub enum CommentsSub {
+    Get {
+        path: String,
+        sheet: String,
+        cell: String,
+    },
+    Add {
+        path: String,
+        sheet: String,
+        cell: String,
+        text: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    Update {
+        path: String,
+        sheet: String,
+        cell: String,
+        text: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    Delete {
+        path: String,
+        sheet: String,
+        cell: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
+
+// ── Named Range ──
+
+#[derive(clap::Args)]
+pub struct NamedRangeArgs {
+    #[command(subcommand)]
+    pub command: NamedRangeSub,
+}
+
+#[derive(Subcommand)]
+pub enum NamedRangeSub {
+    List {
+        path: String,
+    },
+    Get {
+        path: String,
+        name: String,
+    },
+    Create {
+        path: String,
+        name: String,
+        range: String,
+        #[arg(long)]
+        sheet: Option<String>,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    Delete {
+        path: String,
+        name: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
+
+// ── Search ──
+
+#[derive(clap::Args)]
+pub struct SearchArgs {
+    #[command(subcommand)]
+    pub command: SearchSub,
+}
+
+#[derive(Subcommand)]
+pub enum SearchSub {
+    Workbook {
+        path: String,
+        pattern: String,
+        #[arg(long, default_value = "contains")]
+        match_type: String,
+        #[arg(long, default_value = "both")]
+        search_type: String,
+        #[arg(long)]
+        case_sensitive: bool,
+        #[arg(long)]
+        sheets: Option<Vec<String>>,
+    },
+    Sheet {
+        path: String,
+        sheet: String,
+        pattern: String,
+        #[arg(long, default_value = "contains")]
+        match_type: String,
+        #[arg(long, default_value = "both")]
+        search_type: String,
+        #[arg(long)]
+        case_sensitive: bool,
+    },
+}
+
+// ── Conditional Format ──
+
+#[derive(clap::Args)]
+pub struct ConditionalFormatArgs {
+    #[command(subcommand)]
+    pub command: ConditionalFormatSub,
+}
+
+#[derive(Subcommand)]
+pub enum ConditionalFormatSub {
+    Add {
+        path: String,
+        sheet: String,
+        range: String,
+        rule_type: String,
+        condition: String,
+        #[arg(long)]
+        style: Option<String>,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    Remove {
+        path: String,
+        sheet: String,
+        range: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
 }

@@ -2,6 +2,11 @@ use chrono::Utc;
 
 use excel_core::excel_read;
 use excel_core::excel_write;
+use excel_core::features::comments;
+use excel_core::features::conditional_format;
+use excel_core::features::formula_analysis;
+use excel_core::features::named_ranges;
+use excel_core::features::search;
 use excel_core::features::vba_util;
 use excel_core::operations;
 use excel_core::security;
@@ -65,6 +70,10 @@ fn run_command(cli: &Cli) -> Result<serde_json::Value> {
         Commands::Diff(args) => run_diff(args, &cli.format),
         Commands::Batch(args) => run_batch(args, &cli.format),
         Commands::Rollback(args) => run_rollback(args),
+        Commands::Comments(args) => run_comments(args),
+        Commands::NamedRange(args) => run_named_range(args),
+        Commands::Search(args) => run_search(args),
+        Commands::ConditionalFormat(args) => run_conditional_format(args),
     }
 }
 
@@ -345,6 +354,45 @@ fn run_formula(args: &FormulaArgs) -> Result<serde_json::Value> {
             let result = excel_write::refresh_formulas(path, &params, sheet)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
+        FormulaSub::Read { path, sheet, cell } => {
+            let formula = excel_read::read_formula(path, sheet, cell)?;
+            Ok(serde_json::json!({
+                "success": true,
+                "formula": formula
+            }))
+        }
+        FormulaSub::CalcMode { path, mode, dry_run } => {
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
+            let result = excel_write::set_calculation_mode(path, &params, mode)?;
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+        FormulaSub::Trace { path, sheet, cell } => {
+            let trace = formula_analysis::trace_dependencies(path, sheet, cell)?;
+            Ok(serde_json::to_value(trace).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+        FormulaSub::Explain {
+            path,
+            sheet,
+            cell,
+            language,
+        } => {
+            let explanation = formula_analysis::explain_formula(path, sheet, cell, language)?;
+            Ok(serde_json::to_value(explanation).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+        FormulaSub::ExplainLogic {
+            path,
+            sheet,
+            cell,
+            language,
+        } => {
+            let logic =
+                formula_analysis::explain_formula_logic(path, sheet, cell, language)?;
+            Ok(serde_json::to_value(logic).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
     }
 }
 
@@ -439,6 +487,13 @@ fn run_vba(args: &VbaArgs) -> Result<serde_json::Value> {
             };
             let result = vba_util::import_vba(path, &params, &data)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+        VbaSub::Has { path } => {
+            let has = vba_util::has_vba(path)?;
+            Ok(serde_json::json!({
+                "success": true,
+                "has_vba": has
+            }))
         }
     }
 }
@@ -574,4 +629,233 @@ fn run_rollback(args: &RollbackArgs) -> Result<serde_json::Value> {
         "success": true,
         "message": format!("Rolled back {} from {}", args.path, args.backup_path)
     }))
+}
+
+// ── Comments ──
+
+fn run_comments(args: &CommentsArgs) -> Result<serde_json::Value> {
+    match &args.command {
+        CommentsSub::Get { path, sheet, cell } => {
+            let comment = comments::get_comment(path, sheet, cell)?;
+            Ok(serde_json::to_value(comment).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+        CommentsSub::Add {
+            path,
+            sheet,
+            cell,
+            text,
+            dry_run,
+        } => {
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
+            let result = comments::add_comment(path, sheet, cell, text, &params)?;
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+        CommentsSub::Update {
+            path,
+            sheet,
+            cell,
+            text,
+            dry_run,
+        } => {
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
+            let result = comments::update_comment(path, sheet, cell, text, &params)?;
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+        CommentsSub::Delete {
+            path,
+            sheet,
+            cell,
+            dry_run,
+        } => {
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
+            let result = comments::delete_comment(path, sheet, cell, &params)?;
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+    }
+}
+
+// ── Named Range ──
+
+fn run_named_range(args: &NamedRangeArgs) -> Result<serde_json::Value> {
+    match &args.command {
+        NamedRangeSub::List { path } => {
+            let ranges = named_ranges::list_named_ranges(path)?;
+            Ok(serde_json::to_value(ranges).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+        NamedRangeSub::Get { path, name } => {
+            let value = named_ranges::get_named_range_value(path, name)?;
+            Ok(serde_json::to_value(value).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+        NamedRangeSub::Create {
+            path,
+            name,
+            range,
+            sheet,
+            dry_run,
+        } => {
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
+            let result =
+                named_ranges::create_named_range(path, name, range, sheet.as_deref(), &params)?;
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+        NamedRangeSub::Delete { path, name, dry_run } => {
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
+            let result = named_ranges::delete_named_range(path, name, &params)?;
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+    }
+}
+
+// ── Search ──
+
+fn run_search(args: &SearchArgs) -> Result<serde_json::Value> {
+    match &args.command {
+        SearchSub::Workbook {
+            path,
+            pattern,
+            match_type,
+            search_type,
+            case_sensitive,
+            sheets,
+        } => {
+            let query = build_search_query(pattern, match_type, search_type, *case_sensitive, sheets)?;
+            let results = search::search_workbook(path, &query)?;
+            Ok(serde_json::to_value(results).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+        SearchSub::Sheet {
+            path,
+            sheet,
+            pattern,
+            match_type,
+            search_type,
+            case_sensitive,
+        } => {
+            let query = build_search_query(pattern, match_type, search_type, *case_sensitive, &None)?;
+            let results = search::search_sheet(path, sheet, &query)?;
+            Ok(serde_json::to_value(results).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+    }
+}
+
+fn build_search_query(
+    pattern: &str,
+    match_type: &str,
+    search_type: &str,
+    case_sensitive: bool,
+    sheets: &Option<Vec<String>>,
+) -> Result<search::SearchQuery> {
+    let st = match search_type {
+        "value" => search::SearchType::Value,
+        "formula" => search::SearchType::Formula,
+        _ => search::SearchType::Both,
+    };
+    let mt = match match_type {
+        "exact" => search::MatchType::Exact,
+        "regex" => search::MatchType::Regex,
+        _ => search::MatchType::Contains,
+    };
+    Ok(search::SearchQuery {
+        pattern: pattern.to_string(),
+        search_type: st,
+        match_type: mt,
+        case_sensitive,
+        sheets: sheets.clone(),
+    })
+}
+
+// ── Conditional Format ──
+
+fn run_conditional_format(args: &ConditionalFormatArgs) -> Result<serde_json::Value> {
+    match &args.command {
+        ConditionalFormatSub::Add {
+            path,
+            sheet,
+            range,
+            rule_type,
+            condition,
+            style,
+            dry_run,
+        } => {
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
+
+            let rt = match rule_type.to_lowercase().as_str() {
+                "cell_value" | "cellvalue" => conditional_format::ConditionalFormatType::CellValue,
+                "formula" => conditional_format::ConditionalFormatType::Formula,
+                "above_average" | "aboveaverage" => {
+                    conditional_format::ConditionalFormatType::AboveAverage
+                }
+                "top10" | "top_10" => conditional_format::ConditionalFormatType::Top10,
+                "duplicate" => conditional_format::ConditionalFormatType::Duplicate,
+                "text_contains" | "textcontains" => {
+                    conditional_format::ConditionalFormatType::TextContains
+                }
+                "date_occurring" | "dateoccurring" => {
+                    conditional_format::ConditionalFormatType::DateOccurring
+                }
+                _ => {
+                    return Err(AppError::InvalidInput(format!(
+                        "Unknown conditional format rule type: {}",
+                        rule_type
+                    )));
+                }
+            };
+
+            let parsed_style: Option<Style> = if let Some(s) = style {
+                Some(
+                    serde_json::from_str(s)
+                        .map_err(|e| AppError::Serialize(format!("Invalid style JSON: {}", e)))?,
+                )
+            } else {
+                None
+            };
+
+            let rule = conditional_format::ConditionalFormatRule {
+                rule_type: rt,
+                condition: condition.clone(),
+                format: parsed_style,
+            };
+
+            let result =
+                conditional_format::add_conditional_format(path, sheet, range, &rule, &params)?;
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+        ConditionalFormatSub::Remove {
+            path,
+            sheet,
+            range,
+            dry_run,
+        } => {
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
+            let result = conditional_format::remove_conditional_format(path, sheet, range, &params)?;
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+    }
 }

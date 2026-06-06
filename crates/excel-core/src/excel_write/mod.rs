@@ -13,7 +13,8 @@ mod operations;
 pub use batch::*;
 pub(crate) use core::write_sheet_data;
 pub use csv::*;
-pub use data_mut::{append_rows, delete_rows, insert_rows};
+// data_mut functions are pub(crate), not re-exported publicly.
+// Use operations.rs for file-level public API.
 pub use format::{build_format, parse_color};
 pub use operations::*;
 

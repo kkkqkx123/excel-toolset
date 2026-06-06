@@ -276,3 +276,74 @@ pub fn set_calculation_mode(
 ) -> Result<WriteResult> {
     modify_file(path, params, |old_data| Ok(old_data.clone()))
 }
+
+pub fn append_rows(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    new_rows: &[Vec<CellValue>],
+) -> Result<WriteResult> {
+    modify_file(path, params, |old_data| {
+        let mut new_data = old_data.clone();
+        let sd = new_data
+            .get_mut(sheet)
+            .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
+        for row_data in new_rows {
+            let mut row = Vec::new();
+            for val in row_data {
+                row.push(cell_value_to_data(val));
+            }
+            sd.rows.push(row);
+        }
+        Ok(new_data)
+    })
+}
+
+pub fn insert_rows(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    at_row: u32,
+    new_rows: &[Vec<CellValue>],
+) -> Result<WriteResult> {
+    modify_file(path, params, |old_data| {
+        let mut new_data = old_data.clone();
+        let sd = new_data
+            .get_mut(sheet)
+            .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
+        let row_idx = at_row as usize;
+        let mut inserted_rows: Vec<Vec<CellData>> = Vec::new();
+        for row_data in new_rows {
+            let mut row = Vec::new();
+            for val in row_data {
+                row.push(cell_value_to_data(val));
+            }
+            inserted_rows.push(row);
+        }
+        sd.rows.splice(row_idx..row_idx, inserted_rows);
+        Ok(new_data)
+    })
+}
+
+pub fn delete_rows(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    start_row: u32,
+    end_row: u32,
+) -> Result<WriteResult> {
+    modify_file(path, params, |old_data| {
+        let mut new_data = old_data.clone();
+        let sd = new_data
+            .get_mut(sheet)
+            .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
+        let start_idx = start_row as usize;
+        let end_idx = end_row as usize;
+        if start_idx >= sd.rows.len() {
+            return Ok(new_data);
+        }
+        let end_idx = end_idx.min(sd.rows.len() - 1);
+        sd.rows.drain(start_idx..=end_idx);
+        Ok(new_data)
+    })
+}
