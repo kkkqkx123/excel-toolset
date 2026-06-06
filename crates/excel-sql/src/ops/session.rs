@@ -103,10 +103,14 @@ impl QuerySession {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use excel_types::{CellData, FilterOp, CellDataType::*};
+    use excel_types::{CellData, CellDataType::*, FilterOp};
 
     fn make_cell(value: Option<&str>, dt: excel_types::CellDataType) -> CellData {
-        CellData { value: value.map(|s| s.to_string()), data_type: dt, formula: None }
+        CellData {
+            value: value.map(|s| s.to_string()),
+            data_type: dt,
+            formula: None,
+        }
     }
 
     fn sheet1() -> SheetData {
@@ -156,7 +160,11 @@ mod tests {
     fn test_session_sql_query_on_data() {
         let mut session = QuerySession::new().unwrap();
         let result = session
-            .sql_query_on_data(&[sheet1(), sheet2()], "SELECT COUNT(*) AS cnt FROM \"s2\"", false)
+            .sql_query_on_data(
+                &[sheet1(), sheet2()],
+                "SELECT COUNT(*) AS cnt FROM \"s2\"",
+                false,
+            )
             .unwrap();
         assert_eq!(result.row_count, 1);
     }
@@ -164,7 +172,11 @@ mod tests {
     #[test]
     fn test_session_filter_rows_on_data() {
         let mut session = QuerySession::new().unwrap();
-        let cond = FilterCondition { column: 0, operator: FilterOp::Eq, value: "x".into() };
+        let cond = FilterCondition {
+            column: 0,
+            operator: FilterOp::Eq,
+            value: "x".into(),
+        };
         let result = session
             .filter_rows_on_data(&sheet1(), "s1", &[cond], false)
             .unwrap();

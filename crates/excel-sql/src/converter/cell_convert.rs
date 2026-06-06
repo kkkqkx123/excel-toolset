@@ -37,7 +37,11 @@ pub fn cell_to_duckdb_value(cell: &CellData) -> Result<duckdb::types::Value, Str
             let b = cell
                 .value
                 .as_deref()
-                .is_some_and(|v| matches!(v.to_lowercase().as_str(), "true" | "1" | "yes"));
+                .map(|v| {
+                    let lower = v.trim().to_lowercase();
+                    matches!(lower.as_str(), "true" | "1" | "yes" | "y" | "t")
+                })
+                .unwrap_or(false);
             Ok(duckdb::types::Value::Boolean(b))
         }
 
@@ -73,10 +77,16 @@ mod tests {
         #[test]
         fn test_empty_and_error_to_null() {
             let empty = make_cell(None, CellDataType::Empty);
-            assert_eq!(cell_to_duckdb_value(&empty).unwrap(), duckdb::types::Value::Null);
+            assert_eq!(
+                cell_to_duckdb_value(&empty).unwrap(),
+                duckdb::types::Value::Null
+            );
 
             let err = make_cell(Some("#REF!"), CellDataType::Error);
-            assert_eq!(cell_to_duckdb_value(&err).unwrap(), duckdb::types::Value::Null);
+            assert_eq!(
+                cell_to_duckdb_value(&err).unwrap(),
+                duckdb::types::Value::Null
+            );
         }
 
         #[test]
@@ -174,7 +184,10 @@ mod tests {
                 make_cell(Some("true"), CellDataType::Bool),
             ];
             let result = collect_row_types(&[row]);
-            assert_eq!(result[0], vec![CellDataType::Int, CellDataType::String, CellDataType::Bool]);
+            assert_eq!(
+                result[0],
+                vec![CellDataType::Int, CellDataType::String, CellDataType::Bool]
+            );
         }
     }
 }

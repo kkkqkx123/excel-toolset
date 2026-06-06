@@ -4,21 +4,18 @@ use crate::security::compute_file_hash;
 use crate::types::*;
 
 mod batch;
-mod cell;
-mod chart;
+mod core;
 mod csv;
-mod ops;
-mod sheet;
-mod style;
-mod util;
-mod write;
+mod data_mut;
+mod format;
+mod operations;
 
-// Re-export
 pub use batch::*;
+pub(crate) use core::write_sheet_data;
 pub use csv::*;
-pub use ops::*;
-pub use style::build_format;
-pub use style::parse_color;
+pub use data_mut::{append_rows, delete_rows, insert_rows};
+pub use format::{build_format, parse_color};
+pub use operations::*;
 
 pub fn create_file(path: &str, sheet_name: &str) -> Result<WriteResult> {
     let mut wb = Workbook::new();

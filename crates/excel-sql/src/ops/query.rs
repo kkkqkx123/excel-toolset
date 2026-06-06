@@ -32,7 +32,21 @@ fn build_param_conditions(conditions: &[FilterCondition]) -> (String, Vec<duckdb
             }
         };
         clauses.push(clause);
-        params.push(duckdb::types::Value::Text(value));
+        
+        let param_value = match c.operator {
+            FilterOp::Eq | FilterOp::Ne | FilterOp::Gt | FilterOp::Lt | FilterOp::Ge | FilterOp::Le => {
+                if let Ok(num) = c.value.parse::<i64>() {
+                    duckdb::types::Value::BigInt(num)
+                } else if let Ok(num) = c.value.parse::<f64>() {
+                    duckdb::types::Value::Double(num)
+                } else {
+                    duckdb::types::Value::Text(c.value.clone())
+                }
+            }
+            _ => duckdb::types::Value::Text(value),
+        };
+        
+        params.push(param_value);
     }
 
     (clauses.join(" AND "), params)
@@ -93,7 +107,11 @@ mod tests {
     use excel_types::CellDataType::*;
 
     fn make_cell(value: Option<&str>, dt: excel_types::CellDataType) -> CellData {
-        CellData { value: value.map(|s| s.to_string()), data_type: dt, formula: None }
+        CellData {
+            value: value.map(|s| s.to_string()),
+            data_type: dt,
+            formula: None,
+        }
     }
 
     fn sample_data() -> SheetData {
@@ -112,7 +130,11 @@ mod tests {
 
         #[test]
         fn test_eq() {
-            let cond = FilterCondition { column: 0, operator: FilterOp::Eq, value: "10".into() };
+            let cond = FilterCondition {
+                column: 0,
+                operator: FilterOp::Eq,
+                value: "10".into(),
+            };
             let (clause, params) = build_param_conditions(&[cond]);
             assert_eq!(clause, r#""c0" = ?1"#);
             assert_eq!(params, vec![duckdb::types::Value::Text("10".into())]);
@@ -120,7 +142,11 @@ mod tests {
 
         #[test]
         fn test_ne() {
-            let cond = FilterCondition { column: 1, operator: FilterOp::Ne, value: "x".into() };
+            let cond = FilterCondition {
+                column: 1,
+                operator: FilterOp::Ne,
+                value: "x".into(),
+            };
             let (clause, _) = build_param_conditions(&[cond]);
             assert_eq!(clause, r#""c1" != ?1"#);
         }
@@ -134,7 +160,11 @@ mod tests {
                 (FilterOp::Le, "<="),
             ];
             for (op, expected) in ops {
-                let cond = FilterCondition { column: 0, operator: op, value: "5".into() };
+                let cond = FilterCondition {
+                    column: 0,
+                    operator: op,
+                    value: "5".into(),
+                };
                 let (clause, _) = build_param_conditions(&[cond]);
                 assert_eq!(clause, format!(r#""c0" {} ?1"#, expected));
             }
@@ -148,18 +178,33 @@ mod tests {
                 (FilterOp::EndsWith, "abc", "%abc"),
             ];
             for (op, val, expected_pat) in cases {
-                let cond = FilterCondition { column: 0, operator: op, value: val.into() };
+                let cond = FilterCondition {
+                    column: 0,
+                    operator: op,
+                    value: val.into(),
+                };
                 let (clause, params) = build_param_conditions(&[cond]);
                 assert_eq!(clause, r#""c0" LIKE ?1"#);
-                assert_eq!(params, vec![duckdb::types::Value::Text(expected_pat.into())]);
+                assert_eq!(
+                    params,
+                    vec![duckdb::types::Value::Text(expected_pat.into())]
+                );
             }
         }
 
         #[test]
         fn test_multiple_conditions() {
             let conds = vec![
-                FilterCondition { column: 0, operator: FilterOp::Eq, value: "1".into() },
-                FilterCondition { column: 1, operator: FilterOp::Contains, value: "a".into() },
+                FilterCondition {
+                    column: 0,
+                    operator: FilterOp::Eq,
+                    value: "1".into(),
+                },
+                FilterCondition {
+                    column: 1,
+                    operator: FilterOp::Contains,
+                    value: "a".into(),
+                },
             ];
             let (clause, params) = build_param_conditions(&conds);
             assert_eq!(clause, r#""c0" = ?1 AND "c1" LIKE ?2"#);
@@ -169,14 +214,13 @@ mod tests {
 
     #[test]
     fn test_sql_query_on_data() {
-        let data = vec![
-            SheetData {
-                name: "s1".to_string(),
-                rows: vec![
-                    vec![make_cell(Some("k"), String), make_cell(Some("v"), String)],
-                ],
-            },
-        ];
+        let data = vec![SheetData {
+            name: "s1".to_string(),
+            rows: vec![vec![
+                make_cell(Some("k"), String),
+                make_cell(Some("v"), String),
+            ]],
+        }];
         let result = sql_query_on_data(&data, "SELECT * FROM \"s1\"", false).unwrap();
         assert_eq!(result.row_count, 1);
         assert_eq!(result.rows[0][0].value.as_deref(), Some("k"));
@@ -192,7 +236,11 @@ mod tests {
     #[test]
     fn test_filter_rows_on_data_with_condition() {
         let data = sample_data();
-        let cond = FilterCondition { column: 0, operator: FilterOp::Gt, value: "1".into() };
+        let cond = FilterCondition {
+            column: 0,
+            operator: FilterOp::Gt,
+            value: "1".into(),
+        };
         let result = filter_rows_on_data(&data, "t", &[cond], false).unwrap();
         assert_eq!(result.row_count, 2);
     }

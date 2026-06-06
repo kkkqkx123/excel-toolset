@@ -1,5 +1,5 @@
-use excel_core::utils::cell_ref;
 use excel_core::excel_read::read_range;
+use excel_core::utils::cell_ref;
 use excel_types::{CellData, CellDiff, DiffType, RangeDiff, Result};
 
 use crate::helpers::classify_diff;

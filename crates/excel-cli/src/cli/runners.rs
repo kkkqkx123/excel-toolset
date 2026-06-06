@@ -1,18 +1,17 @@
 use chrono::Utc;
 
-use excel_core::api;
-use excel_core::data_ops;
 use excel_core::excel_read;
 use excel_core::excel_write;
-use excel_core::utils::helpers;
+use excel_core::features::vba_util;
+use excel_core::operations;
 use excel_core::security;
 use excel_core::types::*;
-use excel_core::features::vba_util;
+use excel_core::utils::helpers;
 use excel_diff::diff_files;
 use excel_diff::diff_range;
 use excel_diff::diff_sheets;
-use excel_diff::git_driver;
 use excel_diff::get_git_diff_file_paths;
+use excel_diff::git_driver;
 use excel_diff::semantic::{self, Verbosity};
 use excel_diff::summarize;
 
@@ -221,7 +220,7 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 create_backup: true,
                 file_path: path.clone(),
             };
-            let result = data_ops::append_rows(path, &params, sheet, &cell_values)?;
+            let result = excel_write::append_rows(path, &params, sheet, &cell_values)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DataSub::InsertRow {
@@ -242,7 +241,7 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 create_backup: true,
                 file_path: path.clone(),
             };
-            let result = data_ops::insert_rows(path, &params, sheet, *row, &cell_values)?;
+            let result = excel_write::insert_rows(path, &params, sheet, *row, &cell_values)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DataSub::DeleteRow {
@@ -256,7 +255,7 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 create_backup: true,
                 file_path: path.clone(),
             };
-            let result = data_ops::delete_rows(path, &params, sheet, *row, *row)?;
+            let result = excel_write::delete_rows(path, &params, sheet, *row, *row)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DataSub::Filter {
@@ -272,7 +271,7 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 operator: filter_op,
                 value: value.clone(),
             }];
-            let result = api::filter_rows(path, sheet, &conditions)?;
+            let result = operations::filter_rows(path, sheet, &conditions)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DataSub::Sort {
@@ -291,7 +290,7 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 create_backup: true,
                 file_path: path.clone(),
             };
-            let result = api::sort_sheet(path, &params, sheet, &sort_cols)?;
+            let result = operations::sort_sheet(path, &params, sheet, &sort_cols)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DataSub::Dedup {
@@ -306,11 +305,11 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 create_backup: true,
                 file_path: path.clone(),
             };
-            let result = api::dedup_sheet(path, &params, sheet, &cols)?;
+            let result = operations::dedup_sheet(path, &params, sheet, &cols)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DataSub::Sql { path, sheet, query } => {
-            let result = api::sql_query(path, sheet, query)?;
+            let result = operations::sql_query(path, sheet, query)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
     }
@@ -548,7 +547,7 @@ fn run_diff(args: &DiffArgs, format: &str) -> Result<serde_json::Value> {
             // Git diff driver expects text output, not JSON
             let text = semantic::to_natural_text(&diff, None, Verbosity::Detail);
             println!("{}", text);
-            
+
             // Return empty JSON since we already printed the text
             Ok(serde_json::json!({}))
         }

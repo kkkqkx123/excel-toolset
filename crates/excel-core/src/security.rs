@@ -4,8 +4,8 @@ use std::path::Path;
 
 use sha2::{Digest, Sha256};
 
-use crate::utils::file_util::{append_timestamp, copy_file, ensure_parent_dir};
 use crate::types::{BackupInfo, SecurityParams};
+use crate::utils::file_util::{append_timestamp, copy_file, ensure_parent_dir};
 
 pub fn compute_file_hash(path: impl AsRef<Path>) -> io::Result<String> {
     let file = fs::File::open(path)?;

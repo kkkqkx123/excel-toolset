@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use calamine::{Data, Reader, Xlsx, open_workbook};
 
-use crate::utils::cell_ref;
 use crate::security::compute_file_hash;
 use crate::types::{AppError, CellData, CellDataType, FileInfo, Result, SheetData};
+use crate::utils::cell_ref;
 
 pub fn read_file_info(path: &str) -> Result<FileInfo> {
     let sheets = list_sheets(path)?;
@@ -36,7 +36,7 @@ pub fn read_cell(path: &str, sheet: &str, row: u32, col: u16) -> Result<CellData
 
     let cell = range
         .get_value((row, col as u32))
-        .ok_or(AppError::CellNotFound(row, col))?;
+        .unwrap_or(&calamine::Data::Empty);
 
     let formula = ws_formulas
         .as_ref()

@@ -162,10 +162,7 @@ mod tests {
     #[test]
     fn test_infer_column_types_mixed_types() {
         use excel_types::CellDataType::*;
-        let data = vec![
-            vec![Int, Bool, Float],
-            vec![Float, Int, Int],
-        ];
+        let data = vec![vec![Int, Bool, Float], vec![Float, Int, Int]];
         let result = infer_column_types(&data);
         assert_eq!(result, vec![Float, Int, Float]);
     }
@@ -173,10 +170,7 @@ mod tests {
     #[test]
     fn test_infer_column_types_empty_cells_skipped() {
         use excel_types::CellDataType::*;
-        let data = vec![
-            vec![Int, Empty],
-            vec![Empty, Float],
-        ];
+        let data = vec![vec![Int, Empty], vec![Empty, Float]];
         let result = infer_column_types(&data);
         assert_eq!(result, vec![Int, Float]);
     }
@@ -192,10 +186,7 @@ mod tests {
     #[test]
     fn test_infer_column_types_uneven_rows() {
         use excel_types::CellDataType::*;
-        let data = vec![
-            vec![Int, Float],
-            vec![Int],
-        ];
+        let data = vec![vec![Int, Float], vec![Int]];
         let result = infer_column_types(&data);
         assert_eq!(result, vec![Int, Float]);
     }

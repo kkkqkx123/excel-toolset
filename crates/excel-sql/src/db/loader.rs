@@ -240,7 +240,11 @@ mod tests {
     use crate::db::tables::{get_table_schema, table_exists, table_row_count};
 
     fn make_cell(value: Option<&str>, dt: CellDataType) -> CellData {
-        CellData { value: value.map(|s| s.to_string()), data_type: dt, formula: None }
+        CellData {
+            value: value.map(|s| s.to_string()),
+            data_type: dt,
+            formula: None,
+        }
     }
 
     #[test]
@@ -306,8 +310,14 @@ mod tests {
         let conn = create_conn().unwrap();
         create_table(&conn, "t", &[CellDataType::Int, CellDataType::String]).unwrap();
         let rows = vec![
-            vec![make_cell(Some("1"), CellDataType::Int), make_cell(Some("a"), CellDataType::String)],
-            vec![make_cell(Some("2"), CellDataType::Int), make_cell(Some("b"), CellDataType::String)],
+            vec![
+                make_cell(Some("1"), CellDataType::Int),
+                make_cell(Some("a"), CellDataType::String),
+            ],
+            vec![
+                make_cell(Some("2"), CellDataType::Int),
+                make_cell(Some("b"), CellDataType::String),
+            ],
         ];
         batch_insert_rows(&conn, "t", &rows).unwrap();
         assert_eq!(table_row_count(&conn, "t").unwrap(), 2);
@@ -324,7 +334,8 @@ mod tests {
     #[test]
     fn test_batch_insert_rows_with_id() {
         let conn = create_conn().unwrap();
-        conn.execute_batch(r#"CREATE TABLE "t" (row_id INTEGER, c0 VARCHAR)"#).unwrap();
+        conn.execute_batch(r#"CREATE TABLE "t" (row_id INTEGER, c0 VARCHAR)"#)
+            .unwrap();
         let rows = vec![
             vec![make_cell(Some("x"), CellDataType::String)],
             vec![make_cell(Some("y"), CellDataType::String)],
@@ -339,8 +350,14 @@ mod tests {
         let data = SheetData {
             name: "sheet1".to_string(),
             rows: vec![
-                vec![make_cell(Some("ColA"), CellDataType::String), make_cell(Some("ColB"), CellDataType::String)],
-                vec![make_cell(Some("v1"), CellDataType::String), make_cell(Some("v2"), CellDataType::String)],
+                vec![
+                    make_cell(Some("ColA"), CellDataType::String),
+                    make_cell(Some("ColB"), CellDataType::String),
+                ],
+                vec![
+                    make_cell(Some("v1"), CellDataType::String),
+                    make_cell(Some("v2"), CellDataType::String),
+                ],
             ],
         };
         load_sheet_to_db(&conn, "sheet1", &data, true).unwrap();
@@ -355,9 +372,10 @@ mod tests {
         let conn = create_conn().unwrap();
         let data = SheetData {
             name: "sheet1".to_string(),
-            rows: vec![
-                vec![make_cell(Some("1"), CellDataType::Int), make_cell(Some("x"), CellDataType::String)],
-            ],
+            rows: vec![vec![
+                make_cell(Some("1"), CellDataType::Int),
+                make_cell(Some("x"), CellDataType::String),
+            ]],
         };
         load_sheet_to_db(&conn, "sheet1", &data, false).unwrap();
         assert_eq!(table_row_count(&conn, "sheet1").unwrap(), 1);

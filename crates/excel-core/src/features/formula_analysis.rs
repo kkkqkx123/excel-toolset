@@ -201,7 +201,8 @@ fn find_direct_dependents(path: &str, sheet: &str, cell: &str) -> Result<Vec<Str
                         && r == target_row
                         && c == target_col
                     {
-                        let cell_addr = crate::utils::cell_ref::format_cell_ref(row as u32, col as u16);
+                        let cell_addr =
+                            crate::utils::cell_ref::format_cell_ref(row as u32, col as u16);
                         dependents.push(format!("{}!{}", sheet, cell_addr));
                     }
                 }

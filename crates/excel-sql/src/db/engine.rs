@@ -97,7 +97,11 @@ mod tests {
     use excel_types::CellDataType::*;
 
     fn make_cell(value: Option<&str>, dt: excel_types::CellDataType) -> CellData {
-        CellData { value: value.map(|s| s.to_string()), data_type: dt, formula: None }
+        CellData {
+            value: value.map(|s| s.to_string()),
+            data_type: dt,
+            formula: None,
+        }
     }
 
     fn sample_sheet() -> SheetData {
@@ -194,7 +198,9 @@ mod tests {
         let sheet = sample_sheet();
         engine.load_with_header("data", &sheet).unwrap();
 
-        let (cols, rows) = engine.query_to_strings("SELECT Name FROM \"data\" ORDER BY Age").unwrap();
+        let (cols, rows) = engine
+            .query_to_strings("SELECT Name FROM \"data\" ORDER BY Age")
+            .unwrap();
         assert_eq!(cols, vec!["Name"]);
         assert_eq!(rows, vec![vec!["Bob"], vec!["Alice"]]);
     }

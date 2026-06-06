@@ -4,8 +4,8 @@ use crate::excel_read::read_all_sheets_to_map;
 use crate::security::{compute_file_hash, create_backup};
 use crate::types::*;
 
+use super::core::build_workbook_with_ops;
 use super::csv::read_csv_to_cell_values;
-use super::write::build_workbook_with_ops;
 
 fn apply_data_operations(
     data: &mut HashMap<String, SheetData>,
@@ -20,7 +20,7 @@ fn apply_data_operations(
                 col,
                 value,
             } => {
-                super::cell::write(data, sheet, *row, *col, value)?;
+                super::data_mut::write(data, sheet, *row, *col, value)?;
                 succeeded += 1;
             }
             BatchOperation::WriteRange {
@@ -28,7 +28,7 @@ fn apply_data_operations(
                 range,
                 data: grid,
             } => {
-                super::cell::write_range(data, sheet, range, grid)?;
+                super::data_mut::write_range(data, sheet, range, grid)?;
                 succeeded += 1;
             }
             BatchOperation::WriteRangeFromCsv {
@@ -37,11 +37,11 @@ fn apply_data_operations(
                 csv_path,
             } => {
                 let grid = read_csv_to_cell_values(csv_path)?;
-                super::cell::write_range(data, sheet, range, &grid)?;
+                super::data_mut::write_range(data, sheet, range, &grid)?;
                 succeeded += 1;
             }
             BatchOperation::ClearRange { sheet, range } => {
-                super::cell::clear_range(data, sheet, range)?;
+                super::data_mut::clear_range(data, sheet, range)?;
                 succeeded += 1;
             }
             BatchOperation::SetFormula {
@@ -49,7 +49,7 @@ fn apply_data_operations(
                 cell,
                 formula,
             } => {
-                super::cell::set_formula(data, sheet, cell, formula)?;
+                super::data_mut::set_formula(data, sheet, cell, formula)?;
                 succeeded += 1;
             }
             BatchOperation::InsertRows {
@@ -57,7 +57,7 @@ fn apply_data_operations(
                 at_row,
                 data: grid,
             } => {
-                super::cell::insert_rows(data, sheet, *at_row, grid)?;
+                super::data_mut::insert_rows(data, sheet, *at_row, grid)?;
                 succeeded += 1;
             }
             BatchOperation::DeleteRows {
@@ -65,31 +65,31 @@ fn apply_data_operations(
                 start_row,
                 end_row,
             } => {
-                super::cell::delete_rows(data, sheet, *start_row, *end_row)?;
+                super::data_mut::delete_rows(data, sheet, *start_row, *end_row)?;
                 succeeded += 1;
             }
             BatchOperation::AppendRows { sheet, data: grid } => {
-                super::cell::append_rows(data, sheet, grid)?;
+                super::data_mut::append_rows(data, sheet, grid)?;
                 succeeded += 1;
             }
             BatchOperation::AddSheet { name } => {
-                super::sheet::add(data, name)?;
+                super::core::add(data, name)?;
                 succeeded += 1;
             }
             BatchOperation::DeleteSheet { name } => {
-                super::sheet::delete(data, name)?;
+                super::core::delete(data, name)?;
                 succeeded += 1;
             }
             BatchOperation::RenameSheet { old_name, new_name } => {
-                super::sheet::rename(data, old_name, new_name)?;
+                super::core::rename(data, old_name, new_name)?;
                 succeeded += 1;
             }
             BatchOperation::SortSheet { sheet, columns } => {
-                super::sheet::sort(data, sheet, columns)?;
+                super::core::sort(data, sheet, columns)?;
                 succeeded += 1;
             }
             BatchOperation::DedupSheet { sheet, columns } => {
-                super::sheet::dedup(data, sheet, columns)?;
+                super::core::dedup(data, sheet, columns)?;
                 succeeded += 1;
             }
             BatchOperation::SetFormat { .. }

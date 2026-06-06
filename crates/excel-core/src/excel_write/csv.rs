@@ -34,5 +34,5 @@ pub fn write_range_from_csv(
     csv_path: &str,
 ) -> Result<WriteResult> {
     let data = read_csv_to_cell_values(csv_path)?;
-    super::ops::write_range(path, params, sheet, target_range, &data)
+    super::operations::write_range(path, params, sheet, target_range, &data)
 }

@@ -176,7 +176,11 @@ mod tests {
     use excel_types::CellDataType::*;
 
     fn make_cell(value: Option<&str>, dt: excel_types::CellDataType) -> CellData {
-        CellData { value: value.map(|s| s.to_string()), data_type: dt, formula: None }
+        CellData {
+            value: value.map(|s| s.to_string()),
+            data_type: dt,
+            formula: None,
+        }
     }
 
     #[test]
@@ -199,9 +203,16 @@ mod tests {
                 vec![make_cell(Some("2"), Int)],
             ],
         };
-        let sort = SortColumn { column: 0, descending: false };
+        let sort = SortColumn {
+            column: 0,
+            descending: false,
+        };
         let result = sort_sheet_on_data(&data, &[sort]).unwrap();
-        let vals: Vec<&str> = result.rows.iter().map(|r| r[0].value.as_deref().unwrap()).collect();
+        let vals: Vec<&str> = result
+            .rows
+            .iter()
+            .map(|r| r[0].value.as_deref().unwrap())
+            .collect();
         assert_eq!(vals, vec!["1", "2", "3"]);
     }
 
@@ -215,9 +226,16 @@ mod tests {
                 vec![make_cell(Some("b"), String)],
             ],
         };
-        let sort = SortColumn { column: 0, descending: true };
+        let sort = SortColumn {
+            column: 0,
+            descending: true,
+        };
         let result = sort_sheet_on_data(&data, &[sort]).unwrap();
-        let vals: Vec<&str> = result.rows.iter().map(|r| r[0].value.as_deref().unwrap()).collect();
+        let vals: Vec<&str> = result
+            .rows
+            .iter()
+            .map(|r| r[0].value.as_deref().unwrap())
+            .collect();
         assert_eq!(vals, vec!["c", "b", "a"]);
     }
 
@@ -243,7 +261,10 @@ mod tests {
         let data = SheetData {
             name: "t".to_string(),
             rows: vec![
-                vec![make_cell(Some("hdr"), String), make_cell(Some("ignored"), String)],
+                vec![
+                    make_cell(Some("hdr"), String),
+                    make_cell(Some("ignored"), String),
+                ],
                 vec![make_cell(Some("a"), String), make_cell(Some("x"), String)],
                 vec![make_cell(Some("a"), String), make_cell(Some("y"), String)], // dup on col 0 only
             ],
