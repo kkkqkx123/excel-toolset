@@ -1,0 +1,18 @@
+{
+  "file_hash_match": true,
+  "sheet_diffs": [
+    {
+      "sheet_name": "S",
+      "row_count_diff": 0,
+      "col_count_diff": 0,
+      "cell_diffs": []
+    }
+  ],
+  "summary": {
+    "adds": 0,
+    "deletes": 0,
+    "modifies": 0,
+    "passives": 0,
+    "total_changes": 0
+  }
+}

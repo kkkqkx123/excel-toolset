@@ -1,0 +1,19 @@
+[package]
+name = "excel-diff"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+excel-types = { path = "../excel-types" }
+excel-core = { path = "../excel-core" }
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+excel-types = { path = "../excel-types" }
+tempfile = "3"
+rust_xlsxwriter.workspace = true
+
+[[example]]
+name = "generate_prebuilt_fixtures"
+path = "tests/git_e2e/generate_prebuilt_fixtures.rs"

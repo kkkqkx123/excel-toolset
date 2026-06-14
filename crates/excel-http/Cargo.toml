@@ -1,0 +1,15 @@
+[package]
+name = "excel-http"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+excel-core = { path = "../excel-core" }
+excel-diff = { path = "../excel-diff" }
+axum = "0.8"
+tokio = { version = "1.52", features = ["full"] }
+serde.workspace = true
+serde_json.workspace = true
+
+[features]
+sql = ["excel-core/sql"]

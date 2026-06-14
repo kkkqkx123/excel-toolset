@@ -1,0 +1,18 @@
+{
+  "file_hash_match": false,
+  "sheet_diffs": [
+    {
+      "sheet_name": "Resized",
+      "row_count_diff": 5,
+      "col_count_diff": -2,
+      "cell_diffs": []
+    }
+  ],
+  "summary": {
+    "adds": 0,
+    "deletes": 0,
+    "modifies": 0,
+    "passives": 0,
+    "total_changes": 0
+  }
+}

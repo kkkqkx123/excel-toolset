@@ -1,0 +1,40 @@
+{
+  "file_hash_match": false,
+  "sheet_diffs": [
+    {
+      "sheet_name": "Data",
+      "row_count_diff": 1,
+      "col_count_diff": 0,
+      "cell_diffs": [
+        {
+          "row": 3,
+          "col": 0,
+          "cell_ref": "A4",
+          "diff_type": "Add",
+          "new_value": "Charlie"
+        },
+        {
+          "row": 3,
+          "col": 1,
+          "cell_ref": "B4",
+          "diff_type": "Add",
+          "new_value": "300"
+        },
+        {
+          "row": 3,
+          "col": 2,
+          "cell_ref": "C4",
+          "diff_type": "Add",
+          "new_value": "42"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "adds": 3,
+    "deletes": 0,
+    "modifies": 0,
+    "passives": 0,
+    "total_changes": 3
+  }
+}

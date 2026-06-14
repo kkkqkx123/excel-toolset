@@ -1,0 +1,2 @@
+Total 1 changes: 0 added, 0 deleted, 1 modified, 0 passive
+Cell A1 in "Formulas": formula changed from =SUM(B1:B3) to =AVERAGE(B1:B3)

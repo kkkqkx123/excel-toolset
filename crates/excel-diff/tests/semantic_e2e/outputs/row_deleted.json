@@ -1,0 +1,33 @@
+{
+  "file_hash_match": false,
+  "sheet_diffs": [
+    {
+      "sheet_name": "Data",
+      "row_count_diff": -1,
+      "col_count_diff": 0,
+      "cell_diffs": [
+        {
+          "row": 1,
+          "col": 0,
+          "cell_ref": "A2",
+          "diff_type": "Delete",
+          "old_value": "DeletedRow"
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "cell_ref": "B2",
+          "diff_type": "Delete",
+          "old_value": "99"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "adds": 0,
+    "deletes": 2,
+    "modifies": 0,
+    "passives": 0,
+    "total_changes": 2
+  }
+}

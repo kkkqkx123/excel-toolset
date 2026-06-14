@@ -1,0 +1,103 @@
+{
+  "file_hash_match": false,
+  "sheet_diffs": [
+    {
+      "cell_diffs": [
+        {
+          "cell_ref": "A1",
+          "col": 0,
+          "diff_type": "Add",
+          "new_value": "Rent",
+          "row": 0
+        },
+        {
+          "cell_ref": "B1",
+          "col": 1,
+          "diff_type": "Add",
+          "new_value": "500",
+          "row": 0
+        }
+      ],
+      "col_count_diff": 2,
+      "row_count_diff": 1,
+      "sheet_name": "Expenses"
+    },
+    {
+      "cell_diffs": [
+        {
+          "cell_ref": "A1",
+          "col": 0,
+          "diff_type": "Add",
+          "new_value": "Q1",
+          "row": 0
+        },
+        {
+          "cell_ref": "B1",
+          "col": 1,
+          "diff_type": "Add",
+          "new_value": "1000",
+          "row": 0
+        }
+      ],
+      "col_count_diff": 2,
+      "row_count_diff": 1,
+      "sheet_name": "Revenue"
+    },
+    {
+      "cell_diffs": [
+        {
+          "cell_ref": "A1",
+          "col": 0,
+          "diff_type": "Delete",
+          "old_value": "Name",
+          "row": 0
+        },
+        {
+          "cell_ref": "B1",
+          "col": 1,
+          "diff_type": "Delete",
+          "old_value": "Value",
+          "row": 0
+        },
+        {
+          "cell_ref": "A2",
+          "col": 0,
+          "diff_type": "Delete",
+          "old_value": "Alice",
+          "row": 1
+        },
+        {
+          "cell_ref": "B2",
+          "col": 1,
+          "diff_type": "Delete",
+          "old_value": "100",
+          "row": 1
+        },
+        {
+          "cell_ref": "A3",
+          "col": 0,
+          "diff_type": "Delete",
+          "old_value": "Bob",
+          "row": 2
+        },
+        {
+          "cell_ref": "B3",
+          "col": 1,
+          "diff_type": "Delete",
+          "old_value": "200",
+          "row": 2
+        }
+      ],
+      "col_count_diff": -2,
+      "row_count_diff": -3,
+      "sheet_name": "Sheet1"
+    }
+  ],
+  "summary": {
+    "adds": 4,
+    "deletes": 6,
+    "modifies": 0,
+    "passives": 0,
+    "total_changes": 10
+  }
+}

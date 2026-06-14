@@ -1,0 +1,2 @@
+Total 3 changes: 3 added, 0 deleted, 0 modified, 0 passive
+Add row 4 in "Data": A4=Charlie, B4=300, C4=42

@@ -1,0 +1,4 @@
+Total 3 changes: 0 added, 0 deleted, 3 modified, 0 passive
+Cell A1 in "Sheet1": changed from 10 to 20
+Cell B2 in "Sheet1": changed from old to new
+Cell A3 in "Sheet2": changed from x to y

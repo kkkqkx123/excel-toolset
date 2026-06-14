@@ -1,0 +1,29 @@
+{
+  "file_hash_match": false,
+  "sheet_diffs": [
+    {
+      "sheet_name": "Formulas",
+      "row_count_diff": 0,
+      "col_count_diff": 0,
+      "cell_diffs": [
+        {
+          "row": 0,
+          "col": 0,
+          "cell_ref": "A1",
+          "diff_type": "Modify",
+          "old_value": "10",
+          "new_value": "20",
+          "old_formula": "=SUM(B1:B3)",
+          "new_formula": "=AVERAGE(B1:B3)"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "adds": 0,
+    "deletes": 0,
+    "modifies": 1,
+    "passives": 0,
+    "total_changes": 1
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "file_hash_match": false,
+  "sheet_diffs": [
+    {
+      "sheet_name": "Sheet1",
+      "row_count_diff": 0,
+      "col_count_diff": 0,
+      "cell_diffs": [
+        {
+          "row": 0,
+          "col": 0,
+          "cell_ref": "A1",
+          "diff_type": "Modify",
+          "old_value": "10",
+          "new_value": "20"
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "cell_ref": "B2",
+          "diff_type": "Modify",
+          "old_value": "old",
+          "new_value": "new"
+        }
+      ]
+    },
+    {
+      "sheet_name": "Sheet2",
+      "row_count_diff": 0,
+      "col_count_diff": 0,
+      "cell_diffs": [
+        {
+          "row": 2,
+          "col": 0,
+          "cell_ref": "A3",
+          "diff_type": "Modify",
+          "old_value": "x",
+          "new_value": "y"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "adds": 0,
+    "deletes": 0,
+    "modifies": 3,
+    "passives": 0,
+    "total_changes": 3
+  }
+}

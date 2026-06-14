@@ -1,0 +1,5 @@
+Total 5 changes: 2 added, 0 deleted, 3 modified, 0 passive
+Add row 4 in "Sheet1": A4=Dave, B4=400
+Cell B2 in "Sheet1": changed from 100 to 150
+Cell A3 in "Sheet1": changed from Bob to Charlie
+Cell B3 in "Sheet1": changed from 200 to 300

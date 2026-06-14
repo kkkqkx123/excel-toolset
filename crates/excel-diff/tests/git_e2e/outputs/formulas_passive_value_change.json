@@ -1,0 +1,20 @@
+[
+  {
+    "cell_ref": "B1",
+    "col": 1,
+    "diff_type": "Modify",
+    "new_value": "30",
+    "old_value": "10",
+    "row": 0
+  },
+  {
+    "cell_ref": "B3",
+    "col": 1,
+    "diff_type": "Passive",
+    "new_formula": "SUM(B1:B2)",
+    "new_value": "50",
+    "old_formula": "SUM(B1:B2)",
+    "old_value": "30",
+    "row": 2
+  }
+]

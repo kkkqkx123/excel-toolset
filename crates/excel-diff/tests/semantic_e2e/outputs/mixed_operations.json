@@ -1,0 +1,51 @@
+{
+  "file_hash_match": false,
+  "sheet_diffs": [
+    {
+      "sheet_name": "Data",
+      "row_count_diff": 0,
+      "col_count_diff": 0,
+      "cell_diffs": [
+        {
+          "row": 0,
+          "col": 0,
+          "cell_ref": "A1",
+          "diff_type": "Modify",
+          "old_value": "old",
+          "new_value": "new"
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "cell_ref": "B1",
+          "diff_type": "Add",
+          "new_value": "added"
+        },
+        {
+          "row": 2,
+          "col": 0,
+          "cell_ref": "A3",
+          "diff_type": "Delete",
+          "old_value": "gone"
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "cell_ref": "B2",
+          "diff_type": "Passive",
+          "old_value": "5",
+          "new_value": "6",
+          "old_formula": "=A1+1",
+          "new_formula": "=A1+1"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "adds": 1,
+    "deletes": 1,
+    "modifies": 1,
+    "passives": 1,
+    "total_changes": 4
+  }
+}

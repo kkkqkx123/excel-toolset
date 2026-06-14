@@ -1,0 +1,2 @@
+Total 1 changes: 0 added, 0 deleted, 0 modified, 1 passive
+Cell A1 in "Passive": value 10 -> 20 recalculated, formula =B1+1 unchanged
