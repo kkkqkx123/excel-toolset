@@ -7,7 +7,7 @@ pub struct FilterCondition {
     pub value: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum FilterOp {
     Eq,
     Ne,

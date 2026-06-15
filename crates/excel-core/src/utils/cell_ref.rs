@@ -31,20 +31,26 @@ pub fn parse_cell_ref(ref_str: &str) -> Result<(u32, u16)> {
 }
 
 /// Parse a range like "A1:C3" to 0-indexed (row1, col1, row2, col2).
+/// Single cell references like "A1" are treated as "A1:A1".
 pub fn parse_range(range_str: &str) -> Result<(u32, u16, u32, u16)> {
     let range_str = range_str.trim();
     let parts: Vec<&str> = range_str.split(':').collect();
-    if parts.len() != 2 {
-        return Err(AppError::InvalidRange(format!(
+    match parts.len() {
+        1 => {
+            // Single cell reference, treat as A1:A1
+            let (r1, c1) = parse_cell_ref(parts[0])?;
+            Ok((r1, c1, r1, c1))
+        }
+        2 => {
+            let (r1, c1) = parse_cell_ref(parts[0])?;
+            let (r2, c2) = parse_cell_ref(parts[1])?;
+            Ok((r1, c1, r2, c2))
+        }
+        _ => Err(AppError::InvalidRange(format!(
             "Invalid range: {}",
             range_str
-        )));
+        ))),
     }
-
-    let (r1, c1) = parse_cell_ref(parts[0])?;
-    let (r2, c2) = parse_cell_ref(parts[1])?;
-
-    Ok((r1, c1, r2, c2))
 }
 
 /// Convert column letter(s) to 0-indexed column number.

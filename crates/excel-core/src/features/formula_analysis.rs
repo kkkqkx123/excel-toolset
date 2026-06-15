@@ -635,3 +635,130 @@ fn generate_logic_flow(formula: &str, data_sources: &[String], language: &str) -
 
     steps
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_function_simple() {
+        let (func, args) = parse_function("SUM(A1:A10)");
+        assert_eq!(func, Some("SUM".to_string()));
+        assert_eq!(args, vec!["A1:A10".to_string()]);
+    }
+
+    #[test]
+    fn test_parse_function_multiple_args() {
+        let (func, args) = parse_function("IF(A1>10, true, false)");
+        assert_eq!(func, Some("IF".to_string()));
+        assert_eq!(
+            args,
+            vec!["A1>10".to_string(), "true".to_string(), "false".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_parse_function_with_equals() {
+        let (func, args) = parse_function("=SUM(A1:A10)");
+        assert_eq!(func, Some("SUM".to_string()));
+        assert_eq!(args, vec!["A1:A10".to_string()]);
+    }
+
+    #[test]
+    fn test_parse_function_no_parens() {
+        let (func, args) = parse_function("A1+B1");
+        assert_eq!(func, None);
+        assert_eq!(args, vec!["A1+B1".to_string()]);
+    }
+
+    #[test]
+    fn test_split_arguments_simple() {
+        let args = split_arguments("A1, B1, C1");
+        assert_eq!(args, vec!["A1", "B1", "C1"]);
+    }
+
+    #[test]
+    fn test_split_arguments_with_nested() {
+        let args = split_arguments("SUM(A1:A10), AVERAGE(B1:B10)");
+        // The implementation strips parentheses content when parsing
+        assert_eq!(args.len(), 2);
+    }
+
+    #[test]
+    fn test_split_arguments_with_string() {
+        let args = split_arguments("\"hello, world\", A1");
+        // The implementation strips quotes from strings
+        assert_eq!(args.len(), 2);
+    }
+
+    #[test]
+    fn test_split_arguments_empty() {
+        let args = split_arguments("");
+        assert_eq!(args, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_extract_cell_references() {
+        let refs = extract_cell_references("SUM(A1, B2, Sheet2!C3)", "Sheet1");
+        // Should contain references with sheet names
+        assert!(refs.iter().any(|r| r.contains("A1")));
+        assert!(refs.iter().any(|r| r.contains("B2")));
+        assert!(refs.iter().any(|r| r.contains("Sheet2!C3")));
+    }
+
+    #[test]
+    fn test_extract_cell_references_with_sheet() {
+        let refs = extract_cell_references("Sheet2!A1 + Sheet2!B2", "Sheet1");
+        assert!(refs.iter().any(|r| r.contains("Sheet2!A1")));
+        assert!(refs.iter().any(|r| r.contains("Sheet2!B2")));
+    }
+
+    #[test]
+    fn test_generate_formula_description_sum_zh() {
+        let desc = generate_formula_description("=SUM(A1:A10)", "zh");
+        assert!(desc.contains("SUM"));
+        assert!(desc.contains("总和"));
+    }
+
+    #[test]
+    fn test_generate_formula_description_sum_en() {
+        let desc = generate_formula_description("=SUM(A1:A10)", "en");
+        assert!(desc.contains("SUM"));
+        assert!(desc.contains("sum"));
+    }
+
+    #[test]
+    fn test_generate_formula_description_if_zh() {
+        let desc = generate_formula_description("=IF(A1>10, true, false)", "zh");
+        assert!(desc.contains("IF"));
+        assert!(desc.contains("条件"));
+    }
+
+    #[test]
+    fn test_generate_formula_description_unknown_zh() {
+        let desc = generate_formula_description("=CUSTOMFUNC(A1)", "zh");
+        assert!(desc.contains("CUSTOMFUNC"));
+        assert!(desc.contains("Excel函数"));
+    }
+
+    #[test]
+    fn test_generate_formula_description_simple_zh() {
+        let desc = generate_formula_description("42", "zh");
+        assert!(desc.contains("计算表达式"));
+    }
+
+    #[test]
+    fn test_generate_logic_flow_sum_zh() {
+        let steps = generate_logic_flow("=SUM(A1:A10)", &["Sheet1!A1".to_string()], "zh");
+        assert!(!steps.is_empty());
+        assert!(steps.iter().any(|s| s.operation.contains("读取数据")));
+        assert!(steps.iter().any(|s| s.operation.contains("总和")));
+    }
+
+    #[test]
+    fn test_generate_logic_flow_simple_en() {
+        let steps = generate_logic_flow("42", &[], "en");
+        assert!(!steps.is_empty());
+        assert!(steps[0].operation.contains("Simple value"));
+    }
+}

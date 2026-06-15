@@ -461,3 +461,305 @@ pub fn build_workbook_with_ops(
 
     Ok(wb)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{CellData, CellDataType, SheetData};
+    use std::collections::HashMap;
+
+    fn make_cell(value: &str, data_type: CellDataType) -> CellData {
+        CellData {
+            value: Some(value.to_string()),
+            data_type,
+            formula: None,
+        }
+    }
+
+    fn make_sheet(name: &str, rows: Vec<Vec<CellData>>) -> SheetData {
+        SheetData {
+            name: name.to_string(),
+            rows,
+        }
+    }
+
+    #[test]
+    fn test_cell_value_to_data_string() {
+        let cv = CellValue::String("hello".to_string());
+        let cd = cell_value_to_data(&cv);
+        assert_eq!(cd.value, Some("hello".to_string()));
+        assert_eq!(cd.data_type, CellDataType::String);
+    }
+
+    #[test]
+    fn test_cell_value_to_data_number() {
+        let cv = CellValue::Number(42.5);
+        let cd = cell_value_to_data(&cv);
+        assert_eq!(cd.value, Some("42.5".to_string()));
+        assert_eq!(cd.data_type, CellDataType::Float);
+    }
+
+    #[test]
+    fn test_cell_value_to_data_bool() {
+        let cv = CellValue::Bool(true);
+        let cd = cell_value_to_data(&cv);
+        assert_eq!(cd.value, Some("true".to_string()));
+        assert_eq!(cd.data_type, CellDataType::Bool);
+    }
+
+    #[test]
+    fn test_cell_value_to_data_empty() {
+        let cv = CellValue::Empty;
+        let cd = cell_value_to_data(&cv);
+        assert_eq!(cd.value, None);
+        assert_eq!(cd.data_type, CellDataType::Empty);
+    }
+
+    #[test]
+    fn test_cell_value_to_data_error() {
+        let cv = CellValue::Error("#DIV/0!".to_string());
+        let cd = cell_value_to_data(&cv);
+        assert_eq!(cd.value, Some("#DIV/0!".to_string()));
+        assert_eq!(cd.data_type, CellDataType::Error);
+    }
+
+    #[test]
+    fn test_ensure_dimensions_expands_rows() {
+        let mut sheet = SheetData {
+            name: "Test".to_string(),
+            rows: vec![vec![make_cell("a", CellDataType::String)]],
+        };
+        ensure_dimensions(&mut sheet, 3, 0);
+        assert_eq!(sheet.rows.len(), 4);
+    }
+
+    #[test]
+    fn test_ensure_dimensions_expands_cols() {
+        let mut sheet = SheetData {
+            name: "Test".to_string(),
+            rows: vec![vec![make_cell("a", CellDataType::String)]],
+        };
+        ensure_dimensions(&mut sheet, 0, 3);
+        assert_eq!(sheet.rows[0].len(), 4);
+    }
+
+    #[test]
+    fn test_add_sheet_to_map() {
+        let mut data = HashMap::new();
+        add(&mut data, "Sheet1").unwrap();
+        assert!(data.contains_key("Sheet1"));
+        assert_eq!(data["Sheet1"].rows.len(), 0);
+    }
+
+    #[test]
+    fn test_add_sheet_duplicate_error() {
+        let mut data = HashMap::new();
+        add(&mut data, "Sheet1").unwrap();
+        let result = add(&mut data, "Sheet1");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_delete_sheet_from_map() {
+        let mut data = HashMap::new();
+        add(&mut data, "Sheet1").unwrap();
+        add(&mut data, "Sheet2").unwrap();
+        delete(&mut data, "Sheet1").unwrap();
+        assert!(!data.contains_key("Sheet1"));
+        assert!(data.contains_key("Sheet2"));
+    }
+
+    #[test]
+    fn test_delete_sheet_not_found_error() {
+        let mut data = HashMap::new();
+        let result = delete(&mut data, "NonExistent");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_rename_sheet() {
+        let mut data = HashMap::new();
+        add(&mut data, "OldName").unwrap();
+        rename(&mut data, "OldName", "NewName").unwrap();
+        assert!(!data.contains_key("OldName"));
+        assert!(data.contains_key("NewName"));
+        assert_eq!(data["NewName"].name, "NewName");
+    }
+
+    #[test]
+    fn test_rename_sheet_source_not_found() {
+        let mut data = HashMap::new();
+        let result = rename(&mut data, "NonExistent", "NewName");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_rename_sheet_target_exists() {
+        let mut data = HashMap::new();
+        add(&mut data, "Sheet1").unwrap();
+        add(&mut data, "Sheet2").unwrap();
+        let result = rename(&mut data, "Sheet1", "Sheet2");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_sort_single_column_ascending() {
+        let mut data = HashMap::new();
+        let sheet = make_sheet(
+            "Data",
+            vec![
+                vec![
+                    make_cell("Name", CellDataType::String),
+                    make_cell("Age", CellDataType::String),
+                ],
+                vec![
+                    make_cell("Charlie", CellDataType::String),
+                    make_cell("35", CellDataType::String),
+                ],
+                vec![
+                    make_cell("Alice", CellDataType::String),
+                    make_cell("25", CellDataType::String),
+                ],
+                vec![
+                    make_cell("Bob", CellDataType::String),
+                    make_cell("30", CellDataType::String),
+                ],
+            ],
+        );
+        data.insert("Data".to_string(), sheet);
+
+        let sort_columns = vec![SortColumn {
+            column: 0,
+            descending: false,
+        }];
+        sort(&mut data, "Data", &sort_columns).unwrap();
+
+        let sheet = &data["Data"];
+        assert_eq!(sheet.rows[1][0].value, Some("Alice".to_string()));
+        assert_eq!(sheet.rows[2][0].value, Some("Bob".to_string()));
+        assert_eq!(sheet.rows[3][0].value, Some("Charlie".to_string()));
+    }
+
+    #[test]
+    fn test_sort_single_column_descending() {
+        let mut data = HashMap::new();
+        let sheet = make_sheet(
+            "Data",
+            vec![
+                vec![make_cell("Name", CellDataType::String)],
+                vec![make_cell("Alice", CellDataType::String)],
+                vec![make_cell("Bob", CellDataType::String)],
+            ],
+        );
+        data.insert("Data".to_string(), sheet);
+
+        let sort_columns = vec![SortColumn {
+            column: 0,
+            descending: true,
+        }];
+        sort(&mut data, "Data", &sort_columns).unwrap();
+
+        let sheet = &data["Data"];
+        assert_eq!(sheet.rows[1][0].value, Some("Bob".to_string()));
+        assert_eq!(sheet.rows[2][0].value, Some("Alice".to_string()));
+    }
+
+    #[test]
+    fn test_sort_empty_sheet() {
+        let mut data = HashMap::new();
+        let sheet = make_sheet("Data", vec![]);
+        data.insert("Data".to_string(), sheet);
+
+        let sort_columns = vec![SortColumn {
+            column: 0,
+            descending: false,
+        }];
+        let result = sort(&mut data, "Data", &sort_columns);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_sort_sheet_not_found() {
+        let mut data = HashMap::new();
+        let sort_columns = vec![SortColumn {
+            column: 0,
+            descending: false,
+        }];
+        let result = sort(&mut data, "NonExistent", &sort_columns);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_dedup_all_columns() {
+        let mut data = HashMap::new();
+        let sheet = make_sheet(
+            "Data",
+            vec![
+                vec![
+                    make_cell("A", CellDataType::String),
+                    make_cell("B", CellDataType::String),
+                ],
+                vec![
+                    make_cell("1", CellDataType::String),
+                    make_cell("2", CellDataType::String),
+                ],
+                vec![
+                    make_cell("1", CellDataType::String),
+                    make_cell("2", CellDataType::String),
+                ],
+                vec![
+                    make_cell("3", CellDataType::String),
+                    make_cell("4", CellDataType::String),
+                ],
+            ],
+        );
+        data.insert("Data".to_string(), sheet);
+
+        dedup(&mut data, "Data", &[]).unwrap();
+
+        let sheet = &data["Data"];
+        assert_eq!(sheet.rows.len(), 3); // header + 2 unique rows
+    }
+
+    #[test]
+    fn test_dedup_specific_columns() {
+        let mut data = HashMap::new();
+        let sheet = make_sheet(
+            "Data",
+            vec![
+                vec![
+                    make_cell("A", CellDataType::String),
+                    make_cell("B", CellDataType::String),
+                ],
+                vec![
+                    make_cell("1", CellDataType::String),
+                    make_cell("2", CellDataType::String),
+                ],
+                vec![
+                    make_cell("1", CellDataType::String),
+                    make_cell("3", CellDataType::String),
+                ],
+                vec![
+                    make_cell("2", CellDataType::String),
+                    make_cell("2", CellDataType::String),
+                ],
+            ],
+        );
+        data.insert("Data".to_string(), sheet);
+
+        // Dedup only on column 0
+        dedup(&mut data, "Data", &[0]).unwrap();
+
+        let sheet = &data["Data"];
+        assert_eq!(sheet.rows.len(), 3); // header + 2 unique by col 0
+    }
+
+    #[test]
+    fn test_error_to_formula() {
+        assert_eq!(error_to_formula("#DIV/0!"), Some("1/0".to_string()));
+        assert_eq!(error_to_formula("#N/A"), Some("NA()".to_string()));
+        assert_eq!(error_to_formula("#NUM!"), Some("SQRT(-1)".to_string()));
+        assert_eq!(error_to_formula("#VALUE!"), Some("\"TEXT\"+1".to_string()));
+        assert_eq!(error_to_formula("#REF!"), None);
+    }
+}

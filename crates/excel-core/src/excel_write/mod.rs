@@ -11,7 +11,7 @@ mod format;
 mod operations;
 
 pub use batch::*;
-pub(crate) use core::write_sheet_data;
+pub use core::{modify_file_with_wb, write_sheet_data};
 pub use csv::*;
 // data_mut functions are pub(crate), not re-exported publicly.
 // Use operations.rs for file-level public API.

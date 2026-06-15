@@ -118,3 +118,178 @@ pub fn chart_type_from_str(s: &str) -> Result<ChartType> {
         _ => Err(AppError::InvalidChartType(s.into())),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_cell_value_number() {
+        assert_eq!(parse_cell_value("123"), CellValue::Number(123.0));
+        assert_eq!(parse_cell_value("-45.67"), CellValue::Number(-45.67));
+        assert_eq!(parse_cell_value("0"), CellValue::Number(0.0));
+    }
+
+    #[test]
+    fn test_parse_cell_value_bool() {
+        assert_eq!(parse_cell_value("true"), CellValue::Bool(true));
+        assert_eq!(parse_cell_value("false"), CellValue::Bool(false));
+        assert_eq!(parse_cell_value("TRUE"), CellValue::Bool(true));
+        assert_eq!(parse_cell_value("False"), CellValue::Bool(false));
+    }
+
+    #[test]
+    fn test_parse_cell_value_empty() {
+        assert_eq!(parse_cell_value("null"), CellValue::Empty);
+        assert_eq!(parse_cell_value("none"), CellValue::Empty);
+        assert_eq!(parse_cell_value("empty"), CellValue::Empty);
+    }
+
+    #[test]
+    fn test_parse_cell_value_error() {
+        assert_eq!(
+            parse_cell_value("#DIV/0!"),
+            CellValue::Error("#DIV/0!".to_string())
+        );
+        assert_eq!(
+            parse_cell_value("#N/A"),
+            CellValue::Error("#N/A".to_string())
+        );
+        assert_eq!(
+            parse_cell_value("#VALUE!"),
+            CellValue::Error("#VALUE!".to_string())
+        );
+        assert_eq!(
+            parse_cell_value("#REF!"),
+            CellValue::Error("#REF!".to_string())
+        );
+        assert_eq!(
+            parse_cell_value("#NAME?"),
+            CellValue::Error("#NAME?".to_string())
+        );
+        assert_eq!(
+            parse_cell_value("#NULL!"),
+            CellValue::Error("#NULL!".to_string())
+        );
+        assert_eq!(
+            parse_cell_value("#NUM!"),
+            CellValue::Error("#NUM!".to_string())
+        );
+        assert_eq!(
+            parse_cell_value("#GETTING_DATA"),
+            CellValue::Error("#GETTING_DATA".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_cell_value_string() {
+        assert_eq!(
+            parse_cell_value("hello"),
+            CellValue::String("hello".to_string())
+        );
+        assert_eq!(
+            parse_cell_value("Hello World"),
+            CellValue::String("Hello World".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_cell_value_grid() {
+        let json = r#"[[1, "hello", true], [null, 3.14, false]]"#;
+        let result: Vec<Vec<CellValue>> = parse_cell_value_grid(json).unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0][0], CellValue::Number(1.0));
+        assert_eq!(result[0][1], CellValue::String("hello".to_string()));
+        assert_eq!(result[0][2], CellValue::Bool(true));
+        assert_eq!(result[1][0], CellValue::Empty);
+        assert_eq!(result[1][1], CellValue::Number(3.14));
+        assert_eq!(result[1][2], CellValue::Bool(false));
+    }
+
+    #[test]
+    fn test_parse_cell_value_grid_with_errors() {
+        let json = "[[\"#DIV/0!\", \"#N/A\"]]";
+        let result = parse_cell_value_grid(json).unwrap();
+        assert_eq!(result[0][0], CellValue::Error("#DIV/0!".to_string()));
+        assert_eq!(result[0][1], CellValue::Error("#N/A".to_string()));
+    }
+
+    #[test]
+    fn test_parse_cell_value_grid_invalid_json() {
+        let result = parse_cell_value_grid("invalid json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_json_val_to_cell_value() {
+        use serde_json::json;
+
+        assert_eq!(json_val_to_cell_value(&json!(42)), CellValue::Number(42.0));
+        assert_eq!(
+            json_val_to_cell_value(&json!(3.14)),
+            CellValue::Number(3.14)
+        );
+        assert_eq!(json_val_to_cell_value(&json!(true)), CellValue::Bool(true));
+        assert_eq!(
+            json_val_to_cell_value(&json!(false)),
+            CellValue::Bool(false)
+        );
+        assert_eq!(
+            json_val_to_cell_value(&json!("hello")),
+            CellValue::String("hello".to_string())
+        );
+        assert_eq!(json_val_to_cell_value(&json!(null)), CellValue::Empty);
+        assert_eq!(
+            json_val_to_cell_value(&json!("#DIV/0!")),
+            CellValue::Error("#DIV/0!".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_filter_op() {
+        assert_eq!(parse_filter_op("eq").unwrap(), FilterOp::Eq);
+        assert_eq!(parse_filter_op("=").unwrap(), FilterOp::Eq);
+        assert_eq!(parse_filter_op("==").unwrap(), FilterOp::Eq);
+        assert_eq!(parse_filter_op("ne").unwrap(), FilterOp::Ne);
+        assert_eq!(parse_filter_op("!=").unwrap(), FilterOp::Ne);
+        assert_eq!(parse_filter_op("gt").unwrap(), FilterOp::Gt);
+        assert_eq!(parse_filter_op(">").unwrap(), FilterOp::Gt);
+        assert_eq!(parse_filter_op("lt").unwrap(), FilterOp::Lt);
+        assert_eq!(parse_filter_op("<").unwrap(), FilterOp::Lt);
+        assert_eq!(parse_filter_op("ge").unwrap(), FilterOp::Ge);
+        assert_eq!(parse_filter_op(">=").unwrap(), FilterOp::Ge);
+        assert_eq!(parse_filter_op("le").unwrap(), FilterOp::Le);
+        assert_eq!(parse_filter_op("<=").unwrap(), FilterOp::Le);
+        assert_eq!(parse_filter_op("contains").unwrap(), FilterOp::Contains);
+        assert_eq!(parse_filter_op("startswith").unwrap(), FilterOp::StartsWith);
+        assert_eq!(
+            parse_filter_op("starts_with").unwrap(),
+            FilterOp::StartsWith
+        );
+        assert_eq!(parse_filter_op("endswith").unwrap(), FilterOp::EndsWith);
+        assert_eq!(parse_filter_op("ends_with").unwrap(), FilterOp::EndsWith);
+    }
+
+    #[test]
+    fn test_parse_filter_op_invalid() {
+        assert!(parse_filter_op("invalid").is_err());
+        assert!(parse_filter_op("").is_err());
+    }
+
+    #[test]
+    fn test_chart_type_from_str() {
+        assert_eq!(chart_type_from_str("column").unwrap(), ChartType::Column);
+        assert_eq!(chart_type_from_str("COLUMN").unwrap(), ChartType::Column);
+        assert_eq!(chart_type_from_str("line").unwrap(), ChartType::Line);
+        assert_eq!(chart_type_from_str("pie").unwrap(), ChartType::Pie);
+        assert_eq!(chart_type_from_str("bar").unwrap(), ChartType::Bar);
+        assert_eq!(chart_type_from_str("area").unwrap(), ChartType::Area);
+        assert_eq!(chart_type_from_str("scatter").unwrap(), ChartType::Scatter);
+    }
+
+    #[test]
+    fn test_chart_type_from_str_invalid() {
+        assert!(chart_type_from_str("invalid").is_err());
+        assert!(chart_type_from_str("").is_err());
+    }
+}

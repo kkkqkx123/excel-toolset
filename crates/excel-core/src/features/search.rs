@@ -219,3 +219,92 @@ impl Default for SearchQuery {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_check_match_exact() {
+        let query = SearchQuery {
+            pattern: "hello".to_string(),
+            search_type: SearchType::Value,
+            match_type: MatchType::Exact,
+            case_sensitive: false,
+            sheets: None,
+        };
+        assert!(check_match("hello", &query, None));
+        assert!(check_match("HELLO", &query, None));
+        assert!(!check_match("hello world", &query, None));
+    }
+
+    #[test]
+    fn test_check_match_exact_case_sensitive() {
+        let query = SearchQuery {
+            pattern: "Hello".to_string(),
+            search_type: SearchType::Value,
+            match_type: MatchType::Exact,
+            case_sensitive: true,
+            sheets: None,
+        };
+        assert!(check_match("Hello", &query, None));
+        assert!(!check_match("hello", &query, None));
+        assert!(!check_match("HELLO", &query, None));
+    }
+
+    #[test]
+    fn test_check_match_contains() {
+        let query = SearchQuery {
+            pattern: "world".to_string(),
+            search_type: SearchType::Value,
+            match_type: MatchType::Contains,
+            case_sensitive: false,
+            sheets: None,
+        };
+        assert!(check_match("hello world", &query, None));
+        assert!(check_match("WORLD", &query, None));
+        assert!(!check_match("hello", &query, None));
+    }
+
+    #[test]
+    fn test_check_match_regex() {
+        let query = SearchQuery {
+            pattern: r"\d+".to_string(),
+            search_type: SearchType::Value,
+            match_type: MatchType::Regex,
+            case_sensitive: false,
+            sheets: None,
+        };
+        let regex = compile_regex(r"\d+", false).unwrap();
+        assert!(check_match("abc123", &query, Some(&regex)));
+        assert!(!check_match("abc", &query, Some(&regex)));
+    }
+
+    #[test]
+    fn test_value_to_string() {
+        assert_eq!(value_to_string(&calamine::Data::Empty), "");
+        assert_eq!(
+            value_to_string(&calamine::Data::String("test".to_string())),
+            "test"
+        );
+        assert_eq!(value_to_string(&calamine::Data::Float(3.14)), "3.14");
+        assert_eq!(value_to_string(&calamine::Data::Int(42)), "42");
+        assert_eq!(value_to_string(&calamine::Data::Bool(true)), "true");
+    }
+
+    #[test]
+    fn test_compile_regex() {
+        let regex = compile_regex(r"\d+", false).unwrap();
+        assert!(regex.is_match("abc123"));
+        assert!(regex.is_match("ABC123")); // case insensitive
+
+        let regex = compile_regex(r"\d+", true).unwrap();
+        assert!(regex.is_match("abc123"));
+    }
+
+    #[test]
+    fn test_compile_regex_invalid() {
+        let result = compile_regex("[invalid", false);
+        assert!(result.is_err());
+    }
+}

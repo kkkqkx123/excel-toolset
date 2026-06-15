@@ -18,6 +18,11 @@ pub struct VbaImportReq {
     pub dry_run: bool,
 }
 
+#[derive(Deserialize)]
+pub struct VbaHasReq {
+    pub path: String,
+}
+
 pub async fn vba_export(Json(req): Json<VbaExportReq>) -> Json<ApiResponse<String>> {
     match vba_util::export_vba(&req.path) {
         Ok(data) => {
@@ -42,6 +47,13 @@ pub async fn vba_import(Json(req): Json<VbaImportReq>) -> Json<ApiResponse<Write
     };
     match vba_util::import_vba(&req.path, &params, &data) {
         Ok(result) => Json(ApiResponse::ok(Some(result))),
+        Err(e) => Json(ApiResponse::err(e)),
+    }
+}
+
+pub async fn vba_has(Json(req): Json<VbaHasReq>) -> Json<ApiResponse<bool>> {
+    match vba_util::has_vba(&req.path) {
+        Ok(has) => Json(ApiResponse::ok(Some(has))),
         Err(e) => Json(ApiResponse::err(e)),
     }
 }

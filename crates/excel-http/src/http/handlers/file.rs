@@ -52,3 +52,22 @@ pub async fn file_backup(Json(req): Json<BackupFileReq>) -> Json<ApiResponse<Bac
         Err(e) => Json(ApiResponse::err(AppError::Io(e))),
     }
 }
+
+#[derive(Deserialize)]
+pub struct RollbackReq {
+    pub path: String,
+    pub backup_path: String,
+}
+
+pub async fn file_rollback(Json(req): Json<RollbackReq>) -> Json<ApiResponse<()>> {
+    let backup_info = BackupInfo {
+        backup_path: req.backup_path.clone(),
+        timestamp: chrono::Utc::now(),
+        operation: "manual".to_string(),
+        file_hash: String::new(),
+    };
+    match security::rollback(&backup_info, &req.path) {
+        Ok(()) => Json(ApiResponse::ok(None)),
+        Err(e) => Json(ApiResponse::err(AppError::Io(e))),
+    }
+}

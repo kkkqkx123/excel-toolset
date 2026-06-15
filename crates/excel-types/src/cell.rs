@@ -27,7 +27,8 @@ pub struct CellData {
     pub formula: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
 pub enum CellValue {
     String(String),
     Number(f64),

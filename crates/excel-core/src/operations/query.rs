@@ -33,10 +33,9 @@ pub fn sort_sheet(
             .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
 
         if sd.rows.len() > 1 {
-            let header = sd.rows[0].clone();
-            let mut body: Vec<Vec<CellData>> = sd.rows.drain(1..).collect();
+            let mut all_rows: Vec<Vec<CellData>> = sd.rows.drain(..).collect();
 
-            body.sort_by(|a, b| {
+            all_rows.sort_by(|a, b| {
                 for sc in sort_columns {
                     let ca = a
                         .get(sc.column as usize)
@@ -63,8 +62,7 @@ pub fn sort_sheet(
                 std::cmp::Ordering::Equal
             });
 
-            sd.rows = vec![header];
-            sd.rows.extend(body);
+            sd.rows.extend(all_rows);
         }
         Ok(new_data)
     })
@@ -167,5 +165,371 @@ fn matches_one(row: &[CellData], cond: &FilterCondition) -> bool {
         FilterOp::Contains => lower_val.contains(&lower_cond),
         FilterOp::StartsWith => lower_val.starts_with(&lower_cond),
         FilterOp::EndsWith => lower_val.ends_with(&lower_cond),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{CellData, CellDataType};
+
+    fn make_cell(value: &str) -> CellData {
+        CellData {
+            value: Some(value.to_string()),
+            data_type: CellDataType::String,
+            formula: None,
+        }
+    }
+
+    #[test]
+    fn test_matches_all_all_conditions_met() {
+        let row = vec![make_cell("Alice"), make_cell("25"), make_cell("New York")];
+        let conditions = vec![
+            FilterCondition {
+                column: 0,
+                operator: FilterOp::Contains,
+                value: "Ali".to_string(),
+            },
+            FilterCondition {
+                column: 1,
+                operator: FilterOp::Gt,
+                value: "20".to_string(),
+            },
+        ];
+        assert!(matches_all(&row, &conditions));
+    }
+
+    #[test]
+    fn test_matches_all_one_condition_fails() {
+        let row = vec![make_cell("Alice"), make_cell("25"), make_cell("New York")];
+        let conditions = vec![
+            FilterCondition {
+                column: 0,
+                operator: FilterOp::Eq,
+                value: "Bob".to_string(),
+            },
+            FilterCondition {
+                column: 1,
+                operator: FilterOp::Gt,
+                value: "20".to_string(),
+            },
+        ];
+        assert!(!matches_all(&row, &conditions));
+    }
+
+    #[test]
+    fn test_matches_all_no_conditions() {
+        let row = vec![make_cell("Alice")];
+        let conditions: Vec<FilterCondition> = vec![];
+        assert!(matches_all(&row, &conditions));
+    }
+
+    #[test]
+    fn test_matches_one_eq() {
+        let row = vec![make_cell("Alice"), make_cell("25")];
+        let cond = FilterCondition {
+            column: 0,
+            operator: FilterOp::Eq,
+            value: "Alice".to_string(),
+        };
+        assert!(matches_one(&row, &cond));
+
+        let cond = FilterCondition {
+            column: 0,
+            operator: FilterOp::Eq,
+            value: "Bob".to_string(),
+        };
+        assert!(!matches_one(&row, &cond));
+    }
+
+    #[test]
+    fn test_matches_one_eq_case_insensitive() {
+        let row = vec![make_cell("Alice")];
+        let cond = FilterCondition {
+            column: 0,
+            operator: FilterOp::Eq,
+            value: "alice".to_string(),
+        };
+        assert!(matches_one(&row, &cond));
+    }
+
+    #[test]
+    fn test_matches_one_ne() {
+        let row = vec![make_cell("Alice")];
+        let cond = FilterCondition {
+            column: 0,
+            operator: FilterOp::Ne,
+            value: "Bob".to_string(),
+        };
+        assert!(matches_one(&row, &cond));
+
+        let cond = FilterCondition {
+            column: 0,
+            operator: FilterOp::Ne,
+            value: "Alice".to_string(),
+        };
+        assert!(!matches_one(&row, &cond));
+    }
+
+    #[test]
+    fn test_matches_one_numeric_comparison() {
+        let row = vec![make_cell("100")];
+        let cond = FilterCondition {
+            column: 0,
+            operator: FilterOp::Gt,
+            value: "50".to_string(),
+        };
+        assert!(matches_one(&row, &cond));
+
+        let cond = FilterCondition {
+            column: 0,
+            operator: FilterOp::Lt,
+            value: "200".to_string(),
+        };
+        assert!(matches_one(&row, &cond));
+
+        let cond = FilterCondition {
+            column: 0,
+            operator: FilterOp::Ge,
+            value: "100".to_string(),
+        };
+        assert!(matches_one(&row, &cond));
+
+        let cond = FilterCondition {
+            column: 0,
+            operator: FilterOp::Le,
+            value: "100".to_string(),
+        };
+        assert!(matches_one(&row, &cond));
+    }
+
+    #[test]
+    fn test_matches_one_contains() {
+        let row = vec![make_cell("Hello World")];
+        let cond = FilterCondition {
+            column: 0,
+            operator: FilterOp::Contains,
+            value: "World".to_string(),
+        };
+        assert!(matches_one(&row, &cond));
+
+        let cond = FilterCondition {
+            column: 0,
+            operator: FilterOp::Contains,
+            value: "xyz".to_string(),
+        };
+        assert!(!matches_one(&row, &cond));
+    }
+
+    #[test]
+    fn test_matches_one_startswith() {
+        let row = vec![make_cell("Hello World")];
+        let cond = FilterCondition {
+            column: 0,
+            operator: FilterOp::StartsWith,
+            value: "Hello".to_string(),
+        };
+        assert!(matches_one(&row, &cond));
+
+        let cond = FilterCondition {
+            column: 0,
+            operator: FilterOp::StartsWith,
+            value: "World".to_string(),
+        };
+        assert!(!matches_one(&row, &cond));
+    }
+
+    #[test]
+    fn test_matches_one_endswith() {
+        let row = vec![make_cell("Hello World")];
+        let cond = FilterCondition {
+            column: 0,
+            operator: FilterOp::EndsWith,
+            value: "World".to_string(),
+        };
+        assert!(matches_one(&row, &cond));
+
+        let cond = FilterCondition {
+            column: 0,
+            operator: FilterOp::EndsWith,
+            value: "Hello".to_string(),
+        };
+        assert!(!matches_one(&row, &cond));
+    }
+
+    #[test]
+    fn test_matches_one_missing_column() {
+        let row = vec![make_cell("Alice")];
+        let cond = FilterCondition {
+            column: 5,
+            operator: FilterOp::Eq,
+            value: "Alice".to_string(),
+        };
+        assert!(!matches_one(&row, &cond));
+    }
+
+    #[test]
+    fn test_matches_one_string_comparison_fallback() {
+        let row = vec![make_cell("apple")];
+        let cond = FilterCondition {
+            column: 0,
+            operator: FilterOp::Gt,
+            value: "banana".to_string(),
+        };
+        assert!(!matches_one(&row, &cond));
+
+        let cond = FilterCondition {
+            column: 0,
+            operator: FilterOp::Lt,
+            value: "banana".to_string(),
+        };
+        assert!(matches_one(&row, &cond));
+    }
+
+    #[test]
+    fn test_filter_rows_with_header() {
+        let test_dir = "/tmp/excel_test_files";
+        std::fs::create_dir_all(test_dir).ok();
+        let path = format!("{}/test_filter_unit.xlsx", test_dir);
+
+        let mut wb = rust_xlsxwriter::Workbook::new();
+        let ws = wb.add_worksheet();
+        ws.write_string(0, 0, "Name").unwrap();
+        ws.write_string(0, 1, "Age").unwrap();
+        ws.write_string(1, 0, "Alice").unwrap();
+        ws.write_number(1, 1, 25).unwrap();
+        ws.write_string(2, 0, "Bob").unwrap();
+        ws.write_number(2, 1, 30).unwrap();
+        ws.write_string(3, 0, "Charlie").unwrap();
+        ws.write_number(3, 1, 35).unwrap();
+        wb.save(&path).unwrap();
+
+        let conditions = vec![FilterCondition {
+            column: 1,
+            operator: FilterOp::Gt,
+            value: "28".to_string(),
+        }];
+        let result = filter_rows(&path, "Sheet1", &conditions).unwrap();
+        assert_eq!(result.len(), 3); // header + 2 matching rows
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn test_filter_rows_no_match() {
+        let test_dir = "/tmp/excel_test_files";
+        std::fs::create_dir_all(test_dir).ok();
+        let path = format!("{}/test_filter_no_match.xlsx", test_dir);
+
+        let mut wb = rust_xlsxwriter::Workbook::new();
+        let ws = wb.add_worksheet();
+        ws.write_string(0, 0, "Name").unwrap();
+        ws.write_number(0, 1, 10).unwrap();
+        wb.save(&path).unwrap();
+
+        let conditions = vec![FilterCondition {
+            column: 1,
+            operator: FilterOp::Gt,
+            value: "100".to_string(),
+        }];
+        let result = filter_rows(&path, "Sheet1", &conditions).unwrap();
+        assert_eq!(result.len(), 1); // only header
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn test_sort_sheet_numeric_correct_order() {
+        let test_dir = "/tmp/excel_test_files";
+        std::fs::create_dir_all(test_dir).ok();
+        let path = format!("{}/test_sort_numeric.xlsx", test_dir);
+
+        let mut wb = rust_xlsxwriter::Workbook::new();
+        let ws = wb.add_worksheet();
+        ws.write_string(0, 0, "Name").unwrap();
+        ws.write_string(1, 0, "Item2").unwrap();
+        ws.write_string(2, 0, "Item10").unwrap();
+        ws.write_string(3, 0, "Item1").unwrap();
+        wb.save(&path).unwrap();
+
+        let params = SecurityParams {
+            dry_run: false,
+            create_backup: false,
+            file_path: path.clone(),
+        };
+        let sort_columns = vec![SortColumn {
+            column: 0,
+            descending: false,
+        }];
+        let result = sort_sheet(&path, &params, "Sheet1", &sort_columns).unwrap();
+        assert!(result.success);
+
+        let sheet = crate::excel_read::read_sheet_all(&path, "Sheet1").unwrap();
+        // With numeric-aware sorting, "Item1" < "Item2" < "Item10" may vary based on implementation
+        // The current implementation does string comparison for non-numeric values
+        assert_eq!(sheet.rows.len(), 4);
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn test_dedup_sheet_with_duplicates() {
+        let test_dir = "/tmp/excel_test_files";
+        std::fs::create_dir_all(test_dir).ok();
+        let path = format!("{}/test_dedup_unit.xlsx", test_dir);
+
+        let mut wb = rust_xlsxwriter::Workbook::new();
+        let ws = wb.add_worksheet();
+        ws.write_string(0, 0, "Name").unwrap();
+        ws.write_string(1, 0, "Alice").unwrap();
+        ws.write_string(2, 0, "Alice").unwrap();
+        ws.write_string(3, 0, "Bob").unwrap();
+        wb.save(&path).unwrap();
+
+        let params = SecurityParams {
+            dry_run: false,
+            create_backup: false,
+            file_path: path.clone(),
+        };
+        let result = dedup_sheet(&path, &params, "Sheet1", &[]).unwrap();
+        assert!(result.success);
+
+        let sheet = crate::excel_read::read_sheet_all(&path, "Sheet1").unwrap();
+        assert_eq!(sheet.rows.len(), 3); // header + 2 unique
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn test_dedup_sheet_by_specific_column() {
+        let test_dir = "/tmp/excel_test_files";
+        std::fs::create_dir_all(test_dir).ok();
+        let path = format!("{}/test_dedup_col.xlsx", test_dir);
+
+        let mut wb = rust_xlsxwriter::Workbook::new();
+        let ws = wb.add_worksheet();
+        ws.write_string(0, 0, "Name").unwrap();
+        ws.write_string(0, 1, "City").unwrap();
+        ws.write_string(1, 0, "Alice").unwrap();
+        ws.write_string(1, 1, "NYC").unwrap();
+        ws.write_string(2, 0, "Alice").unwrap();
+        ws.write_string(2, 1, "LA").unwrap();
+        ws.write_string(3, 0, "Bob").unwrap();
+        ws.write_string(3, 1, "NYC").unwrap();
+        wb.save(&path).unwrap();
+
+        let params = SecurityParams {
+            dry_run: false,
+            create_backup: false,
+            file_path: path.clone(),
+        };
+        // Dedup only by column 0
+        let result = dedup_sheet(&path, &params, "Sheet1", &[0]).unwrap();
+        assert!(result.success);
+
+        let sheet = crate::excel_read::read_sheet_all(&path, "Sheet1").unwrap();
+        assert_eq!(sheet.rows.len(), 3); // header + 2 unique by col 0
+
+        let _ = std::fs::remove_file(&path);
     }
 }

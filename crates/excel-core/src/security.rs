@@ -88,29 +88,33 @@ mod tests {
 
     #[test]
     fn test_create_backup_and_rollback() {
-        let test_file = "_test_security_file.txt";
-        fs::write(test_file, b"hello security").unwrap();
+        let test_dir = std::env::temp_dir().join(format!(
+            "excel_sec_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+        ));
+        let _ = fs::remove_dir_all(&test_dir);
+        fs::create_dir_all(&test_dir).unwrap();
 
-        let backup = create_backup(test_file, "test_op").unwrap();
+        let test_file = test_dir.join("test_file.txt");
+        fs::write(&test_file, b"hello security").unwrap();
+
+        let backup = create_backup(&test_file, "test_op").unwrap();
         assert!(Path::new(&backup.backup_path).exists());
         assert_eq!(backup.operation, "test_op");
 
-        fs::write(test_file, b"modified content").unwrap();
-        let content_after = fs::read_to_string(test_file).unwrap();
-        assert_eq!(content_after, "modified content");
+        fs::write(&test_file, b"modified content").unwrap();
 
-        rollback(&backup, test_file).unwrap();
-        let content_restored = fs::read_to_string(test_file).unwrap();
+        // Small delay to avoid timestamp collision
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
+        rollback(&backup, &test_file).unwrap();
+        let content_restored = fs::read_to_string(&test_file).unwrap();
         assert_eq!(content_restored, "hello security");
 
-        // Clean up all test files
-        for entry in fs::read_dir(".").unwrap() {
-            if let Ok(entry) = entry {
-                let name = entry.file_name().to_string_lossy().to_string();
-                if name.starts_with("_test_security_file") {
-                    let _ = fs::remove_file(&name);
-                }
-            }
-        }
+        let _ = fs::remove_dir_all(&test_dir);
     }
 }

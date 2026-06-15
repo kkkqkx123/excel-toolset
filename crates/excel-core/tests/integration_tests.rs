@@ -363,7 +363,7 @@ mod file_write_tests {
         assert!(result.success);
 
         let formula = read_formula(&path, "Sheet1", "A5").unwrap();
-        assert_eq!(formula, Some("SUM(A2:A4)".to_string()));
+        assert_eq!(formula, Some("=SUM(A2:A4)".to_string()));
 
         cleanup_test_file(&path);
     }

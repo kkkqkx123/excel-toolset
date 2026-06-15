@@ -104,25 +104,35 @@ fn run_file(args: &FileArgs) -> Result<serde_json::Value> {
 }
 
 fn run_sheet(args: &SheetArgs) -> Result<serde_json::Value> {
-    let params = SecurityParams {
-        dry_run: false,
-        create_backup: true,
-        file_path: String::new(),
-    };
     match &args.command {
         SheetSub::List { path } => {
             let sheets = excel_read::list_sheets(path)?;
             Ok(serde_json::json!({ "success": true, "sheets": sheets }))
         }
         SheetSub::Add { path, name } => {
+            let params = SecurityParams {
+                dry_run: false,
+                create_backup: true,
+                file_path: path.clone(),
+            };
             let result = excel_write::add_sheet(path, &params, name)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         SheetSub::Delete { path, name } => {
+            let params = SecurityParams {
+                dry_run: false,
+                create_backup: true,
+                file_path: path.clone(),
+            };
             let result = excel_write::delete_sheet(path, &params, name)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         SheetSub::Rename { path, old, new } => {
+            let params = SecurityParams {
+                dry_run: false,
+                create_backup: true,
+                file_path: path.clone(),
+            };
             let result = excel_write::rename_sheet(path, &params, old, new)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
@@ -250,7 +260,9 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 create_backup: true,
                 file_path: path.clone(),
             };
-            let result = excel_write::insert_rows(path, &params, sheet, *row, &cell_values)?;
+            // CLI row numbers are 1-indexed, internal functions use 0-indexed
+            let row_idx = row.saturating_sub(1);
+            let result = excel_write::insert_rows(path, &params, sheet, row_idx, &cell_values)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DataSub::DeleteRow {
@@ -264,7 +276,9 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                 create_backup: true,
                 file_path: path.clone(),
             };
-            let result = excel_write::delete_rows(path, &params, sheet, *row, *row)?;
+            // CLI row numbers are 1-indexed, internal functions use 0-indexed
+            let row_idx = row.saturating_sub(1);
+            let result = excel_write::delete_rows(path, &params, sheet, row_idx, row_idx)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         DataSub::Filter {
@@ -275,13 +289,17 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
             value,
         } => {
             let filter_op = helpers::parse_filter_op(op)?;
+            let col_idx = column.saturating_sub(1);
             let conditions = vec![FilterCondition {
-                column: *column,
+                column: col_idx,
                 operator: filter_op,
                 value: value.clone(),
             }];
             let result = operations::filter_rows(path, sheet, &conditions)?;
-            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+            Ok(serde_json::json!({
+                "success": true,
+                "rows": result
+            }))
         }
         DataSub::Sort {
             path,
@@ -290,8 +308,9 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
             desc,
             dry_run,
         } => {
+            let col_idx = column.saturating_sub(1);
             let sort_cols = vec![SortColumn {
-                column: *column,
+                column: col_idx,
                 descending: *desc,
             }];
             let params = SecurityParams {
@@ -308,7 +327,9 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
             column,
             dry_run,
         } => {
-            let cols: Vec<u16> = column.map(|c| vec![c]).unwrap_or_default();
+            let cols: Vec<u16> = column
+                .map(|c| vec![c.saturating_sub(1)])
+                .unwrap_or_default();
             let params = SecurityParams {
                 dry_run: *dry_run,
                 create_backup: true,
@@ -361,7 +382,11 @@ fn run_formula(args: &FormulaArgs) -> Result<serde_json::Value> {
                 "formula": formula
             }))
         }
-        FormulaSub::CalcMode { path, mode, dry_run } => {
+        FormulaSub::CalcMode {
+            path,
+            mode,
+            dry_run,
+        } => {
             let params = SecurityParams {
                 dry_run: *dry_run,
                 create_backup: true,
@@ -381,7 +406,10 @@ fn run_formula(args: &FormulaArgs) -> Result<serde_json::Value> {
             language,
         } => {
             let explanation = formula_analysis::explain_formula(path, sheet, cell, language)?;
-            Ok(serde_json::to_value(explanation).map_err(|e| AppError::Serialize(e.to_string()))?)
+            Ok(
+                serde_json::to_value(explanation)
+                    .map_err(|e| AppError::Serialize(e.to_string()))?,
+            )
         }
         FormulaSub::ExplainLogic {
             path,
@@ -389,8 +417,7 @@ fn run_formula(args: &FormulaArgs) -> Result<serde_json::Value> {
             cell,
             language,
         } => {
-            let logic =
-                formula_analysis::explain_formula_logic(path, sheet, cell, language)?;
+            let logic = formula_analysis::explain_formula_logic(path, sheet, cell, language)?;
             Ok(serde_json::to_value(logic).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
     }
@@ -419,6 +446,7 @@ fn run_format(args: &FormatArgs) -> Result<serde_json::Value> {
             path,
             sheet,
             range,
+            value,
             dry_run,
         } => {
             let params = SecurityParams {
@@ -426,7 +454,8 @@ fn run_format(args: &FormatArgs) -> Result<serde_json::Value> {
                 create_backup: true,
                 file_path: path.clone(),
             };
-            let result = excel_write::merge_cells(path, &params, sheet, range, "")?;
+            let merge_value = value.as_deref().unwrap_or("");
+            let result = excel_write::merge_cells(path, &params, sheet, range, merge_value)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
     }
@@ -440,18 +469,34 @@ fn run_chart(args: &ChartArgs) -> Result<serde_json::Value> {
             range,
             chart_type,
             title,
+            position,
             dry_run,
         } => {
             let ct = helpers::chart_type_from_str(chart_type)?;
-            let (r1, c1, _, _) = excel_core::utils::cell_ref::parse_range(range)?;
+            let (r1, c1, r2, c2) = excel_core::utils::cell_ref::parse_range(range)?;
+            let (chart_row, chart_col) = if let Some(pos) = position {
+                let (pr, pc) = excel_core::utils::cell_ref::parse_cell_ref(pos)?;
+                (pr, pc)
+            } else {
+                (r2 + 1, c1)
+            };
+            // Build sheet-qualified range strings for rust_xlsxwriter
+            let sheet_qualified_range = format!(
+                "{}!${}${}:${}${}",
+                sheet,
+                excel_core::utils::cell_ref::index_to_col(c1),
+                r1 + 1,
+                excel_core::utils::cell_ref::index_to_col(c2),
+                r2 + 1
+            );
             let config = ChartConfig {
                 chart_type: ct,
                 title: title.clone(),
-                categories_range: range.clone(),
-                values_range: range.clone(),
+                categories_range: sheet_qualified_range.clone(),
+                values_range: sheet_qualified_range,
                 sheet: sheet.clone(),
-                row: r1,
-                col: c1,
+                row: chart_row,
+                col: chart_col,
             };
             let params = SecurityParams {
                 dry_run: *dry_run,
@@ -618,11 +663,12 @@ fn run_diff(args: &DiffArgs, format: &str) -> Result<serde_json::Value> {
 }
 
 fn run_rollback(args: &RollbackArgs) -> Result<serde_json::Value> {
+    let hash = security::compute_file_hash(&args.backup_path).map_err(AppError::Io)?;
     let backup = BackupInfo {
         backup_path: args.backup_path.clone(),
         timestamp: Utc::now(),
         operation: "rollback".into(),
-        file_hash: String::new(),
+        file_hash: hash,
     };
     security::rollback(&backup, &args.path)?;
     Ok(serde_json::json!({
@@ -714,7 +760,11 @@ fn run_named_range(args: &NamedRangeArgs) -> Result<serde_json::Value> {
                 named_ranges::create_named_range(path, name, range, sheet.as_deref(), &params)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
-        NamedRangeSub::Delete { path, name, dry_run } => {
+        NamedRangeSub::Delete {
+            path,
+            name,
+            dry_run,
+        } => {
             let params = SecurityParams {
                 dry_run: *dry_run,
                 create_backup: true,
@@ -738,7 +788,8 @@ fn run_search(args: &SearchArgs) -> Result<serde_json::Value> {
             case_sensitive,
             sheets,
         } => {
-            let query = build_search_query(pattern, match_type, search_type, *case_sensitive, sheets)?;
+            let query =
+                build_search_query(pattern, match_type, search_type, *case_sensitive, sheets)?;
             let results = search::search_workbook(path, &query)?;
             Ok(serde_json::to_value(results).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
@@ -750,7 +801,8 @@ fn run_search(args: &SearchArgs) -> Result<serde_json::Value> {
             search_type,
             case_sensitive,
         } => {
-            let query = build_search_query(pattern, match_type, search_type, *case_sensitive, &None)?;
+            let query =
+                build_search_query(pattern, match_type, search_type, *case_sensitive, &None)?;
             let results = search::search_sheet(path, sheet, &query)?;
             Ok(serde_json::to_value(results).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
@@ -854,7 +906,8 @@ fn run_conditional_format(args: &ConditionalFormatArgs) -> Result<serde_json::Va
                 create_backup: true,
                 file_path: path.clone(),
             };
-            let result = conditional_format::remove_conditional_format(path, sheet, range, &params)?;
+            let result =
+                conditional_format::remove_conditional_format(path, sheet, range, &params)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
     }

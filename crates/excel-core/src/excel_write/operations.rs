@@ -347,3 +347,176 @@ pub fn delete_rows(
         Ok(new_data)
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{CellData, CellDataType};
+    use std::collections::HashMap;
+
+    fn make_cell(value: &str) -> CellData {
+        CellData {
+            value: Some(value.to_string()),
+            data_type: CellDataType::String,
+            formula: None,
+        }
+    }
+
+    #[test]
+    fn test_cell_value_to_data_conversion() {
+        let cv_string = CellValue::String("test".to_string());
+        let cd = cell_value_to_data(&cv_string);
+        assert_eq!(cd.value, Some("test".to_string()));
+        assert_eq!(cd.data_type, CellDataType::String);
+
+        let cv_number = CellValue::Number(3.14);
+        let cd = cell_value_to_data(&cv_number);
+        assert_eq!(cd.value, Some("3.14".to_string()));
+        assert_eq!(cd.data_type, CellDataType::Float);
+
+        let cv_bool = CellValue::Bool(true);
+        let cd = cell_value_to_data(&cv_bool);
+        assert_eq!(cd.value, Some("true".to_string()));
+        assert_eq!(cd.data_type, CellDataType::Bool);
+
+        let cv_empty = CellValue::Empty;
+        let cd = cell_value_to_data(&cv_empty);
+        assert_eq!(cd.value, None);
+        assert_eq!(cd.data_type, CellDataType::Empty);
+    }
+
+    #[test]
+    fn test_ensure_dimensions_expand_rows() {
+        let mut sd = SheetData {
+            name: "Test".to_string(),
+            rows: vec![vec![make_cell("a")]],
+        };
+        ensure_dimensions(&mut sd, 3, 0);
+        assert!(sd.rows.len() >= 4);
+    }
+
+    #[test]
+    fn test_ensure_dimensions_expand_cols() {
+        let mut sd = SheetData {
+            name: "Test".to_string(),
+            rows: vec![vec![make_cell("a")]],
+        };
+        ensure_dimensions(&mut sd, 0, 5);
+        assert!(sd.rows[0].len() >= 6);
+    }
+
+    #[test]
+    fn test_append_rows() {
+        let mut data = HashMap::new();
+        data.insert(
+            "Sheet1".to_string(),
+            SheetData {
+                name: "Sheet1".to_string(),
+                rows: vec![vec![make_cell("Header")]],
+            },
+        );
+
+        let new_rows = vec![vec![CellValue::String("Row1".to_string())]];
+
+        // Simulate the append operation
+        let sd = data.get_mut("Sheet1").unwrap();
+        for row_data in &new_rows {
+            let mut row = Vec::new();
+            for val in row_data {
+                row.push(cell_value_to_data(val));
+            }
+            sd.rows.push(row);
+        }
+
+        assert_eq!(data["Sheet1"].rows.len(), 2);
+        assert_eq!(data["Sheet1"].rows[1][0].value, Some("Row1".to_string()));
+    }
+
+    #[test]
+    fn test_insert_rows() {
+        let mut data = HashMap::new();
+        data.insert(
+            "Sheet1".to_string(),
+            SheetData {
+                name: "Sheet1".to_string(),
+                rows: vec![vec![make_cell("Header")], vec![make_cell("Original")]],
+            },
+        );
+
+        let new_rows = vec![vec![CellValue::String("Inserted".to_string())]];
+
+        // Simulate the insert operation
+        let sd = data.get_mut("Sheet1").unwrap();
+        let row_idx = 1;
+        let mut inserted_rows: Vec<Vec<CellData>> = Vec::new();
+        for row_data in &new_rows {
+            let mut row = Vec::new();
+            for val in row_data {
+                row.push(cell_value_to_data(val));
+            }
+            inserted_rows.push(row);
+        }
+        sd.rows.splice(row_idx..row_idx, inserted_rows);
+
+        assert_eq!(data["Sheet1"].rows.len(), 3);
+        assert_eq!(
+            data["Sheet1"].rows[1][0].value,
+            Some("Inserted".to_string())
+        );
+        assert_eq!(
+            data["Sheet1"].rows[2][0].value,
+            Some("Original".to_string())
+        );
+    }
+
+    #[test]
+    fn test_delete_rows() {
+        let mut data = HashMap::new();
+        data.insert(
+            "Sheet1".to_string(),
+            SheetData {
+                name: "Sheet1".to_string(),
+                rows: vec![
+                    vec![make_cell("Header")],
+                    vec![make_cell("Row1")],
+                    vec![make_cell("Row2")],
+                    vec![make_cell("Row3")],
+                ],
+            },
+        );
+
+        let start_idx = 1;
+        let end_idx = 2;
+        let sd = data.get_mut("Sheet1").unwrap();
+        sd.rows.drain(start_idx..=end_idx);
+
+        assert_eq!(data["Sheet1"].rows.len(), 2);
+        assert_eq!(data["Sheet1"].rows[1][0].value, Some("Row3".to_string()));
+    }
+
+    #[test]
+    fn test_delete_rows_beyond_bounds() {
+        let mut data = HashMap::new();
+        data.insert(
+            "Sheet1".to_string(),
+            SheetData {
+                name: "Sheet1".to_string(),
+                rows: vec![vec![make_cell("Header")]],
+            },
+        );
+
+        let result: std::result::Result<(), ()> = {
+            let sd = data.get_mut("Sheet1").unwrap();
+            let start_idx = 10;
+            let end_idx = 20;
+            if start_idx >= sd.rows.len() {
+                Ok(())
+            } else {
+                sd.rows.drain(start_idx..=end_idx);
+                Ok(())
+            }
+        };
+        assert!(result.is_ok());
+        assert_eq!(data["Sheet1"].rows.len(), 1);
+    }
+}

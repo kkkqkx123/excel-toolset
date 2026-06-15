@@ -75,7 +75,15 @@ pub fn read_formula(path: &str, sheet: &str, cell_spec: &str) -> Result<Option<S
 
     let formulas = workbook.worksheet_formula(sheet)?;
 
-    Ok(formulas.get_value((row, col as u32)).map(|s| s.to_string()))
+    Ok(formulas.get_value((row, col as u32)).map(|s| {
+        let formula = s.to_string();
+        // Add = prefix if not present, as calamine stores formulas without it
+        if formula.starts_with('=') {
+            formula
+        } else {
+            format!("={}", formula)
+        }
+    }))
 }
 
 pub fn read_sheet_all(path: &str, sheet: &str) -> Result<SheetData> {

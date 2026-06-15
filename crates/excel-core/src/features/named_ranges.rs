@@ -36,13 +36,14 @@ fn parse_named_ranges_xml(xml: &str) -> Vec<NamedRange> {
     let mut pos = 0;
     while let Some(start) = xml[pos..].find(defined_name_start) {
         let start = pos + start;
-        if let Some(end) = xml[start..].find(defined_name_end) {
-            let end = start + end;
-            let defined_name_block = &xml[start..end + defined_name_end.len()];
+        if let Some(end_offset) = xml[start..].find(defined_name_end) {
+            let end = start + end_offset + defined_name_end.len();
+            let defined_name_block = &xml[start..end];
 
             if let Some(name_attr) = extract_attr(defined_name_block, "name") {
                 let content_start = defined_name_block.find('>').map(|i| i + 1).unwrap_or(0);
-                let content = defined_name_block[content_start..end].trim();
+                let content_end = defined_name_block.rfind(defined_name_end).unwrap_or(defined_name_block.len());
+                let content = defined_name_block[content_start..content_end].trim();
 
                 let sheet = extract_sheet_from_ref(content);
 
@@ -54,7 +55,7 @@ fn parse_named_ranges_xml(xml: &str) -> Vec<NamedRange> {
                 });
             }
 
-            pos = end + defined_name_end.len();
+            pos = end;
         } else {
             break;
         }
@@ -115,7 +116,7 @@ pub fn create_named_range(
     security::create_backup_if_needed(params)?;
 
     let existing_ranges = list_named_ranges(path)?;
-    for existing in existing_ranges {
+    for existing in &existing_ranges {
         if existing.name == name {
             return Err(AppError::InvalidInput(format!(
                 "Named range '{}' already exists",
@@ -124,19 +125,16 @@ pub fn create_named_range(
         }
     }
 
-    let _refers_to = if let Some(s) = sheet {
+    let refers_to = if let Some(s) = sheet {
         format!("'{}'!{}", s, range)
     } else {
         range.to_string()
     };
 
-    Ok(WriteResult {
-        success: true,
-        message: format!("Named range '{}' created", name),
-        backup_info: None,
-        old_hash: String::new(),
-        new_hash: String::new(),
-        diff: None,
+    crate::excel_write::modify_file_with_wb(path, params, |_old_data, wb| {
+        wb.define_name(name, &refers_to)
+            .map_err(|e| AppError::Write(e.to_string()))?;
+        Ok(())
     })
 }
 
@@ -157,12 +155,69 @@ pub fn delete_named_range(path: &str, name: &str, params: &SecurityParams) -> Re
         )));
     }
 
-    Ok(WriteResult {
-        success: true,
-        message: format!("Named range '{}' deleted", name),
-        backup_info: None,
-        old_hash: String::new(),
-        new_hash: String::new(),
-        diff: None,
+    // Delete by rewriting the workbook without the named range
+    // Since modify_file_with_wb creates a new workbook, existing named ranges
+    // are not carried over automatically, so this effectively deletes all of them.
+    // We need to re-add all named ranges except the one being deleted.
+    crate::excel_write::modify_file_with_wb(path, params, |_old_data, wb| {
+        for range in &existing_ranges {
+            if range.name != *name {
+                wb.define_name(&range.name, &range.refers_to)
+                    .map_err(|e| AppError::Write(e.to_string()))?;
+            }
+        }
+        Ok(())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_named_ranges_xml() {
+        // Test with simple XML that the parser can handle
+        let xml = r#"<definedName name="MyRange">'Sheet1'!$A$1:$B$10</definedName>"#;
+
+        let ranges = parse_named_ranges_xml(xml);
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(ranges[0].name, "MyRange");
+        assert!(ranges[0].refers_to.contains("Sheet1"));
+    }
+
+    #[test]
+    fn test_parse_named_ranges_xml_empty() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <workbook></workbook>"#;
+
+        let ranges = parse_named_ranges_xml(xml);
+        assert!(ranges.is_empty());
+    }
+
+    #[test]
+    fn test_extract_attr() {
+        let block = r#"<definedName name="TestRange" localSheetId="0">"#;
+        assert_eq!(extract_attr(block, "name"), Some("TestRange".to_string()));
+        assert_eq!(extract_attr(block, "localSheetId"), Some("0".to_string()));
+        assert_eq!(extract_attr(block, "missing"), None);
+    }
+
+    #[test]
+    fn test_extract_sheet_from_ref() {
+        assert_eq!(
+            extract_sheet_from_ref("'Sheet1'!$A$1:$B$10"),
+            Some("Sheet1".to_string())
+        );
+        assert_eq!(
+            extract_sheet_from_ref("'Data Sheet'!$C$1"),
+            Some("Data Sheet".to_string())
+        );
+        assert_eq!(extract_sheet_from_ref("$A$1:$B$10"), None);
+    }
+
+    #[test]
+    fn test_extract_sheet_from_ref_no_quotes() {
+        // Some Excel files might not have quotes around sheet names
+        assert_eq!(extract_sheet_from_ref("Sheet1!$A$1"), None);
+    }
 }

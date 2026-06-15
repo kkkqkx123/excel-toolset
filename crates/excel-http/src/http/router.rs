@@ -4,7 +4,7 @@ use axum::{
 };
 
 use super::{
-    handler::{batch, cell, chart, comments, diff, file, health, named_ranges, range, search, sheet, vba},
+    handlers::{batch, cell, chart, comments, diff, file, health, named_ranges, range, search, sheet, vba},
     data_operations::{filter, rows, sql},
     formula::{analysis, basic},
     formatting::{cell_format, conditional, merge},
@@ -16,6 +16,7 @@ pub fn create_router() -> Router {
         .route("/api/file/info/:path", get(file::file_info))
         .route("/api/file/create", post(file::file_create))
         .route("/api/file/backup", post(file::file_backup))
+        .route("/api/file/rollback", post(file::file_rollback))
         .route("/api/sheet/list/:path", get(sheet::sheet_list))
         .route("/api/sheet/add", post(sheet::sheet_add))
         .route("/api/sheet/delete", post(sheet::sheet_delete))
@@ -42,6 +43,8 @@ pub fn create_router() -> Router {
         .route("/api/data/sql", post(sql::data_sql))
         .route("/api/formula/set", post(basic::formula_set))
         .route("/api/formula/refresh", post(basic::formula_refresh))
+        .route("/api/formula/read", post(basic::formula_read))
+        .route("/api/formula/calc-mode", post(basic::formula_calc_mode))
         .route(
             "/api/formula/trace_dependencies",
             post(analysis::trace_dependencies),
@@ -89,6 +92,7 @@ pub fn create_router() -> Router {
         )
         .route("/api/vba/export", post(vba::vba_export))
         .route("/api/vba/import", post(vba::vba_import))
+        .route("/api/vba/has", post(vba::vba_has))
         .route("/api/diff/file", post(diff::diff_file))
         .route("/api/diff/range", post(diff::handle_diff_range))
 }

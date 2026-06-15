@@ -280,6 +280,8 @@ pub enum FormatSub {
         sheet: String,
         range: String,
         #[arg(long)]
+        value: Option<String>,
+        #[arg(long)]
         dry_run: bool,
     },
 }
@@ -297,7 +299,10 @@ pub enum ChartSub {
         sheet: String,
         range: String,
         chart_type: String,
+        #[arg(long)]
         title: Option<String>,
+        #[arg(long)]
+        position: Option<String>,
         #[arg(long)]
         dry_run: bool,
     },

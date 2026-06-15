@@ -1,11 +1,18 @@
+#![allow(dead_code, unused)]
+
 pub mod validation;
 
-use axum::{extract::Request, http::StatusCode, response::Response};
-use tower::ServiceExt;
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+use axum::extract::Request;
+use axum::response::Response;
+use tower::Layer;
 
 pub struct ValidationLayer;
 
-impl<S> tower::Layer<S> for ValidationLayer {
+impl<S> Layer<S> for ValidationLayer {
     type Service = ValidationMiddleware<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
@@ -20,16 +27,18 @@ pub struct ValidationMiddleware<S> {
 
 impl<S> tower::Service<Request> for ValidationMiddleware<S>
 where
-    S: tower::Service<Request> + Clone,
+    S: tower::Service<Request, Response = Response> + Clone + Send + 'static,
+    S::Future: Send + 'static,
+    S::Error: std::error::Error + Send + Sync + 'static,
 {
     type Response = S::Response;
     type Error = S::Error;
-    type Future = tower::util::BoxFuture<'static, Result<Self::Response, Self::Error>>;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(
         &mut self,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), Self::Error>> {
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
     }
 
@@ -37,12 +46,13 @@ where
         let mut inner = self.inner.clone();
 
         Box::pin(async move {
-            if let Err(e) = validation::validate_request(&req) {
-                return Ok(Response::builder()
-                    .status(StatusCode::BAD_REQUEST)
+            if let Err(_e) = validation::validate_request(&req) {
+                let resp = Response::builder()
+                    .status(axum::http::StatusCode::BAD_REQUEST)
                     .header("content-type", "application/json")
-                    .body(axum::body::Body::from(serde_json::to_string(&e).unwrap()))
-                    .unwrap());
+                    .body(axum::body::Body::default())
+                    .unwrap();
+                return Ok(resp);
             }
 
             inner.call(req).await

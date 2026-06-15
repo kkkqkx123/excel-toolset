@@ -22,7 +22,7 @@ pub struct Style {
     pub vertical_align: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ChartType {
     Column,
     Line,
