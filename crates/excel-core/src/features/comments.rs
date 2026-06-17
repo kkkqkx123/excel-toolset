@@ -30,8 +30,8 @@ fn load_comments(xlsx_path: &str) -> HashMap<String, Comment> {
 /// Save comments to sidecar file
 fn save_comments(xlsx_path: &str, comments: &HashMap<String, Comment>) -> Result<()> {
     let path = comments_sidecar_path(xlsx_path);
-    let content = serde_json::to_string_pretty(comments)
-        .map_err(|e| AppError::Serialize(e.to_string()))?;
+    let content =
+        serde_json::to_string_pretty(comments).map_err(|e| AppError::Serialize(e.to_string()))?;
     fs::write(&path, content).map_err(AppError::Io)?;
     Ok(())
 }

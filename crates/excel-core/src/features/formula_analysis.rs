@@ -259,10 +259,9 @@ pub fn explain_formula(
     language: &str,
 ) -> Result<FormulaExplanation> {
     let formula = excel_read::read_formula(path, sheet, cell)?.ok_or_else(|| {
-        AppError::CellNotFound(
-            crate::utils::cell_ref::parse_cell_ref(cell).unwrap().0,
-            crate::utils::cell_ref::parse_cell_ref(cell).unwrap().1,
-        )
+        crate::utils::cell_ref::parse_cell_ref(cell)
+            .map(|(r, c)| AppError::CellNotFound(r, c))
+            .unwrap_or_else(|_| AppError::InvalidCellRef(cell.to_string()))
     })?;
 
     let (function_name, arguments) = parse_function(&formula);
@@ -440,10 +439,9 @@ pub fn explain_formula_logic(
     language: &str,
 ) -> Result<FormulaLogicExplanation> {
     let formula = excel_read::read_formula(path, sheet, cell)?.ok_or_else(|| {
-        AppError::CellNotFound(
-            crate::utils::cell_ref::parse_cell_ref(cell).unwrap().0,
-            crate::utils::cell_ref::parse_cell_ref(cell).unwrap().1,
-        )
+        crate::utils::cell_ref::parse_cell_ref(cell)
+            .map(|(r, c)| AppError::CellNotFound(r, c))
+            .unwrap_or_else(|_| AppError::InvalidCellRef(cell.to_string()))
     })?;
 
     let trace = trace_dependencies(path, sheet, cell)?;

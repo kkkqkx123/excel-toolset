@@ -68,12 +68,11 @@ pub fn add_conditional_format(
 
         match rule.rule_type {
             ConditionalFormatType::CellValue => {
-                let cond_format =
-                    rust_xlsxwriter::ConditionalFormatCell::new()
-                        .set_rule(rust_xlsxwriter::ConditionalFormatCellRule::GreaterThan(
-                            rule.condition.as_str(),
-                        ))
-                        .set_format(&format);
+                let cond_format = rust_xlsxwriter::ConditionalFormatCell::new()
+                    .set_rule(rust_xlsxwriter::ConditionalFormatCellRule::GreaterThan(
+                        rule.condition.as_str(),
+                    ))
+                    .set_format(&format);
 
                 worksheet
                     .add_conditional_format(r1, c1, r2, c2, &cond_format)
@@ -89,8 +88,8 @@ pub fn add_conditional_format(
                     .map_err(|e| AppError::Write(e.to_string()))?;
             }
             ConditionalFormatType::Duplicate => {
-                let cond_format = rust_xlsxwriter::ConditionalFormatDuplicate::new()
-                    .set_format(&format);
+                let cond_format =
+                    rust_xlsxwriter::ConditionalFormatDuplicate::new().set_format(&format);
 
                 worksheet
                     .add_conditional_format(r1, c1, r2, c2, &cond_format)

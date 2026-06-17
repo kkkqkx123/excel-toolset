@@ -1,8 +1,13 @@
-use axum::{Json, extract::Path};
+use axum::Json;
 use serde::Deserialize;
 
 use excel_core::features::named_ranges;
 use excel_core::types::*;
+
+#[derive(Deserialize)]
+pub struct ListNamedRangesReq {
+    pub path: String,
+}
 
 #[derive(Deserialize)]
 pub struct GetNamedRangeValueReq {
@@ -29,9 +34,9 @@ pub struct DeleteNamedRangeReq {
 }
 
 pub async fn list_named_ranges(
-    Path(path): Path<String>,
+    Json(req): Json<ListNamedRangesReq>,
 ) -> Json<ApiResponse<Vec<named_ranges::NamedRange>>> {
-    match named_ranges::list_named_ranges(&path) {
+    match named_ranges::list_named_ranges(&req.path) {
         Ok(ranges) => Json(ApiResponse::ok(Some(ranges))),
         Err(e) => Json(ApiResponse::err(e)),
     }

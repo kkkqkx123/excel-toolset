@@ -1,10 +1,17 @@
-use axum::{Json, extract::Path};
+use axum::Json;
 use serde::Deserialize;
 
 use excel_core::excel_read;
 use excel_core::excel_write;
 use excel_core::types::*;
 use excel_core::utils::helpers;
+
+#[derive(Deserialize)]
+pub struct CellReadReq {
+    pub path: String,
+    pub sheet: String,
+    pub cell: String,
+}
 
 #[derive(Deserialize)]
 pub struct CellWriteReq {
@@ -16,14 +23,12 @@ pub struct CellWriteReq {
     pub dry_run: bool,
 }
 
-pub async fn cell_read(
-    Path((path, sheet, cell)): Path<(String, String, String)>,
-) -> Json<ApiResponse<CellData>> {
-    let (row, col) = match excel_core::utils::cell_ref::parse_cell_ref(&cell) {
+pub async fn cell_read(Json(req): Json<CellReadReq>) -> Json<ApiResponse<CellData>> {
+    let (row, col) = match excel_core::utils::cell_ref::parse_cell_ref(&req.cell) {
         Ok(v) => v,
         Err(e) => return Json(ApiResponse::err(e)),
     };
-    match excel_read::read_cell(&path, &sheet, row, col) {
+    match excel_read::read_cell(&req.path, &req.sheet, row, col) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
     }

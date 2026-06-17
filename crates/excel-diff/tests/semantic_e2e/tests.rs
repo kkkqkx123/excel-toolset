@@ -21,6 +21,45 @@ fn write_output(test_name: &str, plain: &str, json: &str) {
     fs::write(&json_path, json).ok();
 }
 
+fn assert_golden(test_name: &str, actual_plain: &str, actual_json: &str) {
+    let txt_path = output_dir().join(format!("{}.txt", test_name));
+    let json_path = output_dir().join(format!("{}.json", test_name));
+    let update = std::env::var("UPDATE_GOLDEN").is_ok();
+
+    match (
+        fs::read_to_string(&txt_path),
+        fs::read_to_string(&json_path),
+    ) {
+        (Ok(exp_plain), Ok(exp_json)) => {
+            if update {
+                fs::write(&txt_path, actual_plain).expect("write golden txt");
+                fs::write(&json_path, actual_json).expect("write golden json");
+            } else {
+                assert_eq!(
+                    actual_plain, exp_plain,
+                    "Golden file mismatch for {} (.txt). Run with UPDATE_GOLDEN=1 to regenerate.",
+                    test_name
+                );
+                assert_eq!(
+                    actual_json, exp_json,
+                    "Golden file mismatch for {} (.json). Run with UPDATE_GOLDEN=1 to regenerate.",
+                    test_name
+                );
+            }
+        }
+        _ => {
+            fs::write(&txt_path, actual_plain).expect("write golden txt");
+            fs::write(&json_path, actual_json).expect("write golden json");
+            if !update {
+                eprintln!(
+                    "Golden file for '{}' created. Commit it and re-run tests.",
+                    test_name
+                );
+            }
+        }
+    }
+}
+
 fn cell_diff(
     row: u32,
     col: u16,
@@ -44,7 +83,6 @@ fn cell_diff(
 }
 
 fn make_file_diff(sheet_diffs: Vec<SheetDiff>) -> FileDiff {
-    // Recompute summary from sheet diffs
     let mut summary = DiffSummary {
         adds: 0,
         deletes: 0,
@@ -93,6 +131,7 @@ fn e2e_empty_diff() {
     let json = serde_json::to_string_pretty(&diff).unwrap();
 
     write_output("empty_diff", &plain, &json);
+    assert_golden("empty_diff", &plain, &json);
     assert_eq!(plain, "No changes");
     assert_eq!(diff.summary.total_changes, 0);
 }
@@ -119,6 +158,7 @@ fn e2e_single_cell_modified() {
     let json = serde_json::to_string_pretty(&diff).unwrap();
 
     write_output("single_cell_modified", &plain, &json);
+    assert_golden("single_cell_modified", &plain, &json);
     assert!(plain.contains("changed from old_value to new_value"));
     assert_eq!(diff.summary.modifies, 1);
 }
@@ -129,8 +169,26 @@ fn e2e_multiple_cells_multi_sheet() {
         sheet_diff(
             "Sheet1",
             vec![
-                cell_diff(0, 0, "A1", DiffType::Modify, Some("10"), Some("20"), None, None),
-                cell_diff(1, 1, "B2", DiffType::Modify, Some("old"), Some("new"), None, None),
+                cell_diff(
+                    0,
+                    0,
+                    "A1",
+                    DiffType::Modify,
+                    Some("10"),
+                    Some("20"),
+                    None,
+                    None,
+                ),
+                cell_diff(
+                    1,
+                    1,
+                    "B2",
+                    DiffType::Modify,
+                    Some("old"),
+                    Some("new"),
+                    None,
+                    None,
+                ),
             ],
             0,
             0,
@@ -156,6 +214,7 @@ fn e2e_multiple_cells_multi_sheet() {
     let json = serde_json::to_string_pretty(&diff).unwrap();
 
     write_output("multiple_cells_multi_sheet", &plain, &json);
+    assert_golden("multiple_cells_multi_sheet", &plain, &json);
     assert!(plain.contains("Sheet1"));
     assert!(plain.contains("Sheet2"));
 }
@@ -165,7 +224,16 @@ fn e2e_cell_added_deleted() {
     let diff = make_file_diff(vec![sheet_diff(
         "Sheet1",
         vec![
-            cell_diff(0, 0, "A1", DiffType::Add, None, Some("new_cell"), None, None),
+            cell_diff(
+                0,
+                0,
+                "A1",
+                DiffType::Add,
+                None,
+                Some("new_cell"),
+                None,
+                None,
+            ),
             cell_diff(
                 2,
                 1,
@@ -185,6 +253,7 @@ fn e2e_cell_added_deleted() {
     let json = serde_json::to_string_pretty(&diff).unwrap();
 
     write_output("cell_added_deleted", &plain, &json);
+    assert_golden("cell_added_deleted", &plain, &json);
     assert_eq!(diff.summary.adds, 1);
     assert_eq!(diff.summary.deletes, 1);
 }
@@ -194,10 +263,28 @@ fn e2e_mixed_operations() {
     let diff = make_file_diff(vec![sheet_diff(
         "Data",
         vec![
-            cell_diff(0, 0, "A1", DiffType::Modify, Some("old"), Some("new"), None, None),
+            cell_diff(
+                0,
+                0,
+                "A1",
+                DiffType::Modify,
+                Some("old"),
+                Some("new"),
+                None,
+                None,
+            ),
             cell_diff(0, 1, "B1", DiffType::Add, None, Some("added"), None, None),
             cell_diff(2, 0, "A3", DiffType::Delete, Some("gone"), None, None, None),
-            cell_diff(1, 1, "B2", DiffType::Passive, Some("5"), Some("6"), Some("=A1+1"), Some("=A1+1")),
+            cell_diff(
+                1,
+                1,
+                "B2",
+                DiffType::Passive,
+                Some("5"),
+                Some("6"),
+                Some("=A1+1"),
+                Some("=A1+1"),
+            ),
         ],
         0,
         0,
@@ -207,6 +294,7 @@ fn e2e_mixed_operations() {
     let json = serde_json::to_string_pretty(&diff).unwrap();
 
     write_output("mixed_operations", &plain, &json);
+    assert_golden("mixed_operations", &plain, &json);
     assert_eq!(diff.summary.modifies, 1);
     assert_eq!(diff.summary.adds, 1);
     assert_eq!(diff.summary.deletes, 1);
@@ -235,6 +323,7 @@ fn e2e_formula_changes() {
     let json = serde_json::to_string_pretty(&diff).unwrap();
 
     write_output("formula_changed", &plain, &json);
+    assert_golden("formula_changed", &plain, &json);
     assert!(plain.contains("formula changed from"));
     assert!(plain.contains("=SUM(B1:B3)"));
     assert!(plain.contains("=AVERAGE(B1:B3)"));
@@ -262,6 +351,7 @@ fn e2e_passive_value_change() {
     let json = serde_json::to_string_pretty(&diff).unwrap();
 
     write_output("passive_value_change", &plain, &json);
+    assert_golden("passive_value_change", &plain, &json);
     assert!(plain.contains("recalculated"));
     assert!(plain.contains("=B1+1"));
 }
@@ -280,6 +370,7 @@ fn e2e_sheet_added() {
     let json = serde_json::to_string_pretty(&diff).unwrap();
 
     write_output("sheet_added", &plain, &json);
+    assert_golden("sheet_added", &plain, &json);
     assert!(plain.contains("Sheet \"NewSheet\" added"));
     assert!(plain.contains("2 rows"));
     assert!(plain.contains("4 cells"));
@@ -288,16 +379,7 @@ fn e2e_sheet_added() {
 #[test]
 fn e2e_sheet_deleted() {
     let cells = vec![
-        cell_diff(
-            0,
-            0,
-            "A1",
-            DiffType::Delete,
-            Some("Name"),
-            None,
-            None,
-            None,
-        ),
+        cell_diff(0, 0, "A1", DiffType::Delete, Some("Name"), None, None, None),
         cell_diff(
             0,
             1,
@@ -308,16 +390,7 @@ fn e2e_sheet_deleted() {
             None,
             None,
         ),
-        cell_diff(
-            1,
-            0,
-            "A2",
-            DiffType::Delete,
-            Some("Bob"),
-            None,
-            None,
-            None,
-        ),
+        cell_diff(1, 0, "A2", DiffType::Delete, Some("Bob"), None, None, None),
     ];
     let diff = make_file_diff(vec![sheet_diff("OldSheet", cells, -2, -1)]);
 
@@ -325,6 +398,7 @@ fn e2e_sheet_deleted() {
     let json = serde_json::to_string_pretty(&diff).unwrap();
 
     write_output("sheet_deleted", &plain, &json);
+    assert_golden("sheet_deleted", &plain, &json);
     assert!(plain.contains("Sheet \"OldSheet\" deleted"));
 }
 
@@ -336,6 +410,7 @@ fn e2e_sheet_resized() {
     let json = serde_json::to_string_pretty(&diff).unwrap();
 
     write_output("sheet_resized", &plain, &json);
+    assert_golden("sheet_resized", &plain, &json);
     assert!(plain.contains("resized"));
     assert!(plain.contains("5 added rows"));
     assert!(plain.contains("2 removed columns"));
@@ -354,6 +429,7 @@ fn e2e_row_added() {
     let json = serde_json::to_string_pretty(&diff).unwrap();
 
     write_output("row_added", &plain, &json);
+    assert_golden("row_added", &plain, &json);
     assert!(plain.contains("Add row 4"));
     assert!(plain.contains("Charlie"));
     assert!(plain.contains("300"));
@@ -372,16 +448,7 @@ fn e2e_row_deleted() {
             None,
             None,
         ),
-        cell_diff(
-            1,
-            1,
-            "B2",
-            DiffType::Delete,
-            Some("99"),
-            None,
-            None,
-            None,
-        ),
+        cell_diff(1, 1, "B2", DiffType::Delete, Some("99"), None, None, None),
     ];
     let diff = make_file_diff(vec![sheet_diff("Data", cells, -1, 0)]);
 
@@ -389,6 +456,7 @@ fn e2e_row_deleted() {
     let json = serde_json::to_string_pretty(&diff).unwrap();
 
     write_output("row_deleted", &plain, &json);
+    assert_golden("row_deleted", &plain, &json);
     assert!(plain.contains("Delete row 2"));
     assert!(plain.contains("DeletedRow"));
     assert!(plain.contains("99"));
@@ -399,7 +467,16 @@ fn e2e_summary_verbosity() {
     let diff = make_file_diff(vec![sheet_diff(
         "S",
         vec![
-            cell_diff(0, 0, "A1", DiffType::Modify, Some("a"), Some("b"), None, None),
+            cell_diff(
+                0,
+                0,
+                "A1",
+                DiffType::Modify,
+                Some("a"),
+                Some("b"),
+                None,
+                None,
+            ),
             cell_diff(0, 1, "B1", DiffType::Add, None, Some("new"), None, None),
         ],
         0,
@@ -411,7 +488,7 @@ fn e2e_summary_verbosity() {
     let json = serde_json::to_string_pretty(&diff).unwrap();
 
     write_output("summary_vs_detail", &summary_text, &json);
-    // Also write detail separately for review
+    assert_golden("summary_vs_detail", &summary_text, &json);
     let detail_path = output_dir().join("summary_vs_detail_detail.txt");
     fs::write(&detail_path, &detail_text).ok();
 
@@ -424,7 +501,6 @@ fn e2e_summary_verbosity() {
 #[test]
 fn e2e_identical_files() {
     let diff = make_file_diff(vec![sheet_diff("S", vec![], 0, 0)]);
-    // Simulate hash match
     let mut hash_match_diff = diff;
     hash_match_diff.file_hash_match = true;
 
@@ -432,6 +508,7 @@ fn e2e_identical_files() {
     let json = serde_json::to_string_pretty(&hash_match_diff).unwrap();
 
     write_output("identical_files", &plain, &json);
+    assert_golden("identical_files", &plain, &json);
     assert_eq!(plain, "No changes");
     assert!(hash_match_diff.file_hash_match);
 }
@@ -441,7 +518,16 @@ fn e2e_semantic_report_json() {
     let diff = make_file_diff(vec![sheet_diff(
         "Sheet1",
         vec![
-            cell_diff(0, 0, "A1", DiffType::Modify, Some("10"), Some("20"), None, None),
+            cell_diff(
+                0,
+                0,
+                "A1",
+                DiffType::Modify,
+                Some("10"),
+                Some("20"),
+                None,
+                None,
+            ),
             cell_diff(1, 1, "B2", DiffType::Add, None, Some("new_val"), None, None),
         ],
         0,
@@ -449,7 +535,6 @@ fn e2e_semantic_report_json() {
     )]);
 
     let report = semantic::to_semantic_report(&diff, None);
-    // Manually build JSON since SemanticReport doesn't derive Serialize
     let report_json = serde_json::json!({
         "summary": report.summary,
         "detail_sentences": report.detail_sentences,
@@ -458,6 +543,23 @@ fn e2e_semantic_report_json() {
     let json = serde_json::to_string_pretty(&report_json).unwrap();
 
     write_output("semantic_report", "", &json);
+    let golden_json_path = output_dir().join("semantic_report.json");
+    let expected_json = fs::read_to_string(&golden_json_path);
+    match expected_json {
+        Ok(exp) => {
+            assert_eq!(
+                json, exp,
+                "Golden file mismatch for semantic_report.json. Run with UPDATE_GOLDEN=1."
+            );
+        }
+        Err(_) => {
+            fs::write(&golden_json_path, &json).expect("write golden json");
+            let update = std::env::var("UPDATE_GOLDEN").is_ok();
+            if !update {
+                eprintln!("Golden file for 'semantic_report' created. Commit it and re-run tests.");
+            }
+        }
+    }
     assert_eq!(report.operations.len(), 2);
     assert_eq!(report.detail_sentences.len(), 2);
 }

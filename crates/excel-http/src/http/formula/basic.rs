@@ -62,18 +62,14 @@ pub struct CalcModeReq {
     pub dry_run: bool,
 }
 
-pub async fn formula_read(
-    Json(req): Json<FormulaReadReq>,
-) -> Json<ApiResponse<Option<String>>> {
+pub async fn formula_read(Json(req): Json<FormulaReadReq>) -> Json<ApiResponse<Option<String>>> {
     match excel_read::read_formula(&req.path, &req.sheet, &req.cell) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
     }
 }
 
-pub async fn formula_calc_mode(
-    Json(req): Json<CalcModeReq>,
-) -> Json<ApiResponse<WriteResult>> {
+pub async fn formula_calc_mode(Json(req): Json<CalcModeReq>) -> Json<ApiResponse<WriteResult>> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,

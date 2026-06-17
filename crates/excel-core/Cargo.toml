@@ -19,3 +19,6 @@ thiserror.workspace = true
 
 [features]
 sql = ["excel-sql"]
+
+[dev-dependencies]
+tempfile = "3"

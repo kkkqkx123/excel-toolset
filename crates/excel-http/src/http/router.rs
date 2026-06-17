@@ -4,29 +4,28 @@ use axum::{
 };
 
 use super::{
-    handlers::{batch, cell, chart, comments, diff, file, health, named_ranges, range, search, sheet, vba},
     data_operations::{filter, rows, sql},
-    formula::{analysis, basic},
     formatting::{cell_format, conditional, merge},
+    formula::{analysis, basic},
+    handlers::{
+        batch, cell, chart, comments, diff, file, health, named_ranges, range, search, sheet, vba,
+    },
 };
 
 pub fn create_router() -> Router {
     Router::new()
         .route("/health", get(health::health))
-        .route("/api/file/info/:path", get(file::file_info))
+        .route("/api/file/info", post(file::file_info))
         .route("/api/file/create", post(file::file_create))
         .route("/api/file/backup", post(file::file_backup))
         .route("/api/file/rollback", post(file::file_rollback))
-        .route("/api/sheet/list/:path", get(sheet::sheet_list))
+        .route("/api/sheet/list", post(sheet::sheet_list))
         .route("/api/sheet/add", post(sheet::sheet_add))
         .route("/api/sheet/delete", post(sheet::sheet_delete))
         .route("/api/sheet/rename", post(sheet::sheet_rename))
-        .route("/api/cell/read/:path/:sheet/:cell", get(cell::cell_read))
+        .route("/api/cell/read", post(cell::cell_read))
         .route("/api/cell/write", post(cell::cell_write))
-        .route(
-            "/api/range/read/:path/:sheet/:range",
-            get(range::range_read),
-        )
+        .route("/api/range/read", post(range::range_read))
         .route("/api/range/write", post(range::range_write))
         .route(
             "/api/range/write-from-csv",
@@ -49,10 +48,7 @@ pub fn create_router() -> Router {
             "/api/formula/trace_dependencies",
             post(analysis::trace_dependencies),
         )
-        .route(
-            "/api/formula/explain",
-            post(analysis::explain_formula),
-        )
+        .route("/api/formula/explain", post(analysis::explain_formula))
         .route(
             "/api/formula/explain_logic",
             post(analysis::explain_formula_logic),
@@ -67,8 +63,8 @@ pub fn create_router() -> Router {
         .route("/api/comments/update", post(comments::update_comment))
         .route("/api/comments/delete", post(comments::delete_comment))
         .route(
-            "/api/named_ranges/list/:path",
-            get(named_ranges::list_named_ranges),
+            "/api/named_ranges/list",
+            post(named_ranges::list_named_ranges),
         )
         .route(
             "/api/named_ranges/get_value",

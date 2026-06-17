@@ -99,8 +99,14 @@ fn test_integration_full_workflow_with_engine() {
     assert_eq!(result.columns, vec!["avg_age", "total_salary"]);
 
     // 5. Drop table
-    engine.drop_table("employees").expect("Failed to drop table");
-    assert!(!engine.table_exists("employees").expect("Failed to check table existence"));
+    engine
+        .drop_table("employees")
+        .expect("Failed to drop table");
+    assert!(
+        !engine
+            .table_exists("employees")
+            .expect("Failed to check table existence")
+    );
 }
 
 #[test]
@@ -252,10 +258,13 @@ fn test_integration_filtering_with_various_operators() {
             operator: op.clone(),
             value: value.to_string(),
         };
-        let result =
-            excel_sql::filter_rows_on_data(&sheet, "test_filter", &[cond], true)
-                .expect("Failed to filter");
-        assert_eq!(result.row_count, expected_count, "Failed for op {:?} with value {}", op, value);
+        let result = excel_sql::filter_rows_on_data(&sheet, "test_filter", &[cond], true)
+            .expect("Failed to filter");
+        assert_eq!(
+            result.row_count, expected_count,
+            "Failed for op {:?} with value {}",
+            op, value
+        );
     }
 }
 
@@ -347,8 +356,7 @@ fn test_integration_sorting_multi_column() {
         },
     ];
 
-    let result = excel_sql::sort_sheet_on_data(&sheet, &sort_columns)
-        .expect("Failed to sort");
+    let result = excel_sql::sort_sheet_on_data(&sheet, &sort_columns).expect("Failed to sort");
     assert_eq!(result.rows.len(), 5);
     // First row should be HR with higher salary
     assert_eq!(result.rows[1][0].value.as_deref(), Some("HR"));
@@ -387,8 +395,7 @@ fn test_integration_deduplication_all_columns() {
         ],
     };
 
-    let result = excel_sql::dedup_sheet_on_data(&sheet, &[])
-        .expect("Failed to deduplicate");
+    let result = excel_sql::dedup_sheet_on_data(&sheet, &[]).expect("Failed to deduplicate");
     // Header + 3 unique rows = 4
     assert_eq!(result.rows.len(), 4);
     assert_eq!(result.rows[0][0].value.as_deref(), Some("ID"));
@@ -423,8 +430,7 @@ fn test_integration_deduplication_specific_columns() {
     };
 
     // Deduplicate on ID only
-    let result = excel_sql::dedup_sheet_on_data(&sheet, &[0])
-        .expect("Failed to deduplicate");
+    let result = excel_sql::dedup_sheet_on_data(&sheet, &[0]).expect("Failed to deduplicate");
     // Header + 2 unique IDs = 3
     assert_eq!(result.rows.len(), 3);
 }
@@ -437,8 +443,8 @@ fn test_integration_engine_with_cache() {
     let _ = std::fs::remove_file(cache_path);
 
     // Create engine with cache
-    let mut engine = ExcelQueryEngine::with_cache(cache_path)
-        .expect("Failed to create engine with cache");
+    let mut engine =
+        ExcelQueryEngine::with_cache(cache_path).expect("Failed to create engine with cache");
     assert!(engine.persistent_path.is_some());
 
     let sheet = create_sample_sheet(
@@ -580,15 +586,9 @@ fn test_integration_empty_and_null_values() {
 fn test_integration_session_clear_and_reuse() {
     let mut session = QuerySession::new().expect("Failed to create session");
 
-    let sheet1 = create_sample_sheet(
-        "temp1",
-        vec![vec![Some("A"), Some("1"), Some("10.0")]],
-    );
+    let sheet1 = create_sample_sheet("temp1", vec![vec![Some("A"), Some("1"), Some("10.0")]]);
 
-    let sheet2 = create_sample_sheet(
-        "temp2",
-        vec![vec![Some("B"), Some("2"), Some("20.0")]],
-    );
+    let sheet2 = create_sample_sheet("temp2", vec![vec![Some("B"), Some("2"), Some("20.0")]]);
 
     session
         .load_sheet("temp1", &sheet1, false)

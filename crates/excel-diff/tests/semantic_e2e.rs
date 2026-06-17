@@ -1,1 +1,2 @@
-include!("semantic_e2e/tests.rs");
+#[path = "semantic_e2e/tests.rs"]
+mod tests_impl;

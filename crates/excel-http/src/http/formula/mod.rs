@@ -1,2 +1,2 @@
-pub mod basic;
 pub mod analysis;
+pub mod basic;

@@ -33,9 +33,10 @@ pub fn sort_sheet(
             .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
 
         if sd.rows.len() > 1 {
-            let mut all_rows: Vec<Vec<CellData>> = sd.rows.drain(..).collect();
+            let header = sd.rows[0].clone();
+            let mut body: Vec<Vec<CellData>> = sd.rows.drain(1..).collect();
 
-            all_rows.sort_by(|a, b| {
+            body.sort_by(|a, b| {
                 for sc in sort_columns {
                     let ca = a
                         .get(sc.column as usize)
@@ -62,7 +63,8 @@ pub fn sort_sheet(
                 std::cmp::Ordering::Equal
             });
 
-            sd.rows.extend(all_rows);
+            sd.rows = vec![header];
+            sd.rows.extend(body);
         }
         Ok(new_data)
     })

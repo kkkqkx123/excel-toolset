@@ -6,9 +6,25 @@
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+fn ensure_binary_built() {
+    static BUILT: OnceLock<()> = OnceLock::new();
+    BUILT.get_or_init(|| {
+        let status = Command::new("cargo")
+            .args(["build", "-p", "excel-cli"])
+            .status()
+            .expect("Failed to run cargo build for excel-cli");
+        assert!(
+            status.success(),
+            "cargo build -p excel-cli failed before tests"
+        );
+    });
+}
+
 fn cli() -> PathBuf {
+    ensure_binary_built();
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.pop();
     path.pop();
@@ -482,11 +498,13 @@ mod data_commands {
         run_json(&["data", "append-row", &path, "Sheet1", "Alice", "30"]);
         run_json(&["data", "append-row", &path, "Sheet1", "Bob", "20"]);
         run_json(&["data", "sort", &path, "Sheet1", "2"]);
+        // Header row (row 0) preserved: "Carol"
+        // Sorted body by col 2 asc: Bob(20), Alice(30)
         assert_eq!(
             run_json(&["cell", "read", &path, "Sheet1", "A1"])["value"]
                 .as_str()
                 .unwrap(),
-            "Bob"
+            "Carol"
         );
         assert_eq!(
             run_json(&["cell", "read", &path, "Sheet1", "A3"])["value"]
@@ -504,11 +522,13 @@ mod data_commands {
         run_json(&["data", "append-row", &path, "Sheet1", "B", "30"]);
         run_json(&["data", "append-row", &path, "Sheet1", "C", "20"]);
         run_json(&["data", "sort", &path, "Sheet1", "2", "--desc"]);
+        // Header row (row 0) preserved: "A"
+        // Sorted body by col 2 desc: B(30), C(20)
         assert_eq!(
             run_json(&["cell", "read", &path, "Sheet1", "A1"])["value"]
                 .as_str()
                 .unwrap(),
-            "B"
+            "A"
         );
     }
 

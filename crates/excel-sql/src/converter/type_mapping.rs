@@ -57,21 +57,17 @@ pub fn infer_column_types(data: &[Vec<CellDataType>]) -> Vec<CellDataType> {
     let max_cols = data.iter().map(|r| r.len()).max().unwrap_or(0);
     let mut col_types = vec![CellDataType::Empty; max_cols];
 
-    #[allow(clippy::needless_range_loop)]
-    for col in 0..max_cols {
+    for (col, col_type) in col_types.iter_mut().enumerate() {
         for row in data {
             if let Some(cell_type) = row.get(col) {
-                // Skip empty cells
                 if *cell_type == CellDataType::Empty {
                     continue;
                 }
 
-                // Combine with current column type using our type hierarchy
-                col_types[col] = combine_types(&col_types[col], cell_type);
+                *col_type = combine_types(col_type, cell_type);
 
-                // If we've reached String or DateTime (highest), no need to check further
                 if matches!(
-                    col_types[col],
+                    *col_type,
                     CellDataType::String | CellDataType::DateTime
                 ) {
                     break;
@@ -79,9 +75,8 @@ pub fn infer_column_types(data: &[Vec<CellDataType>]) -> Vec<CellDataType> {
             }
         }
 
-        // If all values were Empty, default to String
-        if col_types[col] == CellDataType::Empty {
-            col_types[col] = CellDataType::String;
+        if *col_type == CellDataType::Empty {
+            *col_type = CellDataType::String;
         }
     }
 

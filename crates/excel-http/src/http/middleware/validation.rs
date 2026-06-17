@@ -1,7 +1,12 @@
-#![allow(unused_variables, unused_imports, clippy::collapsible_if, clippy::collapsible_match)]
+#![allow(
+    unused_variables,
+    unused_imports,
+    clippy::collapsible_if,
+    clippy::collapsible_match
+)]
 
-use axum::extract::Request;
 use axum::Json;
+use axum::extract::Request;
 use serde_json::json;
 use std::collections::HashMap;
 

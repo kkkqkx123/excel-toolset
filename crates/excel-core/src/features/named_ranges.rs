@@ -42,7 +42,9 @@ fn parse_named_ranges_xml(xml: &str) -> Vec<NamedRange> {
 
             if let Some(name_attr) = extract_attr(defined_name_block, "name") {
                 let content_start = defined_name_block.find('>').map(|i| i + 1).unwrap_or(0);
-                let content_end = defined_name_block.rfind(defined_name_end).unwrap_or(defined_name_block.len());
+                let content_end = defined_name_block
+                    .rfind(defined_name_end)
+                    .unwrap_or(defined_name_block.len());
                 let content = defined_name_block[content_start..content_end].trim();
 
                 let sheet = extract_sheet_from_ref(content);

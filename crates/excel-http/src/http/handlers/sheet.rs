@@ -1,4 +1,4 @@
-use axum::{Json, extract::Path};
+use axum::Json;
 use serde::Deserialize;
 
 use excel_core::excel_read;
@@ -18,8 +18,13 @@ pub struct RenameSheetReq {
     pub new: String,
 }
 
-pub async fn sheet_list(Path(path): Path<String>) -> Json<ApiResponse<Vec<String>>> {
-    match excel_read::list_sheets(&path) {
+#[derive(Deserialize)]
+pub struct SheetListReq {
+    pub path: String,
+}
+
+pub async fn sheet_list(Json(req): Json<SheetListReq>) -> Json<ApiResponse<Vec<String>>> {
+    match excel_read::list_sheets(&req.path) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
     }

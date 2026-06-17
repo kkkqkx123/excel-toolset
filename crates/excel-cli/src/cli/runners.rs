@@ -37,9 +37,17 @@ pub fn execute(cli: &Cli) {
                 );
             }
             if cli.pretty {
-                println!("{}", serde_json::to_string_pretty(&json).unwrap());
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&json)
+                        .expect("JSON serialization of Value should never fail")
+                );
             } else {
-                println!("{}", serde_json::to_string(&json).unwrap());
+                println!(
+                    "{}",
+                    serde_json::to_string(&json)
+                        .expect("JSON serialization of Value should never fail")
+                );
             }
         }
         Err(e) => {
@@ -48,9 +56,17 @@ pub fn execute(cli: &Cli) {
                 "message": e.to_string()
             });
             if cli.pretty {
-                println!("{}", serde_json::to_string_pretty(&err_json).unwrap());
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&err_json)
+                        .expect("JSON serialization of Value should never fail")
+                );
             } else {
-                println!("{}", serde_json::to_string(&err_json).unwrap());
+                println!(
+                    "{}",
+                    serde_json::to_string(&err_json)
+                        .expect("JSON serialization of Value should never fail")
+                );
             }
         }
     }

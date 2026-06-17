@@ -19,7 +19,7 @@ impl FormulaTracker {
         for (row_idx, row) in sheet.rows.iter().enumerate() {
             for (col_idx, cell) in row.iter().enumerate() {
                 if let Some(formula) = &cell.formula {
-                    let cell_ref = format_cell_ref(row_idx, col_idx);
+                    let cell_ref = crate::helpers::format_cell_ref(row_idx, col_idx);
                     let refs = extract_cell_refs(formula);
                     if !refs.is_empty() {
                         tracker.dependencies.insert(cell_ref, refs);
@@ -268,7 +268,7 @@ fn expand_range(range: &str) -> Vec<String> {
 
     for row in start_row.min(end_row)..=start_row.max(end_row) {
         for col in start_col.min(end_col)..=start_col.max(end_col) {
-            let col_name = index_to_col(col);
+            let col_name = crate::helpers::index_to_col(col);
             let row_num = row + 1;
             cells.push(format!("{}{}", col_name, row_num));
         }
@@ -309,25 +309,6 @@ fn col_str_to_index(col_str: &str) -> Option<usize> {
     }
 
     Some(index - 1)
-}
-
-fn format_cell_ref(row: usize, col: usize) -> String {
-    let col_name = index_to_col(col);
-    let row_num = row + 1;
-    format!("{}{}", col_name, row_num)
-}
-
-fn index_to_col(index: usize) -> String {
-    let mut col = String::new();
-    let mut n = index + 1;
-
-    while n > 0 {
-        n -= 1;
-        col.insert(0, ((n % 26) as u8 + b'A') as char);
-        n /= 26;
-    }
-
-    col
 }
 
 #[cfg(test)]

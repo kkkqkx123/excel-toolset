@@ -35,10 +35,7 @@ where
     type Error = S::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
-    fn poll_ready(
-        &mut self,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
     }
 
@@ -50,8 +47,10 @@ where
                 let resp = Response::builder()
                     .status(axum::http::StatusCode::BAD_REQUEST)
                     .header("content-type", "application/json")
-                    .body(axum::body::Body::default())
-                    .unwrap();
+                    .body(axum::body::Body::from(
+                        r#"{"success":false,"message":"Validation failed"}"#,
+                    ))
+                    .expect("failed to build validation error response");
                 return Ok(resp);
             }
 

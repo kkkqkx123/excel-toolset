@@ -32,9 +32,14 @@ fn build_param_conditions(conditions: &[FilterCondition]) -> (String, Vec<duckdb
             }
         };
         clauses.push(clause);
-        
+
         let param_value = match c.operator {
-            FilterOp::Eq | FilterOp::Ne | FilterOp::Gt | FilterOp::Lt | FilterOp::Ge | FilterOp::Le => {
+            FilterOp::Eq
+            | FilterOp::Ne
+            | FilterOp::Gt
+            | FilterOp::Lt
+            | FilterOp::Ge
+            | FilterOp::Le => {
                 if let Ok(num) = c.value.parse::<i64>() {
                     duckdb::types::Value::BigInt(num)
                 } else if let Ok(num) = c.value.parse::<f64>() {
@@ -45,7 +50,7 @@ fn build_param_conditions(conditions: &[FilterCondition]) -> (String, Vec<duckdb
             }
             _ => duckdb::types::Value::Text(value),
         };
-        
+
         params.push(param_value);
     }
 

@@ -1,4 +1,4 @@
-use axum::{Json, extract::Path};
+use axum::Json;
 use serde::Deserialize;
 
 use excel_core::excel_read;
@@ -23,8 +23,13 @@ pub struct BackupFileReq {
     pub output: Option<String>,
 }
 
-pub async fn file_info(Path(path): Path<String>) -> Json<ApiResponse<FileInfo>> {
-    match excel_read::read_file_info(&path) {
+#[derive(Deserialize)]
+pub struct FileInfoReq {
+    pub path: String,
+}
+
+pub async fn file_info(Json(req): Json<FileInfoReq>) -> Json<ApiResponse<FileInfo>> {
+    match excel_read::read_file_info(&req.path) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
     }

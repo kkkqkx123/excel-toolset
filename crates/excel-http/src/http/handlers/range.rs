@@ -1,10 +1,17 @@
-use axum::{Json, extract::Path};
+use axum::Json;
 use serde::Deserialize;
 
 use excel_core::excel_read;
 use excel_core::excel_write;
 use excel_core::types::*;
 use excel_core::utils::helpers;
+
+#[derive(Deserialize)]
+pub struct RangeReadReq {
+    pub path: String,
+    pub sheet: String,
+    pub range: String,
+}
 
 #[derive(Deserialize)]
 pub struct RangeWriteReq {
@@ -35,10 +42,8 @@ pub struct RangeWriteCsvReq {
     pub dry_run: bool,
 }
 
-pub async fn range_read(
-    Path((path, sheet, range)): Path<(String, String, String)>,
-) -> Json<ApiResponse<Vec<Vec<CellData>>>> {
-    match excel_read::read_range(&path, &sheet, &range) {
+pub async fn range_read(Json(req): Json<RangeReadReq>) -> Json<ApiResponse<Vec<Vec<CellData>>>> {
+    match excel_read::read_range(&req.path, &req.sheet, &req.range) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
     }
