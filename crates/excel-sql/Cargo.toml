@@ -5,7 +5,7 @@ edition.workspace = true
 
 [dependencies]
 excel-types = { path = "../excel-types" }
-duckdb = { version = "~1.10503.1", features = ["bundled"] }
+duckdb = { version = "~v1.10504.0", features = ["bundled"] }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
