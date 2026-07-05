@@ -168,10 +168,10 @@ pub fn set_format(
     path: &str,
     params: &SecurityParams,
     sheet: &str,
-    cell_spec: &str,
+    range_spec: &str,
     style: &Style,
 ) -> Result<WriteResult> {
-    let (row, col) = cell_ref::parse_cell_ref(cell_spec)?;
+    let (r_start, r_end, c_start, c_end) = cell_ref::parse_range_normalized(range_spec)?;
 
     modify_file_with_wb(path, params, |old_data, wb| {
         *wb = Workbook::new();
@@ -182,8 +182,12 @@ pub fn set_format(
             if name == sheet {
                 for (ri, row_data) in data.rows.iter().enumerate() {
                     for (ci, cell) in row_data.iter().enumerate() {
-                        let fmt = build_format(style);
-                        if ri == row as usize && ci == col as usize {
+                        if ri >= r_start as usize
+                            && ri <= r_end as usize
+                            && ci >= c_start as usize
+                            && ci <= c_end as usize
+                        {
+                            let fmt = build_format(style);
                             write_cell_with_format(ws, ri as u32, ci as u16, cell, &fmt)?;
                         } else {
                             write_cell_data(ws, ri as u32, ci as u16, cell)?;
@@ -214,7 +218,6 @@ pub fn merge_cells(
             ws.set_name(name).map_err(AppError::Xlsx)?;
 
             if name == sheet {
-                write_sheet_data(ws, data)?;
                 ws.merge_range(r1, c1, r2, c2, value, &Format::new())
                     .map_err(AppError::Xlsx)?;
             } else {
@@ -228,23 +231,30 @@ pub fn merge_cells(
 pub fn add_chart(path: &str, params: &SecurityParams, config: &ChartConfig) -> Result<WriteResult> {
     modify_file_with_wb(path, params, |old_data, wb| {
         *wb = Workbook::new();
-        for (name, data) in old_data.iter() {
+        let sheet_names: Vec<&str> = old_data.keys().map(|s| s.as_str()).collect();
+        for name in &sheet_names {
+            let sd = &old_data[*name];
             let ws = wb.add_worksheet();
-            ws.set_name(name).map_err(AppError::Xlsx)?;
-            write_sheet_data(ws, data)?;
+            ws.set_name(*name).map_err(AppError::Xlsx)?;
+            write_sheet_data(ws, sd)?;
+        }
 
-            if name == &config.sheet {
-                let mut chart = Chart::new(map_chart_type(&config.chart_type));
-                chart
-                    .add_series()
-                    .set_categories(config.categories_range.as_str())
-                    .set_values(config.values_range.as_str());
-                if let Some(ref title) = config.title {
-                    chart.title().set_name(title);
-                }
-                ws.insert_chart(config.row, config.col, &chart)
-                    .map_err(AppError::Xlsx)?;
+        // Insert chart after all data sheets are created
+        let sheet_idx = sheet_names
+            .iter()
+            .position(|n| *n == config.sheet)
+            .ok_or_else(|| AppError::SheetNotFound(config.sheet.clone()))?;
+        if let Ok(ws) = wb.worksheet_from_index(sheet_idx) {
+            let mut chart = Chart::new(map_chart_type(&config.chart_type));
+            chart
+                .add_series()
+                .set_categories(config.categories_range.as_str())
+                .set_values(config.values_range.as_str());
+            if let Some(ref title) = config.title {
+                chart.title().set_name(title);
             }
+            ws.insert_chart(config.row, config.col, &chart)
+                .map_err(AppError::Xlsx)?;
         }
         Ok(())
     })

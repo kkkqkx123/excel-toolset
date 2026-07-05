@@ -30,7 +30,7 @@ fn cli() -> PathBuf {
     path.pop();
     path.push("target");
     path.push("debug");
-    path.push("excel-cli");
+    path.push("excel");
     path
 }
 
@@ -686,10 +686,10 @@ mod batch_commands {
         let id = test_id();
         let path = mkfile(id, "f.xlsx");
         let ops = r#"[
-            {"type":"WriteCell","sheet":"Sheet1","row":0,"col":0,"value":"Header1"},
-            {"type":"WriteCell","sheet":"Sheet1","row":0,"col":1,"value":"Header2"},
-            {"type":"WriteCell","sheet":"Sheet1","row":1,"col":0,"value":"Data1"},
-            {"type":"WriteCell","sheet":"Sheet1","row":1,"col":1,"value":"Data2"}
+            {"op":"write_cell","sheet":"Sheet1","row":0,"col":0,"value":"Header1"},
+            {"op":"write_cell","sheet":"Sheet1","row":0,"col":1,"value":"Header2"},
+            {"op":"write_cell","sheet":"Sheet1","row":1,"col":0,"value":"Data1"},
+            {"op":"write_cell","sheet":"Sheet1","row":1,"col":1,"value":"Data2"}
         ]"#;
         let r = run_json(&["batch", "modify", &path, "--operations", ops]);
         assert_ok(&r);
@@ -713,8 +713,8 @@ mod batch_commands {
         let id = test_id();
         let path = mkfile(id, "f.xlsx");
         let ops = r#"[
-            {"type":"AddSheet","name":"Data"},
-            {"type":"WriteCell","sheet":"Data","row":0,"col":0,"value":"test"}
+            {"op":"add_sheet","name":"Data"},
+            {"op":"write_cell","sheet":"Data","row":0,"col":0,"value":"test"}
         ]"#;
         let r = run_json(&["batch", "modify", &path, "--operations", ops]);
         assert_ok(&r);
@@ -731,7 +731,7 @@ mod batch_commands {
     fn test_batch_dry_run() {
         let id = test_id();
         let path = mkfile(id, "f.xlsx");
-        let ops = r#"[{"type":"WriteCell","sheet":"Sheet1","row":0,"col":0,"value":"nope"}]"#;
+        let ops = r#"[{"op":"write_cell","sheet":"Sheet1","row":0,"col":0,"value":"nope"}]"#;
         let _ = run_json(&["batch", "modify", &path, "--operations", ops, "--dry-run"]);
         let d = run_json(&["cell", "read", &path, "Sheet1", "A1"]);
         assert_eq!(d["data_type"].as_str().unwrap(), "Empty");
@@ -741,7 +741,7 @@ mod batch_commands {
     fn test_batch_text_format() {
         let id = test_id();
         let path = mkfile(id, "f.xlsx");
-        let ops = r#"[{"type":"WriteCell","sheet":"Sheet1","row":0,"col":0,"value":"t"}]"#;
+        let ops = r#"[{"op":"write_cell","sheet":"Sheet1","row":0,"col":0,"value":"t"}]"#;
         let out = run(&[
             "batch",
             "modify",
@@ -760,8 +760,8 @@ mod batch_commands {
         let id = test_id();
         let path = mkfile(id, "f.xlsx");
         let ops = r#"[
-            {"type":"AppendRows","sheet":"Sheet1","data":[["Alice","30"],["Bob","25"]]},
-            {"type":"WriteRange","sheet":"Sheet1","range":"C1:C2","data":[["Eng"],["Mgr"]]}
+            {"op":"append_rows","sheet":"Sheet1","data":[["Alice","30"],["Bob","25"]]},
+            {"op":"write_range","sheet":"Sheet1","range":"C1:C2","data":[["Eng"],["Mgr"]]}
         ]"#;
         let r = run_json(&["batch", "modify", &path, "--operations", ops]);
         assert_ok(&r);
@@ -1169,13 +1169,13 @@ mod e2e_scenarios {
         let path = tf(id, "batch_flow.xlsx");
         run_json(&["file", "create", &path, "--sheet", "Report"]);
         let ops = r#"[
-            {"type":"WriteCell","sheet":"Report","row":0,"col":0,"value":"ID"},
-            {"type":"WriteCell","sheet":"Report","row":0,"col":1,"value":"Name"},
-            {"type":"WriteCell","sheet":"Report","row":0,"col":2,"value":"Score"},
-            {"type":"AppendRows","sheet":"Report","data":[["1","Alice","95"],["2","Bob","87"],["3","Carol","92"]]},
-            {"type":"SetFormula","sheet":"Report","cell":"D1","formula":"=SUM(C2:C4)"},
-            {"type":"AddSheet","name":"Summary"},
-            {"type":"WriteCell","sheet":"Summary","row":0,"col":0,"value":"Total Average"}
+            {"op":"write_cell","sheet":"Report","row":0,"col":0,"value":"ID"},
+            {"op":"write_cell","sheet":"Report","row":0,"col":1,"value":"Name"},
+            {"op":"write_cell","sheet":"Report","row":0,"col":2,"value":"Score"},
+            {"op":"append_rows","sheet":"Report","data":[["1","Alice","95"],["2","Bob","87"],["3","Carol","92"]]},
+            {"op":"set_formula","sheet":"Report","cell":"D1","formula":"=SUM(C2:C4)"},
+            {"op":"add_sheet","name":"Summary"},
+            {"op":"write_cell","sheet":"Summary","row":0,"col":0,"value":"Total Average"}
         ]"#;
         let r = run_json(&["batch", "modify", &path, "--operations", ops]);
         assert_ok(&r);

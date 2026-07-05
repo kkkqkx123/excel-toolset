@@ -36,6 +36,15 @@ fn parse_named_ranges_xml(xml: &str) -> Vec<NamedRange> {
     let mut pos = 0;
     while let Some(start) = xml[pos..].find(defined_name_start) {
         let start = pos + start;
+        // Skip "<definedNames>" (plural parent tag) — only match "<definedName" followed by space or '>'
+        let after_tag = start + defined_name_start.len();
+        if after_tag < xml.len() {
+            let next_byte = xml.as_bytes()[after_tag];
+            if next_byte != b' ' && next_byte != b'>' {
+                pos = start + 1;
+                continue;
+            }
+        }
         if let Some(end_offset) = xml[start..].find(defined_name_end) {
             let end = start + end_offset + defined_name_end.len();
             let defined_name_block = &xml[start..end];
@@ -94,6 +103,12 @@ pub fn get_named_range_value(path: &str, name: &str) -> Result<Option<Vec<Vec<Ce
             && let Some(ref sheet) = range.sheet
         {
             let clean_ref = range.refers_to.trim_start_matches('=').trim();
+            // Strip the sheet prefix (e.g. "'Sheet1'!A1:C3" → "A1:C3")
+            let clean_ref = if let Some(excl_pos) = clean_ref.rfind('!') {
+                clean_ref[excl_pos + 1..].trim()
+            } else {
+                clean_ref
+            };
             return crate::excel_read::read_range(path, sheet, clean_ref).map(Some);
         }
     }

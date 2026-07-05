@@ -3,6 +3,10 @@ name = "excel-cli"
 version.workspace = true
 edition.workspace = true
 
+[[bin]]
+name = "excel-cli"
+path = "src/main.rs"
+
 [dependencies]
 excel-core = { path = "../excel-core" }
 excel-diff = { path = "../excel-diff" }

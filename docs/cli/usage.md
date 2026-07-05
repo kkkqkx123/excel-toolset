@@ -3,11 +3,14 @@
 ## 安装与构建
 
 ```bash
-# 构建
+# 构建（基础功能）
 cargo build --package excel-cli --release
 
+# 构建（包含 SQL 查询功能）
+cargo build --package excel-cli --release --features sql
+
 # 生成的可执行文件
-./target/release/excel
+./target/release/excel-cli
 ```
 
 ## 全局标志
@@ -18,8 +21,8 @@ cargo build --package excel-cli --release
 | `--format` | `json` | 输出格式，可选 `json` 或 `text`（仅 diff 命令支持 text） |
 
 ```bash
-excel --pretty file info data.xlsx
-excel --format text diff file old.xlsx new.xlsx
+excel-cli --pretty file info data.xlsx
+excel-cli --format text diff file old.xlsx new.xlsx
 ```
 
 ## 输出格式
@@ -39,20 +42,20 @@ excel --format text diff file old.xlsx new.xlsx
 
 ### 创建文件
 ```bash
-excel file create <path> [--sheet <name>]
+excel-cli file create <path> [--sheet <name>]
 ```
 - `path`：Excel 文件路径
 - `--sheet`：初始工作表名，默认 `Sheet1`
 
 ### 查看文件信息
 ```bash
-excel file info <path>
+excel-cli file info <path>
 ```
 返回工作表数量、名称、文件哈希等元数据。
 
 ### 创建备份
 ```bash
-excel file backup <path> [--output <dest>]
+excel-cli file backup <path> [--output <dest>]
 ```
 - `--output`：可选，将备份复制到指定位置
 
@@ -62,22 +65,22 @@ excel file backup <path> [--output <dest>]
 
 ### 列出工作表
 ```bash
-excel sheet list <path>
+excel-cli sheet list <path>
 ```
 
 ### 添加工作表
 ```bash
-excel sheet add <path> <name>
+excel-cli sheet add <path> <name>
 ```
 
 ### 删除工作表
 ```bash
-excel sheet delete <path> <name>
+excel-cli sheet delete <path> <name>
 ```
 
 ### 重命名工作表
 ```bash
-excel sheet rename <path> <old-name> <new-name>
+excel-cli sheet rename <path> <old-name> <new-name>
 ```
 
 ---
@@ -86,13 +89,13 @@ excel sheet rename <path> <old-name> <new-name>
 
 ### 读取单元格
 ```bash
-excel cell read <path> <sheet> <cell>
+excel-cli cell read <path> <sheet> <cell>
 ```
 - `cell`：单元格引用，如 `A1`、`B3`
 
 ### 写入单元格
 ```bash
-excel cell write <path> <sheet> <cell> <value> [--dry-run]
+excel-cli cell write <path> <sheet> <cell> <value> [--dry-run]
 ```
 - `value`：写入的值（自动推断类型：数字、布尔、字符串）
 - `--dry-run`：模拟执行，不写入文件
@@ -103,24 +106,24 @@ excel cell write <path> <sheet> <cell> <value> [--dry-run]
 
 ### 读取区域
 ```bash
-excel range read <path> <sheet> <range>
+excel-cli range read <path> <sheet> <range>
 ```
 - `range`：区域引用，如 `A1:C5`
 
 ### 写入区域
 ```bash
-excel range write <path> <sheet> <range> <data> [--dry-run]
+excel-cli range write <path> <sheet> <range> <data> [--dry-run]
 ```
 - `data`：JSON 格式的二维数组，如 `[["a","b"],["1","2"]]`
 
 ### 从 CSV 写入区域
 ```bash
-excel range write-csv <path> <sheet> <range> <csv-file> [--dry-run]
+excel-cli range write-csv <path> <sheet> <range> <csv-file> [--dry-run]
 ```
 
 ### 清空区域
 ```bash
-excel range clear <path> <sheet> <range> [--dry-run]
+excel-cli range clear <path> <sheet> <range> [--dry-run]
 ```
 
 ---
@@ -129,23 +132,23 @@ excel range clear <path> <sheet> <range> [--dry-run]
 
 ### 追加行
 ```bash
-excel data append-row <path> <sheet> <val1> <val2> ... [--dry-run]
+excel-cli data append-row <path> <sheet> <val1> <val2> ... [--dry-run]
 ```
 
 ### 插入行
 ```bash
-excel data insert-row <path> <sheet> <row> <val1> <val2> ... [--dry-run]
+excel-cli data insert-row <path> <sheet> <row> <val1> <val2> ... [--dry-run]
 ```
 - `row`：目标行号（从 1 开始）
 
 ### 删除行
 ```bash
-excel data delete-row <path> <sheet> <row> [--dry-run]
+excel-cli data delete-row <path> <sheet> <row> [--dry-run]
 ```
 
 ### 过滤
 ```bash
-excel data filter <path> <sheet> <column> <op> <value>
+excel-cli data filter <path> <sheet> <column> <op> <value>
 ```
 - `column`：列号（从 1 开始）
 - `op`：操作符，如 `eq`、`ne`、`gt`、`lt`、`gte`、`lte`、`contains`
@@ -153,20 +156,21 @@ excel data filter <path> <sheet> <column> <op> <value>
 
 ### 排序
 ```bash
-excel data sort <path> <sheet> <column> [--desc] [--dry-run]
+excel-cli data sort <path> <sheet> <column> [--desc] [--dry-run]
 ```
 
 ### 去重
 ```bash
-excel data dedup <path> <sheet> [--column <col>] [--dry-run]
+excel-cli data dedup <path> <sheet> [--column <col>] [--dry-run]
 ```
 - `--column`：按指定列去重，不传则比较整行
 
 ### SQL 查询
 ```bash
-excel data sql <path> <sheet> <query>
+excel-cli data sql <path> <sheet> <query>
 ```
 - `query`：SQL 语句，如 `SELECT * FROM t WHERE A > 10`
+- 注意：SQL 功能需要通过 `--features sql` 构建才可用
 
 ---
 
@@ -174,42 +178,42 @@ excel data sql <path> <sheet> <query>
 
 ### 设置公式
 ```bash
-excel formula set <path> <sheet> <cell> <formula> [--dry-run]
+excel-cli formula set <path> <sheet> <cell> <formula> [--dry-run]
 ```
 - `formula`：公式字符串，如 `=SUM(A1:A10)`
 
 ### 刷新公式
 ```bash
-excel formula refresh <path> <sheet> [--dry-run]
+excel-cli formula refresh <path> <sheet> [--dry-run]
 ```
 
 ### 读取公式
 ```bash
-excel formula read <path> <sheet> <cell>
+excel-cli formula read <path> <sheet> <cell>
 ```
 返回单元格原始公式字符串。
 
 ### 设置计算模式
 ```bash
-excel formula calc-mode <path> [--mode <mode>] [--dry-run]
+excel-cli formula calc-mode <path> [--mode <mode>] [--dry-run]
 ```
 - `mode`：`auto`（默认）或 `manual`
 
 ### 追踪依赖
 ```bash
-excel formula trace <path> <sheet> <cell>
+excel-cli formula trace <path> <sheet> <cell>
 ```
 返回单元格的前驱和后继依赖链。
 
 ### 解释公式
 ```bash
-excel formula explain <path> <sheet> <cell> [--language <lang>]
+excel-cli formula explain <path> <sheet> <cell> [--language <lang>]
 ```
 - `language`：`en`（默认）或 `zh`
 
 ### 解释公式逻辑
 ```bash
-excel formula explain-logic <path> <sheet> <cell> [--language <lang>]
+excel-cli formula explain-logic <path> <sheet> <cell> [--language <lang>]
 ```
 返回公式逻辑结构的自然语言说明。
 
@@ -219,13 +223,13 @@ excel formula explain-logic <path> <sheet> <cell> [--language <lang>]
 
 ### 设置格式
 ```bash
-excel format set <path> <sheet> <range> <style> [--dry-run]
+excel-cli format set <path> <sheet> <range> <style> [--dry-run]
 ```
 - `style`：JSON 格式样式，如 `{"bold": true, "font_size": 14, "font_color": "#FF0000"}`
 
 ### 合并单元格
 ```bash
-excel format merge <path> <sheet> <range> [--dry-run]
+excel-cli format merge <path> <sheet> <range> [--dry-run]
 ```
 
 ---
@@ -234,10 +238,11 @@ excel format merge <path> <sheet> <range> [--dry-run]
 
 ### 创建图表
 ```bash
-excel chart create <path> <sheet> <range> <chart-type> [title] [--dry-run]
+excel-cli chart create <path> <sheet> <range> <chart-type> [--title <title>] [--position <cell>] [--dry-run]
 ```
 - `chart-type`：`column`、`bar`、`line`、`pie`、`area`、`scatter`
-- `title`：可选，图表标题
+- `--title`：可选，图表标题
+- `--position`：可选，图表放置位置的单元格引用（如 `E5`），默认放在数据区域下方
 
 ---
 
@@ -245,17 +250,17 @@ excel chart create <path> <sheet> <range> <chart-type> [title] [--dry-run]
 
 ### 导出 VBA
 ```bash
-excel vba export <path> <output-file>
+excel-cli vba export <path> <output-file>
 ```
 
 ### 导入 VBA
 ```bash
-excel vba import <path> <vba-file> [--dry-run]
+excel-cli vba import <path> <vba-file> [--dry-run]
 ```
 
 ### 检查是否包含 VBA
 ```bash
-excel vba has <path>
+excel-cli vba has <path>
 ```
 
 ---
@@ -264,31 +269,31 @@ excel vba has <path>
 
 ### 文件对比
 ```bash
-excel diff file <old-path> <new-path> [--sheet <name>]
+excel-cli diff file <old-path> <new-path> [--sheet <name>]
 ```
 对比两个 Excel 文件的全部差异，或指定单个工作表。
 
 ### 区域对比
 ```bash
-excel diff range <old-path> <new-path> <sheet> <range>
+excel-cli diff range <old-path> <new-path> <sheet> <range>
 ```
 
 ### Git Diff 驱动
 ```bash
 # 安装 Git 驱动
-excel diff install-git-driver
+excel-cli diff install-git-driver
 
 # 卸载 Git 驱动
-excel diff uninstall-git-driver
+excel-cli diff uninstall-git-driver
 
 # 手动触发（由 git diff 自动调用）
-excel diff git-driver
+excel-cli diff git-driver
 ```
 
 安装后在 `.gitattributes` 中添加：
 ```
-*.xls diff=excel
-*.xlsx diff=excel
+*.xls diff=excel-cli
+*.xlsx diff=excel-cli
 ```
 
 ---
@@ -297,13 +302,13 @@ excel diff git-driver
 
 ### 批量修改
 ```bash
-excel batch modify <path> --operations '<json>' [--dry-run]
+excel-cli batch modify <path> --operations '<json>' [--dry-run]
 ```
 - `operations`：JSON 数组，每个元素包含 `op`（操作类型）和对应参数字段
 
 示例：
 ```bash
-excel batch modify data.xlsx --operations '[
+excel-cli batch modify data.xlsx --operations '[
   {"op": "write_cell", "sheet": "Sheet1", "row": 1, "col": 1, "value": "Hello"},
   {"op": "add_sheet", "name": "NewSheet"},
   {"op": "set_format", "sheet": "Sheet1", "range": "A1:A5", "style": {"bold": true}}
@@ -315,7 +320,7 @@ excel batch modify data.xlsx --operations '[
 ## rollback — 回滚
 
 ```bash
-excel rollback <path> <backup-path>
+excel-cli rollback <path> <backup-path>
 ```
 从备份文件恢复原始文件。
 
@@ -325,22 +330,22 @@ excel rollback <path> <backup-path>
 
 ### 获取批注
 ```bash
-excel comments get <path> <sheet> <cell>
+excel-cli comments get <path> <sheet> <cell>
 ```
 
 ### 添加批注
 ```bash
-excel comments add <path> <sheet> <cell> <text> [--dry-run]
+excel-cli comments add <path> <sheet> <cell> <text> [--dry-run]
 ```
 
 ### 更新批注
 ```bash
-excel comments update <path> <sheet> <cell> <text> [--dry-run]
+excel-cli comments update <path> <sheet> <cell> <text> [--dry-run]
 ```
 
 ### 删除批注
 ```bash
-excel comments delete <path> <sheet> <cell> [--dry-run]
+excel-cli comments delete <path> <sheet> <cell> [--dry-run]
 ```
 
 ---
@@ -349,22 +354,22 @@ excel comments delete <path> <sheet> <cell> [--dry-run]
 
 ### 列出命名范围
 ```bash
-excel named-range list <path>
+excel-cli named-range list <path>
 ```
 
 ### 获取命名范围的值
 ```bash
-excel named-range get <path> <name>
+excel-cli named-range get <path> <name>
 ```
 
 ### 创建命名范围
 ```bash
-excel named-range create <path> <name> <range> [--sheet <name>] [--dry-run]
+excel-cli named-range create <path> <name> <range> [--sheet <name>] [--dry-run]
 ```
 
 ### 删除命名范围
 ```bash
-excel named-range delete <path> <name> [--dry-run]
+excel-cli named-range delete <path> <name> [--dry-run]
 ```
 
 ---
@@ -373,7 +378,7 @@ excel named-range delete <path> <name> [--dry-run]
 
 ### 全文搜索
 ```bash
-excel search workbook <path> <pattern> \
+excel-cli search workbook <path> <pattern> \
   [--match-type <type>] \
   [--search-type <type>] \
   [--case-sensitive] \
@@ -385,7 +390,7 @@ excel search workbook <path> <pattern> \
 
 ### 单表搜索
 ```bash
-excel search sheet <path> <sheet> <pattern> \
+excel-cli search sheet <path> <sheet> <pattern> \
   [--match-type <type>] \
   [--search-type <type>] \
   [--case-sensitive]
@@ -397,7 +402,7 @@ excel search sheet <path> <sheet> <pattern> \
 
 ### 添加条件格式
 ```bash
-excel conditional-format add <path> <sheet> <range> <rule-type> <condition> \
+excel-cli conditional-format add <path> <sheet> <range> <rule-type> <condition> \
   [--style <json>] [--dry-run]
 ```
 - `rule-type`：`cell_value`、`formula`、`above_average`、`top10`、`duplicate`、`text_contains`、`date_occurring`
@@ -406,5 +411,5 @@ excel conditional-format add <path> <sheet> <range> <rule-type> <condition> \
 
 ### 移除条件格式
 ```bash
-excel conditional-format remove <path> <sheet> <range> [--dry-run]
+excel-cli conditional-format remove <path> <sheet> <range> [--dry-run]
 ```

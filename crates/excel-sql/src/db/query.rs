@@ -150,7 +150,7 @@ pub fn query(db: &duckdb::Connection, sql: &str) -> Result<QueryResult, AppError
     let col_count = stmt.column_count();
     let mut columns = Vec::with_capacity(col_count);
     for i in 0..col_count {
-        columns.push(stmt.column_name(i).unwrap_or("").to_string());
+        columns.push(stmt.column_name(i).map_or("", |v| v).to_string());
     }
 
     let rows = stmt
@@ -190,7 +190,7 @@ pub fn query_with_params(
     let col_count = stmt.column_count();
     let mut columns = Vec::with_capacity(col_count);
     for i in 0..col_count {
-        columns.push(stmt.column_name(i).unwrap_or("").to_string());
+        columns.push(stmt.column_name(i).map_or("", |v| v).to_string());
     }
 
     let rows = stmt

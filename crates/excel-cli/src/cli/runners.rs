@@ -497,19 +497,32 @@ fn run_chart(args: &ChartArgs) -> Result<serde_json::Value> {
                 (r2 + 1, c1)
             };
             // Build sheet-qualified range strings for rust_xlsxwriter
-            let sheet_qualified_range = format!(
-                "{}!${}${}:${}${}",
+            // Use first column as categories, remaining columns as values
+            let categories_range = format!(
+                "'{}'!${}${}:${}${}",
                 sheet,
                 excel_core::utils::cell_ref::index_to_col(c1),
                 r1 + 1,
-                excel_core::utils::cell_ref::index_to_col(c2),
+                excel_core::utils::cell_ref::index_to_col(c1),
                 r2 + 1
             );
+            let values_range = if c2 > c1 {
+                format!(
+                    "'{}'!${}${}:${}${}",
+                    sheet,
+                    excel_core::utils::cell_ref::index_to_col(c1 + 1),
+                    r1 + 1,
+                    excel_core::utils::cell_ref::index_to_col(c2),
+                    r2 + 1
+                )
+            } else {
+                categories_range.clone()
+            };
             let config = ChartConfig {
                 chart_type: ct,
                 title: title.clone(),
-                categories_range: sheet_qualified_range.clone(),
-                values_range: sheet_qualified_range,
+                categories_range,
+                values_range,
                 sheet: sheet.clone(),
                 row: chart_row,
                 col: chart_col,

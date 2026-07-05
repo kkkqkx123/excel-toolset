@@ -32,7 +32,7 @@ impl WriteResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "op", rename_all = "snake_case")]
 pub enum BatchOperation {
     WriteCell {
         sheet: String,
