@@ -37,6 +37,15 @@ pub enum AppError {
     #[error("Unknown chart type: {0}")]
     InvalidChartType(String),
 
+    #[error("Unknown table style: {0}")]
+    InvalidTableStyle(String),
+
+    #[error("Unknown data validation type: {0}")]
+    InvalidDataValidationType(String),
+
+    #[error("Unknown pivot aggregation: {0}")]
+    InvalidPivotAggregation(String),
+
     #[error("{0}")]
     VbaNotSupported(String),
 
@@ -76,6 +85,9 @@ impl AppError {
             AppError::InvalidArgument(_) => "INVALID_ARGUMENT",
             AppError::InvalidFilterOp(_) => "INVALID_FILTER_OP",
             AppError::InvalidChartType(_) => "INVALID_CHART_TYPE",
+            AppError::InvalidTableStyle(_) => "INVALID_TABLE_STYLE",
+            AppError::InvalidDataValidationType(_) => "INVALID_DATA_VALIDATION_TYPE",
+            AppError::InvalidPivotAggregation(_) => "INVALID_PIVOT_AGGREGATION",
             AppError::VbaNotSupported(_) => "VBA_NOT_SUPPORTED",
             AppError::FeatureNotEnabled(_) => "FEATURE_NOT_ENABLED",
             AppError::DuckDb(_) => "DUCKDB_ERROR",

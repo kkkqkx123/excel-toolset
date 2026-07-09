@@ -20,6 +20,8 @@ pub struct Style {
     pub horizontal_align: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vertical_align: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub number_format: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

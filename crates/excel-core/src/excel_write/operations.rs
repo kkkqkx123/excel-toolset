@@ -358,6 +358,54 @@ pub fn delete_rows(
     })
 }
 
+// ── Data Validation ──
+
+pub fn add_data_validation(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    config: &DataValidationConfig,
+) -> Result<WriteResult> {
+    crate::features::data_validation::add_data_validation(path, config, params, sheet)
+}
+
+pub fn remove_data_validation(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    range: &str,
+) -> Result<WriteResult> {
+    crate::features::data_validation::remove_data_validation(path, sheet, params, range)
+}
+
+// ── Table ──
+
+pub fn create_table(
+    path: &str,
+    params: &SecurityParams,
+    config: &TableConfig,
+) -> Result<WriteResult> {
+    crate::features::table::create_table(path, config, params)
+}
+
+pub fn remove_table(
+    path: &str,
+    params: &SecurityParams,
+    table_name: &str,
+) -> Result<WriteResult> {
+    crate::features::table::remove_table(path, table_name, params)
+}
+
+// ── Pivot Table ──
+
+pub fn create_pivot_table(
+    path: &str,
+    params: &SecurityParams,
+    config: &PivotTableConfig,
+) -> Result<WriteResult> {
+    crate::features::pivot_table::create_pivot_table(path, config, params)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

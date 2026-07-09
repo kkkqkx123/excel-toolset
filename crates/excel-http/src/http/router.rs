@@ -8,7 +8,8 @@ use super::{
     formatting::{cell_format, conditional, merge},
     formula::{analysis, basic},
     handlers::{
-        batch, cell, chart, comments, diff, file, health, named_ranges, range, search, sheet, vba,
+        batch, cell, chart, comments, data_validation, diff, file, health, named_ranges,
+        pivot_table, range, search, sheet, table, vba,
     },
 };
 
@@ -91,4 +92,18 @@ pub fn create_router() -> Router {
         .route("/api/vba/has", post(vba::vba_has))
         .route("/api/diff/file", post(diff::diff_file))
         .route("/api/diff/range", post(diff::handle_diff_range))
+        .route("/api/table/create", post(table::table_create))
+        .route("/api/table/remove", post(table::table_remove))
+        .route(
+            "/api/data_validation/add",
+            post(data_validation::data_validation_add),
+        )
+        .route(
+            "/api/data_validation/remove",
+            post(data_validation::data_validation_remove),
+        )
+        .route(
+            "/api/pivot_table/create",
+            post(pivot_table::pivot_table_create),
+        )
 }

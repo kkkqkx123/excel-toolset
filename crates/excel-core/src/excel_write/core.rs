@@ -1,4 +1,4 @@
-use rust_xlsxwriter::{Chart, Format, Workbook, Worksheet};
+use rust_xlsxwriter::{Chart, Format, Table as XlsxTable, Workbook, Worksheet};
 
 use crate::excel_read::read_all_sheets_to_map;
 use crate::security::{compute_file_hash, create_backup};
@@ -441,6 +441,36 @@ pub fn build_workbook_with_ops(
                 }
             }
         }
+
+        // Add tables for this worksheet
+        for op in operations {
+            if let BatchOperation::AddTable { config } = op {
+                let (r1, c1, r2, c2) = cell_ref::parse_range(&config.range)?;
+                let mut table = XlsxTable::new();
+                table = table.set_name(&config.name);
+                if config.has_header {
+                    table = table.set_header_row(true);
+                }
+                if config.has_total {
+                    table = table.set_total_row(true);
+                }
+                ws.add_table(r1, c1, r2, c2, &table)
+                    .map_err(AppError::Xlsx)?;
+            }
+        }
+
+        // Add data validations for this worksheet
+        for op in operations {
+            if let BatchOperation::AddDataValidation { sheet, config } = op {
+                if sheet != *name {
+                    continue;
+                }
+                let (r1, c1, r2, c2) = cell_ref::parse_range(&config.range)?;
+                let dv = crate::features::data_validation::build_data_validation(&config)?;
+                ws.add_data_validation(r1, c1, r2, c2, &dv)
+                    .map_err(AppError::Xlsx)?;
+            }
+        }
     }
 
     for op in operations {
@@ -460,6 +490,21 @@ pub fn build_workbook_with_ops(
                 }
                 ws.insert_chart(config.row, config.col, &chart)
                     .map_err(AppError::Xlsx)?;
+            }
+        }
+        if let BatchOperation::AddPivotTable { config } = op {
+            let target_sheet_idx = sheet_names
+                .iter()
+                .position(|n| *n == config.target_sheet)
+                .ok_or_else(|| AppError::SheetNotFound(config.target_sheet.clone()))?;
+            if let Ok(ws) = wb.worksheet_from_index(target_sheet_idx) {
+                let (target_r, target_c) =
+                    cell_ref::parse_cell_ref(&config.target_cell)?;
+                // Write pivot table label as a placeholder
+                ws.write(target_r, target_c, &format!("PivotTable: {}", config.name))
+                    .map_err(AppError::Xlsx)?;
+                // Note: Full pivot table rendering is handled by
+                // features::pivot_table::create_pivot_table via modify_file_with_wb
             }
         }
     }

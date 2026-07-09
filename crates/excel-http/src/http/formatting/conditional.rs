@@ -12,6 +12,8 @@ pub struct AddConditionalFormatReq {
     pub rule_type: String,
     pub condition: String,
     pub format: Option<Style>,
+    /// JSON config for DataBar, ColorScale, IconSet types.
+    pub config: Option<conditional_format::ConditionalFormatConfig>,
     #[serde(default)]
     pub dry_run: bool,
 }
@@ -25,21 +27,6 @@ pub struct RemoveConditionalFormatReq {
     pub dry_run: bool,
 }
 
-fn parse_rule_type(s: &str) -> conditional_format::ConditionalFormatType {
-    match s.to_lowercase().as_str() {
-        "cellvalue" | "cell_value" | "cell" => conditional_format::ConditionalFormatType::CellValue,
-        "formula" => conditional_format::ConditionalFormatType::Formula,
-        "aboveaverage" | "above_average" => conditional_format::ConditionalFormatType::AboveAverage,
-        "top10" => conditional_format::ConditionalFormatType::Top10,
-        "duplicate" => conditional_format::ConditionalFormatType::Duplicate,
-        "textcontains" | "text_contains" => conditional_format::ConditionalFormatType::TextContains,
-        "dateoccurring" | "date_occurring" => {
-            conditional_format::ConditionalFormatType::DateOccurring
-        }
-        _ => conditional_format::ConditionalFormatType::CellValue,
-    }
-}
-
 pub async fn add_conditional_format(
     Json(req): Json<AddConditionalFormatReq>,
 ) -> Json<ApiResponse<WriteResult>> {
@@ -50,9 +37,10 @@ pub async fn add_conditional_format(
     };
 
     let rule = conditional_format::ConditionalFormatRule {
-        rule_type: parse_rule_type(&req.rule_type),
+        rule_type: conditional_format::parse_rule_type(&req.rule_type),
         condition: req.condition,
         format: req.format,
+        config: req.config,
     };
 
     match conditional_format::add_conditional_format(

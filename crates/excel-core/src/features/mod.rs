@@ -1,6 +1,9 @@
 pub mod comments;
 pub mod conditional_format;
+pub mod data_validation;
 pub mod formula_analysis;
 pub mod named_ranges;
+pub mod pivot_table;
 pub mod search;
+pub mod table;
 pub mod vba_util;

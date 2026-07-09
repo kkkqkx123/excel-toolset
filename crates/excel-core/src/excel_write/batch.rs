@@ -94,7 +94,10 @@ fn apply_data_operations(
             }
             BatchOperation::SetFormat { .. }
             | BatchOperation::MergeCells { .. }
-            | BatchOperation::AddChart { .. } => {}
+            | BatchOperation::AddChart { .. }
+            | BatchOperation::AddTable { .. }
+            | BatchOperation::AddDataValidation { .. }
+            | BatchOperation::AddPivotTable { .. } => {}
         }
     }
     Ok(succeeded)
@@ -142,6 +145,9 @@ pub fn execute_batch_operations(
                 BatchOperation::SetFormat { .. }
                     | BatchOperation::MergeCells { .. }
                     | BatchOperation::AddChart { .. }
+                    | BatchOperation::AddTable { .. }
+                    | BatchOperation::AddDataValidation { .. }
+                    | BatchOperation::AddPivotTable { .. }
             )
         })
         .count();

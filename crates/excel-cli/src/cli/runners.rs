@@ -90,6 +90,9 @@ fn run_command(cli: &Cli) -> Result<serde_json::Value> {
         Commands::NamedRange(args) => run_named_range(args),
         Commands::Search(args) => run_search(args),
         Commands::ConditionalFormat(args) => run_conditional_format(args),
+        Commands::Table(args) => run_table(args),
+        Commands::DataValidation(args) => run_data_validation(args),
+        Commands::PivotTable(args) => run_pivot_table(args),
     }
 }
 
@@ -875,6 +878,7 @@ fn run_conditional_format(args: &ConditionalFormatArgs) -> Result<serde_json::Va
             rule_type,
             condition,
             style,
+            config,
             dry_run,
         } => {
             let params = SecurityParams {
@@ -883,27 +887,7 @@ fn run_conditional_format(args: &ConditionalFormatArgs) -> Result<serde_json::Va
                 file_path: path.clone(),
             };
 
-            let rt = match rule_type.to_lowercase().as_str() {
-                "cell_value" | "cellvalue" => conditional_format::ConditionalFormatType::CellValue,
-                "formula" => conditional_format::ConditionalFormatType::Formula,
-                "above_average" | "aboveaverage" => {
-                    conditional_format::ConditionalFormatType::AboveAverage
-                }
-                "top10" | "top_10" => conditional_format::ConditionalFormatType::Top10,
-                "duplicate" => conditional_format::ConditionalFormatType::Duplicate,
-                "text_contains" | "textcontains" => {
-                    conditional_format::ConditionalFormatType::TextContains
-                }
-                "date_occurring" | "dateoccurring" => {
-                    conditional_format::ConditionalFormatType::DateOccurring
-                }
-                _ => {
-                    return Err(AppError::InvalidInput(format!(
-                        "Unknown conditional format rule type: {}",
-                        rule_type
-                    )));
-                }
-            };
+            let rt = conditional_format::parse_rule_type(rule_type);
 
             let parsed_style: Option<Style> = if let Some(s) = style {
                 Some(
@@ -914,10 +898,20 @@ fn run_conditional_format(args: &ConditionalFormatArgs) -> Result<serde_json::Va
                 None
             };
 
+            let parsed_config: Option<conditional_format::ConditionalFormatConfig> =
+                if let Some(c) = config {
+                    Some(serde_json::from_str(c).map_err(|e| {
+                        AppError::Serialize(format!("Invalid config JSON: {}", e))
+                    })?)
+                } else {
+                    None
+                };
+
             let rule = conditional_format::ConditionalFormatRule {
                 rule_type: rt,
                 condition: condition.clone(),
                 format: parsed_style,
+                config: parsed_config,
             };
 
             let result =
@@ -937,6 +931,100 @@ fn run_conditional_format(args: &ConditionalFormatArgs) -> Result<serde_json::Va
             };
             let result =
                 conditional_format::remove_conditional_format(path, sheet, range, &params)?;
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+    }
+}
+
+// ── Table ──
+
+fn run_table(args: &TableArgs) -> Result<serde_json::Value> {
+    match &args.command {
+        TableSub::Create {
+            path,
+            config,
+            dry_run,
+        } => {
+            let table_config: TableConfig = serde_json::from_str(config)
+                .map_err(|e| AppError::Serialize(format!("Invalid table config JSON: {}", e)))?;
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
+            let result = excel_write::create_table(path, &params, &table_config)?;
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+        TableSub::Remove {
+            path,
+            name,
+            dry_run,
+        } => {
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
+            let result = excel_write::remove_table(path, &params, name)?;
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+    }
+}
+
+// ── Data Validation ──
+
+fn run_data_validation(args: &DataValidationArgs) -> Result<serde_json::Value> {
+    match &args.command {
+        DataValidationSub::Add {
+            path,
+            sheet,
+            config,
+            dry_run,
+        } => {
+            let dv_config: DataValidationConfig = serde_json::from_str(config)
+                .map_err(|e| AppError::Serialize(format!("Invalid data validation config JSON: {}", e)))?;
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
+            let result = excel_write::add_data_validation(path, &params, sheet, &dv_config)?;
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+        DataValidationSub::Remove {
+            path,
+            sheet,
+            range,
+            dry_run,
+        } => {
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
+            let result = excel_write::remove_data_validation(path, &params, sheet, range)?;
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+    }
+}
+
+// ── Pivot Table ──
+
+fn run_pivot_table(args: &PivotTableArgs) -> Result<serde_json::Value> {
+    match &args.command {
+        PivotTableSub::Create {
+            path,
+            config,
+            dry_run,
+        } => {
+            let pt_config: PivotTableConfig = serde_json::from_str(config)
+                .map_err(|e| AppError::Serialize(format!("Invalid pivot table config JSON: {}", e)))?;
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
+            let result = excel_write::create_pivot_table(path, &params, &pt_config)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
     }

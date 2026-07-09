@@ -31,6 +31,9 @@ pub enum Commands {
     NamedRange(NamedRangeArgs),
     Search(SearchArgs),
     ConditionalFormat(ConditionalFormatArgs),
+    Table(TableArgs),
+    DataValidation(DataValidationArgs),
+    PivotTable(PivotTableArgs),
 }
 
 #[derive(clap::Args)]
@@ -509,6 +512,10 @@ pub enum ConditionalFormatSub {
         condition: String,
         #[arg(long)]
         style: Option<String>,
+        /// JSON config for DataBar, ColorScale, IconSet types.
+        /// Example: '{"fill_color":"#00FF00"}' or '{"icon_type":"three_arrows"}'
+        #[arg(long)]
+        config: Option<String>,
         #[arg(long)]
         dry_run: bool,
     },
@@ -516,6 +523,77 @@ pub enum ConditionalFormatSub {
         path: String,
         sheet: String,
         range: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
+
+// ── Table ──
+
+#[derive(clap::Args)]
+pub struct TableArgs {
+    #[command(subcommand)]
+    pub command: TableSub,
+}
+
+#[derive(Subcommand)]
+pub enum TableSub {
+    Create {
+        path: String,
+        #[arg(long)]
+        config: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    Remove {
+        path: String,
+        name: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
+
+// ── Data Validation ──
+
+#[derive(clap::Args)]
+pub struct DataValidationArgs {
+    #[command(subcommand)]
+    pub command: DataValidationSub,
+}
+
+#[derive(Subcommand)]
+pub enum DataValidationSub {
+    Add {
+        path: String,
+        sheet: String,
+        #[arg(long)]
+        config: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    Remove {
+        path: String,
+        sheet: String,
+        range: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
+
+// ── Pivot Table ──
+
+#[derive(clap::Args)]
+pub struct PivotTableArgs {
+    #[command(subcommand)]
+    pub command: PivotTableSub,
+}
+
+#[derive(Subcommand)]
+pub enum PivotTableSub {
+    Create {
+        path: String,
+        #[arg(long)]
+        config: String,
         #[arg(long)]
         dry_run: bool,
     },

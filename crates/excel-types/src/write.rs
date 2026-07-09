@@ -4,7 +4,10 @@ use crate::cell::CellValue;
 use crate::diff::FileDiff;
 use crate::filter::SortColumn;
 use crate::meta::BackupInfo;
+use crate::pivot_table::PivotTableConfig;
 use crate::style::{ChartConfig, Style};
+use crate::table::TableConfig;
+use crate::validation::DataValidationConfig;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WriteResult {
@@ -103,6 +106,16 @@ pub enum BatchOperation {
     },
     AddChart {
         config: ChartConfig,
+    },
+    AddTable {
+        config: TableConfig,
+    },
+    AddDataValidation {
+        sheet: String,
+        config: DataValidationConfig,
+    },
+    AddPivotTable {
+        config: PivotTableConfig,
     },
 }
 

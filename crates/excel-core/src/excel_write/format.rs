@@ -38,6 +38,9 @@ pub fn build_format(style: &Style) -> Format {
         };
         fmt = fmt.set_border(b);
     }
+    if let Some(ref nf) = style.number_format {
+        fmt = fmt.set_num_format(nf);
+    }
     fmt
 }
 
