@@ -5,24 +5,43 @@ use std::process::Command;
 
 use excel_types::{AppError, Result};
 
-const GITATTR_ENTRY: &str = "*.xlsx diff=excel-diff\n";
-const GITATTR_PATTERN: &str = "*.xlsx diff=excel-diff";
+const GITATTR_PATTERN: &str = "diff=excel-diff";
+const DEFAULT_PATTERNS: &[&str] = &["*.xlsx", "*.xls", "*.xlsm", "*.xlsb"];
 
 const GIT_DIFF_PATH_OLD: &str = "GIT_DIFF_PATH_OLD";
 const GIT_DIFF_PATH_NEW: &str = "GIT_DIFF_PATH_NEW";
 
-#[allow(dead_code)]
-const DEFAULT_COMMAND_NAME: &str = "excel-cli";
+/// Install the git diff driver for Excel files.
+///
+/// When `global` is false (default), configures the current git repository.
+/// When `global` is true, configures the global git config and global gitattributes
+/// so that all repositories on the system use the driver.
+pub fn install_git_driver(global: bool, patterns: &[String]) -> Result<()> {
+    // Determine which gitattributes path and git config scope to use
+    let (gitattr_path, is_global_attr) = if global {
+        (get_global_gitattributes_path()?, true)
+    } else {
+        (get_repo_gitattributes_path()?, false)
+    };
 
-pub fn install_git_driver() -> Result<()> {
-    let gitattr_path = get_gitattributes_path()?;
+    // Normalize patterns: if empty, use defaults
+    let resolved_patterns: Vec<&str> = if patterns.is_empty() {
+        DEFAULT_PATTERNS.to_vec()
+    } else {
+        patterns.iter().map(|s| s.as_str()).collect()
+    };
 
+    // Write gitattributes entries
     let gitattr_existed = gitattr_path.exists();
     let mut need_write = true;
 
     if gitattr_existed {
         let content = read_gitattributes(&gitattr_path)?;
-        if content.contains(GITATTR_PATTERN) {
+        // Check if all patterns already exist
+        let all_exist = resolved_patterns
+            .iter()
+            .all(|p| content.contains(&format!("{} {}", p, GITATTR_PATTERN)));
+        if all_exist {
             need_write = false;
         }
     }
@@ -30,21 +49,50 @@ pub fn install_git_driver() -> Result<()> {
     if need_write {
         if gitattr_existed {
             let content = read_gitattributes(&gitattr_path)?;
-            write_gitattributes(&gitattr_path, content + GITATTR_ENTRY)?;
+            let mut new_content = content;
+            for pattern in &resolved_patterns {
+                let entry = format!("{} {}\n", pattern, GITATTR_PATTERN);
+                if !new_content.contains(&format!("{} {}", pattern, GITATTR_PATTERN)) {
+                    new_content.push_str(&entry);
+                }
+            }
+            write_gitattributes(&gitattr_path, new_content)?;
         } else {
-            write_gitattributes(&gitattr_path, GITATTR_ENTRY.to_string())?;
+            // Ensure the directory exists (needed for global ~/.config/git/ path)
+            if let Some(parent) = gitattr_path.parent() {
+                fs::create_dir_all(parent).map_err(|e| {
+                    AppError::Io(std::io::Error::other(format!(
+                        "Failed to create directory for gitattributes: {}",
+                        e
+                    )))
+                })?;
+            }
+            let mut content = String::new();
+            for pattern in &resolved_patterns {
+                content.push_str(&format!("{} {}\n", pattern, GITATTR_PATTERN));
+            }
+            write_gitattributes(&gitattr_path, content)?;
         }
     }
 
+    // Set git config for the diff driver command
     let exe_path = get_invocation_command()?;
 
+    let mut args = vec!["config"];
+    if global {
+        args.push("--global");
+    }
+    args.push("diff.excel-diff.command");
+    args.push(&exe_path);
+
     let output = Command::new("git")
-        .args(["config", "diff.excel-diff.command", &exe_path])
+        .args(&args)
         .output()
         .map_err(|e| AppError::Custom(format!("Failed to run git config: {}", e)))?;
 
     if !output.status.success() {
-        if need_write && !gitattr_existed {
+        // Rollback gitattributes if we just created it
+        if need_write && !gitattr_existed && !is_global_attr {
             let _ = fs::remove_file(&gitattr_path);
         }
         return Err(AppError::Custom(format!(
@@ -53,27 +101,61 @@ pub fn install_git_driver() -> Result<()> {
         )));
     }
 
+    // When installing globally, also set core.attributesfile if needed
+    if global {
+        let attr_path_str = gitattr_path.to_string_lossy().to_string();
+        let need_set_attr = match Command::new("git")
+            .args(["config", "--global", "core.attributesfile"])
+            .output()
+        {
+            Ok(out) => {
+                let current = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                current != attr_path_str
+            }
+            Err(_) => true,
+        };
+
+        if need_set_attr {
+            let output = Command::new("git")
+                .args([
+                    "config",
+                    "--global",
+                    "core.attributesfile",
+                    &attr_path_str,
+                ])
+                .output()
+                .map_err(|e| AppError::Custom(format!("Failed to set core.attributesfile: {}", e)))?;
+
+            if !output.status.success() {
+                return Err(AppError::Custom(format!(
+                    "git config core.attributesfile failed: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                )));
+            }
+        }
+    }
+
     Ok(())
 }
 
-pub fn uninstall_git_driver() -> Result<()> {
-    let gitattr_path = get_gitattributes_path()?;
+/// Uninstall the git diff driver.
+///
+/// When `global` is false (default), removes configuration from the current repository.
+/// When `global` is true, removes from global git config.
+pub fn uninstall_git_driver(global: bool) -> Result<()> {
+    if global {
+        uninstall_global()?;
+    } else {
+        uninstall_local()?;
+    }
+    Ok(())
+}
+
+fn uninstall_local() -> Result<()> {
+    let gitattr_path = get_repo_gitattributes_path()?;
 
     if gitattr_path.exists() {
-        let content = read_gitattributes(&gitattr_path)?;
-
-        let remaining: String = content
-            .lines()
-            .filter(|line| !line.contains(GITATTR_PATTERN))
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        let trimmed = remaining.trim();
-        if trimmed.is_empty() {
-            fs::remove_file(&gitattr_path).map_err(AppError::Io)?;
-        } else {
-            write_gitattributes(&gitattr_path, trimmed.to_string())?;
-        }
+        remove_excel_entries_from_attr(&gitattr_path)?;
     }
 
     let output = Command::new("git")
@@ -97,6 +179,61 @@ pub fn uninstall_git_driver() -> Result<()> {
     Ok(())
 }
 
+fn uninstall_global() -> Result<()> {
+    // Remove from global gitattributes
+    let gitattr_path = get_global_gitattributes_path()?;
+
+    if gitattr_path.exists() {
+        remove_excel_entries_from_attr(&gitattr_path)?;
+    }
+
+    // Unset global git config
+    let output = Command::new("git")
+        .args([
+            "config",
+            "--global",
+            "--unset",
+            "diff.excel-diff.command",
+        ])
+        .output()
+        .map_err(|e| AppError::Custom(format!("Failed to unset global git config: {}", e)))?;
+
+    if !output.status.success() {
+        let exit_code = output.status.code().unwrap_or(-1);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let combined = format!("{}{}", stdout, stderr);
+        if exit_code != 5 && !combined.contains("entry does not exist") {
+            return Err(AppError::Custom(format!(
+                "git config --global --unset failed: {}",
+                stderr
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+/// Remove all Excel diff entries from a gitattributes file.
+/// If the file becomes empty after removal, delete it.
+fn remove_excel_entries_from_attr(path: &PathBuf) -> Result<()> {
+    let content = read_gitattributes(path)?;
+
+    let remaining: String = content
+        .lines()
+        .filter(|line| !line.contains(GITATTR_PATTERN))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let trimmed = remaining.trim();
+    if trimmed.is_empty() {
+        fs::remove_file(path).map_err(AppError::Io)?;
+    } else {
+        write_gitattributes(path, trimmed.to_string())?;
+    }
+    Ok(())
+}
+
 fn read_gitattributes(path: &PathBuf) -> Result<String> {
     fs::read_to_string(path).map_err(|e| {
         AppError::Io(std::io::Error::other(format!(
@@ -115,7 +252,7 @@ fn write_gitattributes(path: &PathBuf, content: String) -> Result<()> {
     })
 }
 
-fn get_gitattributes_path() -> Result<PathBuf> {
+fn get_repo_gitattributes_path() -> Result<PathBuf> {
     let output = Command::new("git")
         .args(["rev-parse", "--show-toplevel"])
         .output()
@@ -127,6 +264,33 @@ fn get_gitattributes_path() -> Result<PathBuf> {
 
     let root = String::from_utf8_lossy(&output.stdout).trim().to_string();
     Ok(PathBuf::from(root).join(".gitattributes"))
+}
+
+/// Get the global gitattributes path (typically ~/.config/git/attributes).
+/// Falls back to ~/.gitattributes if the XDG config path is not used.
+fn get_global_gitattributes_path() -> Result<PathBuf> {
+    // Try to read from git config first
+    if let Ok(output) = Command::new("git")
+        .args(["config", "--global", "core.attributesfile"])
+        .output()
+    {
+        let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !path.is_empty() {
+            return Ok(PathBuf::from(path));
+        }
+    }
+
+    // Check XDG_CONFIG_HOME first, then fallback to ~/.config
+    let config_home = if let Ok(xdg) = env::var("XDG_CONFIG_HOME") {
+        PathBuf::from(xdg)
+    } else {
+        let home = env::var("HOME").map_err(|_| {
+            AppError::Custom("Cannot determine home directory for global gitattributes".into())
+        })?;
+        PathBuf::from(home).join(".config")
+    };
+
+    Ok(config_home.join("git").join("attributes"))
 }
 
 fn get_invocation_command() -> Result<String> {
@@ -144,6 +308,12 @@ fn get_invocation_command() -> Result<String> {
             return Ok(custom_cmd);
         }
 
+        // For global installs, prefer the command name so it survives binary upgrades.
+        // Check if the binary is on PATH (global install scenario).
+        if let Ok(_path) = which_binary("excel-cli") {
+            return Ok("excel-cli diff git-driver".to_string());
+        }
+
         let exe_path = env::current_exe()
             .map_err(|e| AppError::Custom(format!("Failed to get current executable: {}", e)))?;
 
@@ -156,6 +326,25 @@ fn get_invocation_command() -> Result<String> {
         }
     }
 }
+
+/// Check if a binary exists on PATH.
+#[cfg(not(test))]
+fn which_binary(name: &str) -> Result<String> {
+    let output = Command::new("which")
+        .arg(name)
+        .output()
+        .map_err(|e| AppError::Custom(format!("Failed to run which: {}", e)))?;
+    if output.status.success() {
+        let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !path.is_empty() {
+            return Ok(path);
+        }
+    }
+    Err(AppError::Custom(format!("{} not found on PATH", name)))
+}
+
+#[allow(dead_code)]
+const DEFAULT_COMMAND_NAME: &str = "excel-cli";
 
 /// Get file paths for git diff driver.
 /// Supports both environment variables (standard Git diff driver protocol)
@@ -271,16 +460,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_gitattributes_line_pattern() {
-        assert!(GITATTR_PATTERN.contains("*.xlsx"));
-        assert!(GITATTR_PATTERN.contains("diff=excel-diff"));
-    }
-
-    #[test]
-    fn test_gitattributes_format() {
-        let entry = GITATTR_ENTRY.trim();
-        assert!(entry.starts_with("*.xlsx"));
-        assert!(entry.contains("diff=excel-diff"));
+    fn test_default_patterns_cover_all_extensions() {
+        assert!(DEFAULT_PATTERNS.contains(&"*.xlsx"));
+        assert!(DEFAULT_PATTERNS.contains(&"*.xls"));
+        assert!(DEFAULT_PATTERNS.contains(&"*.xlsm"));
+        assert!(DEFAULT_PATTERNS.contains(&"*.xlsb"));
     }
 
     #[test]
@@ -457,7 +641,7 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_line_removes_excel_diff() {
+    fn test_remove_excel_entries_preserves_other() {
         let lines = vec![
             "*.xml diff=xml-diff",
             "*.xlsx diff=excel-diff",
@@ -474,7 +658,7 @@ mod tests {
     }
 
     #[test]
-    fn test_gitattributes_excel_only_is_empty_after_filter() {
+    fn test_remove_excel_entries_only_entry() {
         let content = "*.xlsx diff=excel-diff\n";
         let remaining: String = content
             .lines()
@@ -485,7 +669,7 @@ mod tests {
     }
 
     #[test]
-    fn test_gitattributes_no_excel_entry_stays_unchanged() {
+    fn test_remove_excel_entries_no_excel() {
         let content = "*.xml diff=xml-diff\n*.json diff=json-diff\n";
         let remaining: String = content
             .lines()
@@ -498,13 +682,8 @@ mod tests {
     #[test]
     fn test_gitattributes_trailing_newline_is_preserved() {
         let content = "*.xml diff=xml-diff\n";
-        let mut need_write = true;
-        if content.contains(GITATTR_PATTERN) {
-            need_write = false;
-        }
-        assert!(need_write);
-
-        let new_content = content.to_string() + GITATTR_ENTRY;
+        let new_content = content.to_string()
+            + &format!("{} {}\n", DEFAULT_PATTERNS[0], GITATTR_PATTERN);
         assert!(new_content.ends_with('\n'));
         assert!(new_content.contains("*.xlsx"));
         assert!(new_content.contains("*.xml"));

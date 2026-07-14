@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use calamine::{Data, Reader};
 use excel_types::{AppError, FilterCondition, SheetData, SortColumn};
 
 use crate::converter::QueryResult;
@@ -97,6 +98,94 @@ impl QuerySession {
 
     pub fn list_tables(&self) -> Result<Vec<String>, AppError> {
         crate::db::tables::list_tables(&self.conn)
+    }
+
+    /// Open an Excel workbook at `path` and register every sheet as a DuckDB table.
+    ///
+    /// Sheets that have already been loaded (tracked in `loaded_tables`) are skipped.
+    pub fn open_workbook(&mut self, path: &str) -> Result<(), AppError> {
+        let mut workbook = calamine::open_workbook::<calamine::Xlsx<_>, _>(path)
+            .map_err(|e| AppError::Read(e.to_string()))?;
+        let sheet_names = workbook.sheet_names().to_vec();
+        for name in &sheet_names {
+            if self.loaded_tables.contains(name) {
+                continue;
+            }
+            let range = workbook
+                .worksheet_range(name)
+                .map_err(|e| AppError::Read(e.to_string()))?;
+            let rows: Vec<Vec<excel_types::CellData>> = range
+                .rows()
+                .map(|row| {
+                    row.iter()
+                        .map(|cell| calamine_data_to_cell_data(cell))
+                        .collect()
+                })
+                .collect();
+            let data = SheetData {
+                name: name.clone(),
+                rows,
+            };
+            self.load_sheet(name, &data, false)?;
+        }
+        Ok(())
+    }
+
+    /// Execute multiple queries in a single batch and return results in order.
+    pub fn execute_multi(&self, queries: &[&str]) -> Result<Vec<QueryResult>, AppError> {
+        queries.iter().map(|q| self.query(q)).collect()
+    }
+}
+
+/// Convert a calamine `Data` cell to `excel_types::CellData`.
+fn calamine_data_to_cell_data(data: &Data) -> excel_types::CellData {
+    use excel_types::{CellData, CellDataType};
+    match data {
+        Data::String(s) => CellData {
+            value: Some(s.clone()),
+            data_type: CellDataType::String,
+            formula: None,
+        },
+        Data::Float(f) => CellData {
+            value: Some(f.to_string()),
+            data_type: CellDataType::Float,
+            formula: None,
+        },
+        Data::Int(i) => CellData {
+            value: Some(i.to_string()),
+            data_type: CellDataType::Int,
+            formula: None,
+        },
+        Data::Bool(b) => CellData {
+            value: Some(b.to_string()),
+            data_type: CellDataType::Bool,
+            formula: None,
+        },
+        Data::DateTime(f) => CellData {
+            value: Some(f.to_string()),
+            data_type: CellDataType::DateTime,
+            formula: None,
+        },
+        Data::DateTimeIso(s) => CellData {
+            value: Some(s.clone()),
+            data_type: CellDataType::DateTime,
+            formula: None,
+        },
+        Data::DurationIso(s) => CellData {
+            value: Some(s.clone()),
+            data_type: CellDataType::String,
+            formula: None,
+        },
+        Data::Error(e) => CellData {
+            value: Some(format!("{e}")),
+            data_type: CellDataType::Error,
+            formula: None,
+        },
+        Data::Empty => CellData {
+            value: None,
+            data_type: CellDataType::Empty,
+            formula: None,
+        },
     }
 }
 
@@ -203,5 +292,28 @@ mod tests {
     fn test_session_table_exists() {
         let session = QuerySession::new().unwrap();
         assert!(!session.table_exists("nonexistent").unwrap());
+    }
+
+    #[test]
+    fn test_execute_multi() {
+        let mut session = QuerySession::new().unwrap();
+        session.load_sheet("s1", &sheet1(), false).unwrap();
+        session.load_sheet("s2", &sheet2(), false).unwrap();
+        let results = session
+            .execute_multi(&[
+                "SELECT * FROM \"s1\"",
+                "SELECT COUNT(*) AS cnt FROM \"s2\"",
+            ])
+            .unwrap();
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].row_count, 2);
+        assert_eq!(results[1].row_count, 1);
+    }
+
+    #[test]
+    fn test_execute_multi_empty() {
+        let session = QuerySession::new().unwrap();
+        let results = session.execute_multi(&[]).unwrap();
+        assert!(results.is_empty());
     }
 }

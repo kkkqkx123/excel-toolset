@@ -5,9 +5,12 @@ use excel_core::excel_write;
 use excel_core::features::comments;
 use excel_core::features::conditional_format;
 use excel_core::features::formula_analysis;
+use excel_core::features::formula_ops;
 use excel_core::features::named_ranges;
 use excel_core::features::search;
+use excel_core::features::sparkline;
 use excel_core::features::vba_util;
+use excel_core::features::workbook_overview;
 use excel_core::operations;
 use excel_core::security;
 use excel_core::types::*;
@@ -72,6 +75,59 @@ pub fn execute(cli: &Cli) {
     }
 }
 
+// ── Sparkline ──
+
+fn run_sparkline(args: &SparklineArgs) -> Result<serde_json::Value> {
+    match &args.command {
+        SparklineSub::Add {
+            path,
+            sheet,
+            source_range,
+            sparkline_type,
+            target_cell,
+            style,
+            dry_run,
+        } => {
+            let (target_row, target_col) =
+                excel_core::utils::cell_ref::parse_cell_ref(target_cell)?;
+            let st = sparkline::parse_sparkline_type(sparkline_type);
+            let config = SparklineConfig {
+                sparkline_type: st,
+                sheet: sheet.clone(),
+                source_range: source_range.clone(),
+                target_row,
+                target_col,
+                style: *style,
+            };
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
+            let result = excel_write::add_sparkline(path, &params, &config)?;
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+        SparklineSub::Remove {
+            path,
+            sheet,
+            target_cell,
+            dry_run,
+        } => {
+            let (target_row, target_col) =
+                excel_core::utils::cell_ref::parse_cell_ref(target_cell)?;
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
+            let result = excel_write::remove_sparkline(
+                path, &params, sheet, target_row, target_col,
+            )?;
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+    }
+}
+
 fn run_command(cli: &Cli) -> Result<serde_json::Value> {
     match &cli.command {
         Commands::File(args) => run_file(args),
@@ -93,6 +149,9 @@ fn run_command(cli: &Cli) -> Result<serde_json::Value> {
         Commands::Table(args) => run_table(args),
         Commands::DataValidation(args) => run_data_validation(args),
         Commands::PivotTable(args) => run_pivot_table(args),
+        Commands::Sparkline(args) => run_sparkline(args),
+        Commands::Overview(args) => run_overview(args),
+        Commands::History(args) => run_history(args),
     }
 }
 
@@ -187,8 +246,25 @@ fn run_cell(args: &CellArgs) -> Result<serde_json::Value> {
 
 fn run_range(args: &RangeArgs) -> Result<serde_json::Value> {
     match &args.command {
-        RangeSub::Read { path, sheet, range } => {
-            let data = excel_read::read_range(path, sheet, range)?;
+        RangeSub::Read {
+            path,
+            sheet,
+            range,
+            mode,
+            truncate,
+        } => {
+            let output_mode = match mode.as_str() {
+                "compact" => OutputMode::Compact,
+                "csv" => OutputMode::Csv,
+                _ => OutputMode::Detailed,
+            };
+            let options = ReadRangeOptions {
+                mode: output_mode,
+                truncate: *truncate,
+                include_context: Some(false),
+                context_size: Some(3),
+            };
+            let data = excel_read::read_range_with_options(path, sheet, range, &options)?;
             Ok(serde_json::to_value(data).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         RangeSub::Write {
@@ -357,9 +433,51 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
             let result = operations::dedup_sheet(path, &params, sheet, &cols)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
-        DataSub::Sql { path, sheet, query } => {
-            let result = operations::sql_query(path, sheet, query)?;
-            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+        DataSub::Sql {
+            path,
+            sheet,
+            query,
+            session,
+            cache,
+        } => {
+            // Session support is implemented in Task 5 (QuerySession enhancement).
+            #[cfg(feature = "sql")]
+            {
+                if *cache {
+                    let config = excel_sql::QueryCacheConfig::default();
+                    let mut query_cache = excel_sql::QueryCache::new(config);
+                    let key = excel_sql::QueryCache::make_key(path, query);
+                    if let Some(cached) = query_cache.get(&key) {
+                        return Ok(serde_json::to_value(cached)
+                            .map_err(|e| AppError::Serialize(e.to_string()))?);
+                    }
+                    let result = operations::sql_query(path, sheet, query)?;
+                    query_cache.put(key, excel_sql::QueryResult {
+                        columns: Vec::new(),
+                        rows: result.clone(),
+                        row_count: result.len(),
+                    });
+                    return Ok(serde_json::to_value(result)
+                        .map_err(|e| AppError::Serialize(e.to_string()))?);
+                }
+                if *session {
+                    let mut qs = excel_sql::QuerySession::new()?;
+                    qs.open_workbook(path)?;
+                    let result = qs.query(query)?;
+                    return Ok(serde_json::to_value(result)
+                        .map_err(|e| AppError::Serialize(e.to_string()))?);
+                }
+                let result = operations::sql_query(path, sheet, query)?;
+                Ok(serde_json::to_value(result)
+                    .map_err(|e| AppError::Serialize(e.to_string()))?)
+            }
+            #[cfg(not(feature = "sql"))]
+            {
+                let _ = (path, sheet, query, session, cache);
+                Err(AppError::FeatureNotEnabled(
+                    "SQL queries require the 'sql' feature".into(),
+                ))
+            }
         }
     }
 }
@@ -439,6 +557,22 @@ fn run_formula(args: &FormulaArgs) -> Result<serde_json::Value> {
             let logic = formula_analysis::explain_formula_logic(path, sheet, cell, language)?;
             Ok(serde_json::to_value(logic).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
+        FormulaSub::Fill {
+            path,
+            sheet,
+            source,
+            target_range,
+            dry_run,
+        } => {
+            let params = SecurityParams {
+                dry_run: *dry_run,
+                create_backup: true,
+                file_path: path.clone(),
+            };
+            let result =
+                formula_ops::fill_formula(path, sheet, source, target_range, &params)?;
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
     }
 }
 
@@ -490,6 +624,7 @@ fn run_chart(args: &ChartArgs) -> Result<serde_json::Value> {
             title,
             position,
             dry_run,
+            ..
         } => {
             let ct = helpers::chart_type_from_str(chart_type)?;
             let (r1, c1, r2, c2) = excel_core::utils::cell_ref::parse_range(range)?;
@@ -529,6 +664,10 @@ fn run_chart(args: &ChartArgs) -> Result<serde_json::Value> {
                 sheet: sheet.clone(),
                 row: chart_row,
                 col: chart_col,
+                trendline: None,
+                y_error_bars: None,
+                x_error_bars: None,
+                log_base: None,
             };
             let params = SecurityParams {
                 dry_run: *dry_run,
@@ -581,15 +720,28 @@ fn run_batch(args: &BatchArgs, format: &str) -> Result<serde_json::Value> {
             path,
             operations,
             dry_run,
+            strategy,
+            validate_only,
         } => {
             let ops: Vec<BatchOperation> = serde_json::from_str(operations)
                 .map_err(|e| AppError::Serialize(format!("Invalid operations JSON: {}", e)))?;
+            let exec_strategy = if *validate_only {
+                BatchExecutionStrategy::DryRun
+            } else {
+                match strategy.as_str() {
+                    "all-or-nothing" => BatchExecutionStrategy::AllOrNothing,
+                    "dry-run" => BatchExecutionStrategy::DryRun,
+                    _ => BatchExecutionStrategy::BestEffort,
+                }
+            };
             let params = SecurityParams {
                 dry_run: *dry_run,
                 create_backup: true,
                 file_path: path.clone(),
             };
-            let mut result = excel_write::execute_batch_operations(path, &params, &ops)?;
+            let mut result = excel_write::execute_batch_operations_with_strategy(
+                path, &params, &ops, &exec_strategy,
+            )?;
             if let Some(ref backup) = result.backup_info
                 && let Ok(diff) = excel_diff::diff_files(&backup.backup_path, path)
             {
@@ -613,6 +765,15 @@ fn run_batch(args: &BatchArgs, format: &str) -> Result<serde_json::Value> {
                 Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
             }
         }
+        BatchSub::ValidateRefs {
+            path,
+            sheet,
+            formula,
+        } => {
+            let result =
+                excel_write::validate_formula_references(path, sheet, formula)?;
+            Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
     }
 }
 
@@ -622,7 +783,14 @@ fn run_diff(args: &DiffArgs, format: &str) -> Result<serde_json::Value> {
             old_path,
             new_path,
             sheet,
+            semantic: use_semantic,
         } => {
+            if *use_semantic {
+                let sd = excel_diff::diff_with_semantic(old_path, new_path)?;
+                return Ok(
+                    serde_json::to_value(sd).map_err(|e| AppError::Serialize(e.to_string()))?
+                );
+            }
             let diff = match sheet {
                 Some(s) => {
                     let sd = diff_sheets(old_path, new_path, s)?;
@@ -648,7 +816,58 @@ fn run_diff(args: &DiffArgs, format: &str) -> Result<serde_json::Value> {
             new_path,
             sheet,
             range,
+            semantic: use_semantic,
         } => {
+            if *use_semantic {
+                let sd = excel_diff::diff_range(old_path, new_path, sheet, range)?;
+                let sheet_diff = SheetDiff {
+                    sheet_name: sheet.clone(),
+                    row_count_diff: 0,
+                    col_count_diff: 0,
+                    cell_diffs: sd.cell_diffs.clone(),
+                };
+                let summary = summarize::summarize(std::slice::from_ref(&sheet_diff));
+                let fd = FileDiff {
+                    file_hash_match: false,
+                    sheet_diffs: vec![sheet_diff],
+                    summary,
+                };
+                let report = semantic::to_semantic_report(&fd, None);
+                let mut entries = Vec::new();
+                for (idx, op) in report.operations.iter().enumerate() {
+                    let sentence = report.detail_sentences.get(idx).cloned().unwrap_or_default();
+                    let (cell, change_type) = match op {
+                        semantic::grouper::LogicalOperation::CellModified { sheet, cell_ref, .. } => {
+                            (format!("{}!{}", sheet, cell_ref), "modified".to_string())
+                        }
+                        semantic::grouper::LogicalOperation::CellPassive { sheet, cell_ref, .. } => {
+                            (format!("{}!{}", sheet, cell_ref), "passive".to_string())
+                        }
+                        semantic::grouper::LogicalOperation::RowAdded { sheet, row, .. } => {
+                            (format!("{}!row-{}", sheet, row + 1), "added".to_string())
+                        }
+                        semantic::grouper::LogicalOperation::RowDeleted { sheet, row, .. } => {
+                            (format!("{}!row-{}", sheet, row + 1), "deleted".to_string())
+                        }
+                        _ => (String::new(), String::new()),
+                    };
+                    if !cell.is_empty() {
+                        entries.push(SemanticDiffEntry {
+                            cell,
+                            change_type,
+                            description: sentence,
+                            impact: None,
+                        });
+                    }
+                }
+                let semantic_diff = SemanticDiff {
+                    summary: report.summary,
+                    entries,
+                    statistics: fd.summary,
+                };
+                return Ok(serde_json::to_value(semantic_diff)
+                    .map_err(|e| AppError::Serialize(e.to_string()))?);
+            }
             let diff = diff_range(old_path, new_path, sheet, range)?;
             if format == "text" {
                 let sd = SheetDiff {
@@ -669,6 +888,22 @@ fn run_diff(args: &DiffArgs, format: &str) -> Result<serde_json::Value> {
                 Ok(serde_json::to_value(diff).map_err(|e| AppError::Serialize(e.to_string()))?)
             }
         }
+        DiffSub::Semantic {
+            old_path,
+            new_path,
+        } => {
+            let sd = excel_diff::diff_with_semantic(old_path, new_path)?;
+            Ok(serde_json::to_value(sd).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+        DiffSub::FormulaDeps {
+            old_path,
+            new_path,
+            sheet,
+        } => {
+            let deps =
+                excel_diff::diff_formula_dependencies(old_path, new_path, sheet)?;
+            Ok(serde_json::to_value(deps).map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
         DiffSub::GitDriver => {
             // Get file paths from environment variables or command line arguments
             let (old_path, new_path) = get_git_diff_file_paths()?;
@@ -683,13 +918,28 @@ fn run_diff(args: &DiffArgs, format: &str) -> Result<serde_json::Value> {
             // Return empty JSON since we already printed the text
             Ok(serde_json::json!({}))
         }
-        DiffSub::InstallGitDriver {} => {
-            git_driver::install_git_driver()?;
-            Ok(serde_json::json!({ "success": true, "message": "Git diff driver installed" }))
+        DiffSub::InstallGitDriver { global, patterns } => {
+            git_driver::install_git_driver(*global, patterns)?;
+            let scope = if *global { "全局" } else { "当前仓库" };
+            Ok(serde_json::json!({
+                "success": true,
+                "message": format!("Git diff driver 已安装（{}）。覆盖模式：{}",
+                    scope,
+                    if patterns.is_empty() {
+                        "*.xlsx, *.xls, *.xlsm, *.xlsb (默认)"
+                    } else {
+                        ""
+                    }
+                )
+            }))
         }
-        DiffSub::UninstallGitDriver {} => {
-            git_driver::uninstall_git_driver()?;
-            Ok(serde_json::json!({ "success": true, "message": "Git diff driver uninstalled" }))
+        DiffSub::UninstallGitDriver { global } => {
+            git_driver::uninstall_git_driver(*global)?;
+            let scope = if *global { "全局" } else { "当前仓库" };
+            Ok(serde_json::json!({
+                "success": true,
+                "message": format!("Git diff driver 已从{}卸载", scope)
+            }))
         }
     }
 }
@@ -968,6 +1218,16 @@ fn run_table(args: &TableArgs) -> Result<serde_json::Value> {
             let result = excel_write::remove_table(path, &params, name)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
+        TableSub::List { path } => {
+            let tables = excel_core::features::table::list_tables(path)?;
+            Ok(serde_json::to_value(tables)
+                .map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
+        TableSub::Get { path, name } => {
+            let table = excel_core::features::table::get_table(path, name)?;
+            Ok(serde_json::to_value(table)
+                .map_err(|e| AppError::Serialize(e.to_string()))?)
+        }
     }
 }
 
@@ -1028,4 +1288,21 @@ fn run_pivot_table(args: &PivotTableArgs) -> Result<serde_json::Value> {
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
     }
+}
+
+// ── Overview / History ──
+
+fn run_overview(args: &OverviewArgs) -> Result<serde_json::Value> {
+    if args.blueprint {
+        let bp = workbook_overview::get_workbook_blueprint(&args.path)?;
+        Ok(serde_json::to_value(bp).map_err(|e| AppError::Serialize(e.to_string()))?)
+    } else {
+        let overview = workbook_overview::get_workbook_overview(&args.path)?;
+        Ok(serde_json::to_value(overview).map_err(|e| AppError::Serialize(e.to_string()))?)
+    }
+}
+
+fn run_history(args: &HistoryArgs) -> Result<serde_json::Value> {
+    let history = workbook_overview::list_workbook_history(&args.path)?;
+    Ok(serde_json::to_value(history).map_err(|e| AppError::Serialize(e.to_string()))?)
 }

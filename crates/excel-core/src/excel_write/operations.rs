@@ -246,18 +246,129 @@ pub fn add_chart(path: &str, params: &SecurityParams, config: &ChartConfig) -> R
             .ok_or_else(|| AppError::SheetNotFound(config.sheet.clone()))?;
         if let Ok(ws) = wb.worksheet_from_index(sheet_idx) {
             let mut chart = Chart::new(map_chart_type(&config.chart_type));
-            chart
+
+            // Add series data
+            let mut series = chart
                 .add_series()
                 .set_categories(config.categories_range.as_str())
                 .set_values(config.values_range.as_str());
+
+            // Trendline configuration
+            if let Some(ref tl_cfg) = config.trendline {
+                let trendline = build_chart_trendline(tl_cfg);
+                series = series.set_trendline(&trendline);
+            }
+
+            // Y error bars configuration
+            if let Some(ref eb_cfg) = config.y_error_bars {
+                let error_bars = build_chart_error_bars(eb_cfg);
+                series = series.set_y_error_bars(&error_bars);
+            }
+
+            // X error bars configuration
+            if let Some(ref eb_cfg) = config.x_error_bars {
+                let error_bars = build_chart_error_bars(eb_cfg);
+                let _ = series.set_x_error_bars(&error_bars);
+            }
+
             if let Some(ref title) = config.title {
                 chart.title().set_name(title);
             }
+
+            // Logarithmic axis
+            if let Some(base) = config.log_base {
+                chart.y_axis().set_log_base(base);
+            }
+
             ws.insert_chart(config.row, config.col, &chart)
                 .map_err(AppError::Xlsx)?;
         }
         Ok(())
     })
+}
+
+/// Build rust_xlsxwriter ChartTrendline from config.
+pub(crate) fn build_chart_trendline(
+    cfg: &crate::types::ChartTrendlineConfig,
+) -> rust_xlsxwriter::ChartTrendline {
+    use rust_xlsxwriter::ChartTrendline;
+    use rust_xlsxwriter::ChartTrendlineType;
+
+    let mut trendline = ChartTrendline::new();
+
+    let trend_type = match cfg.trend_type.to_lowercase().as_str() {
+        "linear" => ChartTrendlineType::Linear,
+        "logarithmic" | "log" => ChartTrendlineType::Logarithmic,
+        "polynomial" | "poly" => {
+            let order = cfg.polynomial_order.unwrap_or(3);
+            ChartTrendlineType::Polynomial(order)
+        }
+        "power" => ChartTrendlineType::Power,
+        "exponential" | "exp" => ChartTrendlineType::Exponential,
+        "moving_average" | "ma" | "movingaverage" => {
+            let period = cfg.moving_average_period.unwrap_or(2);
+            ChartTrendlineType::MovingAverage(period as u8)
+        }
+        _ => ChartTrendlineType::Linear,
+    };
+
+    trendline.set_type(trend_type);
+
+    if let Some(forward) = cfg.forward_period {
+        trendline.set_forward_period(forward);
+    }
+    if let Some(backward) = cfg.backward_period {
+        trendline.set_backward_period(backward);
+    }
+    if cfg.display_equation == Some(true) {
+        trendline.display_equation(true);
+    }
+    if cfg.display_r_squared == Some(true) {
+        trendline.display_r_squared(true);
+    }
+    if let Some(ref name) = cfg.name {
+        trendline.set_name(name.as_str());
+    }
+
+    trendline
+}
+
+/// Build rust_xlsxwriter ChartErrorBars from config.
+pub(crate) fn build_chart_error_bars(
+    cfg: &crate::types::ChartErrorBarsConfig,
+) -> rust_xlsxwriter::ChartErrorBars {
+    use rust_xlsxwriter::{ChartErrorBars, ChartErrorBarsDirection, ChartErrorBarsType};
+
+    let mut error_bars = ChartErrorBars::new();
+
+    let error_type = match cfg.error_type.to_lowercase().as_str() {
+        "fixed_value" | "fixed" | "fixedvalue" => {
+            ChartErrorBarsType::FixedValue(cfg.value.unwrap_or(0.0))
+        }
+        "percentage" | "percent" => ChartErrorBarsType::Percentage(cfg.value.unwrap_or(5.0)),
+        "standard_deviation" | "stddev" | "stdev" => {
+            ChartErrorBarsType::StandardDeviation(cfg.value.unwrap_or(1.0))
+        }
+        "standard_error" | "stderror" | "stderr" => ChartErrorBarsType::StandardError,
+        _ => ChartErrorBarsType::StandardError,
+    };
+
+        error_bars.set_type(error_type);
+
+    if let Some(ref dir) = cfg.direction {
+        let direction = match dir.to_lowercase().as_str() {
+            "plus" | "+" => ChartErrorBarsDirection::Plus,
+            "minus" | "-" => ChartErrorBarsDirection::Minus,
+            _ => ChartErrorBarsDirection::Both,
+        };
+        error_bars.set_direction(direction);
+    }
+
+    if cfg.end_cap == Some(false) {
+        error_bars.set_end_cap(false);
+    }
+
+    error_bars
 }
 
 pub fn refresh_formulas(path: &str, params: &SecurityParams, sheet: &str) -> Result<WriteResult> {
@@ -396,6 +507,14 @@ pub fn remove_table(
     crate::features::table::remove_table(path, table_name, params)
 }
 
+pub fn list_tables(path: &str) -> Result<Vec<TableInfo>> {
+    crate::features::table::list_tables(path)
+}
+
+pub fn get_table(path: &str, table_name: &str) -> Result<TableInfo> {
+    crate::features::table::get_table(path, table_name)
+}
+
 // ── Pivot Table ──
 
 pub fn create_pivot_table(
@@ -404,6 +523,26 @@ pub fn create_pivot_table(
     config: &PivotTableConfig,
 ) -> Result<WriteResult> {
     crate::features::pivot_table::create_pivot_table(path, config, params)
+}
+
+// ── Sparkline ──
+
+pub fn add_sparkline(
+    path: &str,
+    params: &SecurityParams,
+    config: &SparklineConfig,
+) -> Result<WriteResult> {
+    crate::features::sparkline::add_sparkline(path, config, params)
+}
+
+pub fn remove_sparkline(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    target_row: u32,
+    target_col: u16,
+) -> Result<WriteResult> {
+    crate::features::sparkline::remove_sparkline(path, sheet, target_row, target_col, params)
 }
 
 #[cfg(test)]

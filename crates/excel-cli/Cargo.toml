@@ -10,9 +10,10 @@ path = "src/main.rs"
 [dependencies]
 excel-core = { path = "../excel-core" }
 excel-diff = { path = "../excel-diff" }
+excel-sql = { path = "../excel-sql", optional = true }
 clap = { version = "4", features = ["derive"] }
 serde_json.workspace = true
 chrono.workspace = true
 
 [features]
-sql = ["excel-core/sql"]
+sql = ["excel-core/sql", "excel-sql"]

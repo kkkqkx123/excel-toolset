@@ -44,3 +44,57 @@ pub struct SheetData {
     pub name: String,
     pub rows: Vec<Vec<CellData>>,
 }
+
+// ===== ReadRange advanced mode types =====
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReadRangeOptions {
+    #[serde(default)]
+    pub mode: OutputMode,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub truncate: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub include_context: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub context_size: Option<usize>,
+}
+
+impl Default for ReadRangeOptions {
+    fn default() -> Self {
+        Self {
+            mode: OutputMode::Detailed,
+            truncate: None,
+            include_context: None,
+            context_size: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub enum OutputMode {
+    #[serde(rename = "compact")]
+    Compact,
+    #[serde(rename = "csv")]
+    Csv,
+    #[serde(rename = "detailed")]
+    #[default]
+    Detailed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReadRangeResult {
+    pub mode: OutputMode,
+    pub data: ReadRangeData,
+    pub total_rows: usize,
+    pub total_cols: usize,
+    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ReadRangeData {
+    Detailed(Vec<Vec<CellData>>),
+    Compact(Vec<String>),
+    Csv(String),
+}

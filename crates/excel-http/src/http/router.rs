@@ -1,6 +1,6 @@
 use axum::{
     Router,
-    routing::{get, post},
+    routing::{delete, get, post},
 };
 
 use super::{
@@ -8,8 +8,8 @@ use super::{
     formatting::{cell_format, conditional, merge},
     formula::{analysis, basic},
     handlers::{
-        batch, cell, chart, comments, data_validation, diff, file, health, named_ranges,
-        pivot_table, range, search, sheet, table, vba,
+        batch, cell, chart, comments, data_validation, diff, file, formula_ops, health,
+        named_ranges, pivot_table, range, search, sheet, sparkline, table, vba, workbook_overview,
     },
 };
 
@@ -34,6 +34,10 @@ pub fn create_router() -> Router {
         )
         .route("/api/range/clear", post(range::range_clear))
         .route("/api/batch/modify", post(batch::batch_modify))
+        .route(
+            "/api/batch/validate_formula",
+            post(batch::batch_validate_formula),
+        )
         .route("/api/data/append-row", post(rows::data_append_row))
         .route("/api/data/insert-row", post(rows::data_insert_row))
         .route("/api/data/delete-row", post(rows::data_delete_row))
@@ -41,6 +45,11 @@ pub fn create_router() -> Router {
         .route("/api/data/sort", post(filter::data_sort))
         .route("/api/data/dedup", post(filter::data_dedup))
         .route("/api/data/sql", post(sql::data_sql))
+        .route("/api/data/sql_session", post(sql::create_session))
+        .route(
+            "/api/data/sql_session/:id",
+            delete(sql::close_session),
+        )
         .route("/api/formula/set", post(basic::formula_set))
         .route("/api/formula/refresh", post(basic::formula_refresh))
         .route("/api/formula/read", post(basic::formula_read))
@@ -54,6 +63,7 @@ pub fn create_router() -> Router {
             "/api/formula/explain_logic",
             post(analysis::explain_formula_logic),
         )
+        .route("/api/formula/fill", post(formula_ops::formula_fill))
         .route("/api/search/workbook", post(search::search_workbook))
         .route("/api/search/sheet", post(search::search_sheet))
         .route("/api/format/set", post(cell_format::format_set))
@@ -92,8 +102,15 @@ pub fn create_router() -> Router {
         .route("/api/vba/has", post(vba::vba_has))
         .route("/api/diff/file", post(diff::diff_file))
         .route("/api/diff/range", post(diff::handle_diff_range))
+        .route("/api/diff/semantic", post(diff::diff_semantic))
+        .route(
+            "/api/diff/formula_dependencies",
+            post(diff::diff_formula_dependencies_handler),
+        )
         .route("/api/table/create", post(table::table_create))
         .route("/api/table/remove", post(table::table_remove))
+        .route("/api/table/list", post(table::table_list))
+        .route("/api/table/get", post(table::table_get))
         .route(
             "/api/data_validation/add",
             post(data_validation::data_validation_add),
@@ -106,4 +123,22 @@ pub fn create_router() -> Router {
             "/api/pivot_table/create",
             post(pivot_table::pivot_table_create),
         )
+        .route("/api/sparkline/add", post(sparkline::sparkline_add))
+        .route(
+            "/api/sparkline/remove",
+            post(sparkline::sparkline_remove),
+        )
+        .route(
+            "/api/workbook/overview",
+            post(workbook_overview::workbook_overview),
+        )
+        .route(
+            "/api/workbook/history",
+            post(workbook_overview::workbook_history),
+        )
+        .route(
+            "/api/workbook/sheet_overview",
+            post(workbook_overview::sheet_overview),
+        )
 }
+

@@ -3,6 +3,10 @@ name = "excel-diff"
 version.workspace = true
 edition.workspace = true
 
+[[bin]]
+name = "excel-diff"
+path = "src/main.rs"
+
 [dependencies]
 excel-types = { path = "../excel-types" }
 excel-core = { path = "../excel-core" }

@@ -1,6 +1,7 @@
 use rust_xlsxwriter::{ChartType as XlsxChartType, Color, Format, FormatBorder};
 
 use crate::types::*;
+use crate::utils::helpers;
 
 pub fn build_format(style: &Style) -> Format {
     let mut fmt = Format::new();
@@ -39,7 +40,7 @@ pub fn build_format(style: &Style) -> Format {
         fmt = fmt.set_border(b);
     }
     if let Some(ref nf) = style.number_format {
-        fmt = fmt.set_num_format(nf);
+        fmt = fmt.set_num_format(helpers::resolve_number_format(nf));
     }
     fmt
 }
@@ -77,10 +78,26 @@ pub fn parse_color(color: &str) -> Option<Color> {
 pub fn map_chart_type(ct: &ChartType) -> XlsxChartType {
     match ct {
         ChartType::Column => XlsxChartType::Column,
+        ChartType::ColumnStacked => XlsxChartType::ColumnStacked,
+        ChartType::ColumnPercentStacked => XlsxChartType::ColumnPercentStacked,
         ChartType::Line => XlsxChartType::Line,
+        ChartType::LineStacked => XlsxChartType::LineStacked,
+        ChartType::LinePercentStacked => XlsxChartType::LinePercentStacked,
         ChartType::Pie => XlsxChartType::Pie,
+        ChartType::Doughnut => XlsxChartType::Doughnut,
         ChartType::Bar => XlsxChartType::Bar,
+        ChartType::BarStacked => XlsxChartType::BarStacked,
+        ChartType::BarPercentStacked => XlsxChartType::BarPercentStacked,
         ChartType::Area => XlsxChartType::Area,
+        ChartType::AreaStacked => XlsxChartType::AreaStacked,
+        ChartType::AreaPercentStacked => XlsxChartType::AreaPercentStacked,
         ChartType::Scatter => XlsxChartType::Scatter,
+        ChartType::ScatterStraight => XlsxChartType::ScatterStraight,
+        ChartType::ScatterStraightWithMarkers => XlsxChartType::ScatterStraightWithMarkers,
+        ChartType::ScatterSmooth => XlsxChartType::ScatterSmooth,
+        ChartType::ScatterSmoothWithMarkers => XlsxChartType::ScatterSmoothWithMarkers,
+        ChartType::Stock => XlsxChartType::Stock,
+        ChartType::Radar => XlsxChartType::Radar,
+        ChartType::RadarWithMarkers => XlsxChartType::RadarWithMarkers,
     }
 }

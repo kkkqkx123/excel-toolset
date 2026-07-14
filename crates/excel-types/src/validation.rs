@@ -35,9 +35,10 @@ pub enum DataValidationOperator {
 }
 
 /// Error style displayed when validation fails.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum DataValidationErrorStyle {
+    #[default]
     Stop,
     Warning,
     Information,
@@ -87,10 +88,4 @@ pub struct DataValidationConfig {
 
 fn default_true() -> bool {
     true
-}
-
-impl Default for DataValidationErrorStyle {
-    fn default() -> Self {
-        DataValidationErrorStyle::Stop
-    }
 }

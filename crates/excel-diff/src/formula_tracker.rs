@@ -1,4 +1,3 @@
-#![expect(dead_code)]
 use std::collections::{HashMap, HashSet};
 
 use excel_types::SheetData;
@@ -41,6 +40,58 @@ impl FormulaTracker {
             (Some(of), Some(nf)) => of == nf,
             _ => false,
         }
+    }
+
+    /// Detect cycles in the dependency graph. Returns a list of cell references
+    /// that participate in cycles (one entry per cycle-starting node).
+    pub fn detect_cycles(&self) -> Vec<String> {
+        let mut cycles = Vec::new();
+        let mut global_visited = HashSet::new();
+
+        for node in self.dependencies.keys() {
+            if global_visited.contains(node.as_str()) {
+                continue;
+            }
+            let mut path = Vec::new();
+            let mut path_set = HashSet::new();
+            if self.detect_cycles_dfs(node, &mut path, &mut path_set, &mut global_visited) {
+                cycles.push(node.clone());
+            }
+        }
+
+        cycles
+    }
+
+    fn detect_cycles_dfs(
+        &self,
+        node: &str,
+        path: &mut Vec<String>,
+        path_set: &mut HashSet<String>,
+        global_visited: &mut HashSet<String>,
+    ) -> bool {
+        if path_set.contains(node) {
+            return true;
+        }
+        if global_visited.contains(node) {
+            return false;
+        }
+
+        global_visited.insert(node.to_string());
+        path.push(node.to_string());
+        path_set.insert(node.to_string());
+
+        if let Some(deps) = self.dependencies.get(node) {
+            for dep in deps {
+                if self.detect_cycles_dfs(dep, path, path_set, global_visited) {
+                    return true;
+                }
+            }
+        }
+
+        path_set.remove(node);
+        path.pop();
+
+        false
     }
 
     pub fn get_dependency_chain(&self, cell_ref: &str) -> Option<String> {

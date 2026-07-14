@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use calamine::{Data, Reader, Xlsx, open_workbook};
 
 use crate::security::compute_file_hash;
-use crate::types::{AppError, CellData, CellDataType, FileInfo, Result, SheetData};
+use crate::types::{
+    AppError, CellData, CellDataType, FileInfo, OutputMode, ReadRangeData, ReadRangeOptions,
+    ReadRangeResult, Result, SheetData,
+};
 use crate::utils::cell_ref;
 
 pub fn read_file_info(path: &str) -> Result<FileInfo> {
@@ -45,28 +48,134 @@ pub fn read_cell(path: &str, sheet: &str, row: u32, col: u16) -> Result<CellData
     Ok(data_to_cell_data(cell, formula))
 }
 
+/// Original read_range for backward compatibility.
 pub fn read_range(path: &str, sheet: &str, range_spec: &str) -> Result<Vec<Vec<CellData>>> {
+    let result = read_range_with_options(
+        path,
+        sheet,
+        range_spec,
+        &ReadRangeOptions::default(),
+    )?;
+    match result.data {
+        ReadRangeData::Detailed(data) => Ok(data),
+        _ => unreachable!("Detailed mode always returns Detailed variant"),
+    }
+}
+
+/// Read range with advanced output mode options.
+pub fn read_range_with_options(
+    path: &str,
+    sheet: &str,
+    range_spec: &str,
+    options: &ReadRangeOptions,
+) -> Result<ReadRangeResult> {
     let (r_start, r_end, c_start, c_end) = cell_ref::parse_range_normalized(range_spec)?;
     let mut workbook: Xlsx<_> = open_workbook(path)?;
 
     let range = workbook.worksheet_range(sheet)?;
-
     let ws_formulas = workbook.worksheet_formula(sheet).ok();
 
-    let mut result = Vec::new();
-    for row in r_start..=r_end {
+    let total_rows = (r_end - r_start + 1) as usize;
+    let total_cols = (c_end - c_start + 1) as usize;
+
+    let effective_rows = match options.truncate {
+        Some(trunc) if trunc < total_rows => trunc,
+        _ => total_rows,
+    };
+    let truncated = effective_rows < total_rows;
+
+    let mut raw_data = Vec::new();
+    for row in r_start..r_start + effective_rows as u32 {
         let mut row_data = Vec::new();
         for col in c_start..=c_end {
-            let cell = range.get_value((row, col as u32)).unwrap_or(&Data::Empty);
+            let cell = range
+                .get_value((row, col as u32))
+                .unwrap_or(&Data::Empty);
             let formula = ws_formulas
                 .as_ref()
                 .and_then(|f| f.get_value((row, col as u32)).map(|s| s.to_string()));
             row_data.push(data_to_cell_data(cell, formula));
         }
-        result.push(row_data);
+        raw_data.push(row_data);
     }
 
-    Ok(result)
+    let data = match options.mode {
+        OutputMode::Detailed => {
+            if truncated {
+                let marker_row = vec![
+                    CellData {
+                        value: Some(format!("... ({} more rows)", total_rows - effective_rows)),
+                        data_type: CellDataType::String,
+                        formula: None,
+                    };
+                    total_cols
+                ];
+                raw_data.append(&mut vec![marker_row]);
+            }
+            ReadRangeData::Detailed(raw_data)
+        }
+        OutputMode::Compact => {
+            let compact = format_compact(&raw_data, r_start, c_start, total_rows, truncated);
+            ReadRangeData::Compact(compact)
+        }
+        OutputMode::Csv => {
+            let csv = format_csv(&raw_data, total_rows, truncated);
+            ReadRangeData::Csv(csv)
+        }
+    };
+
+    Ok(ReadRangeResult {
+        mode: options.mode.clone(),
+        data,
+        total_rows,
+        total_cols,
+        truncated,
+    })
+}
+
+fn format_compact(
+    data: &[Vec<CellData>],
+    row_offset: u32,
+    col_offset: u16,
+    _total_rows: usize,
+    _truncated: bool,
+) -> Vec<String> {
+    data.iter()
+        .enumerate()
+        .map(|(row_idx, row)| {
+            let cells: Vec<String> = row
+                .iter()
+                .enumerate()
+                .map(|(col_idx, cell)| {
+                    let col = cell_ref::index_to_col(col_offset + col_idx as u16);
+                    let col_ref = format!("{}{}", col, row_offset + row_idx as u32 + 1);
+                    let val = match &cell.value {
+                        Some(v) => v.clone(),
+                        None => String::new(),
+                    };
+                    format!("{}: {}", col_ref, val)
+                })
+                .collect();
+            cells.join("  ")
+        })
+        .collect()
+}
+
+fn format_csv(data: &[Vec<CellData>], _total_rows: usize, _truncated: bool) -> String {
+    let mut wtr = csv::Writer::from_writer(Vec::new());
+    for row in data {
+        let record: Vec<String> = row
+            .iter()
+            .map(|cell| match &cell.value {
+                Some(v) => v.clone(),
+                None => String::new(),
+            })
+            .collect();
+        let _ = wtr.write_record(&record);
+    }
+    let _ = wtr.flush();
+    String::from_utf8(wtr.into_inner().expect("CSV writer should not fail"))
+        .expect("CSV output should be valid UTF-8")
 }
 
 pub fn read_formula(path: &str, sheet: &str, cell_spec: &str) -> Result<Option<String>> {

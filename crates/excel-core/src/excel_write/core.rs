@@ -481,12 +481,27 @@ pub fn build_workbook_with_ops(
                 .ok_or_else(|| AppError::SheetNotFound(config.sheet.clone()))?;
             if let Ok(ws) = wb.worksheet_from_index(sheet_idx) {
                 let mut chart = Chart::new(map_chart_type(&config.chart_type));
-                chart
+                let mut series = chart
                     .add_series()
                     .set_categories(config.categories_range.as_str())
                     .set_values(config.values_range.as_str());
+                if let Some(ref tl_cfg) = config.trendline {
+                    let trendline = super::operations::build_chart_trendline(tl_cfg);
+                    series = series.set_trendline(&trendline);
+                }
+                if let Some(ref eb_cfg) = config.y_error_bars {
+                    let error_bars = super::operations::build_chart_error_bars(eb_cfg);
+                    series = series.set_y_error_bars(&error_bars);
+                }
+                if let Some(ref eb_cfg) = config.x_error_bars {
+                    let error_bars = super::operations::build_chart_error_bars(eb_cfg);
+                    series = series.set_x_error_bars(&error_bars);
+                }
                 if let Some(ref title) = config.title {
                     chart.title().set_name(title);
+                }
+                if let Some(base) = config.log_base {
+                    chart.y_axis().set_log_base(base);
                 }
                 ws.insert_chart(config.row, config.col, &chart)
                     .map_err(AppError::Xlsx)?;
@@ -505,6 +520,27 @@ pub fn build_workbook_with_ops(
                     .map_err(AppError::Xlsx)?;
                 // Note: Full pivot table rendering is handled by
                 // features::pivot_table::create_pivot_table via modify_file_with_wb
+            }
+        }
+        if let BatchOperation::AddSparkline { config } = op {
+            let sheet_idx = sheet_names
+                .iter()
+                .position(|n| *n == config.sheet)
+                .ok_or_else(|| AppError::SheetNotFound(config.sheet.clone()))?;
+            if let Ok(ws) = wb.worksheet_from_index(sheet_idx) {
+                let sparkline_type = match &config.sparkline_type {
+                    crate::types::SparklineType::Line => rust_xlsxwriter::SparklineType::Line,
+                    crate::types::SparklineType::Column => rust_xlsxwriter::SparklineType::Column,
+                    crate::types::SparklineType::WinLose => rust_xlsxwriter::SparklineType::WinLose,
+                };
+                let mut sl = rust_xlsxwriter::Sparkline::new()
+                    .set_range(config.source_range.as_str())
+                    .set_type(sparkline_type);
+                if let Some(style_num) = config.style {
+                    sl = sl.set_style(style_num);
+                }
+                ws.add_sparkline(config.target_row, config.target_col, &sl)
+                    .map_err(AppError::Xlsx)?;
             }
         }
     }

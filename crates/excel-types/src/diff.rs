@@ -67,3 +67,35 @@ pub struct RowDiff {
     pub diff_type: DiffType,
     pub cell_diffs: Vec<CellDiff>,
 }
+
+// ===== Semantic Diff types =====
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SemanticDiffEntry {
+    pub cell: String,
+    pub change_type: String,
+    pub description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub impact: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SemanticDiff {
+    pub summary: String,
+    pub entries: Vec<SemanticDiffEntry>,
+    pub statistics: DiffSummary,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FormulaDependencyDiff {
+    pub new_dependencies: Vec<DependencyNode>,
+    pub removed_dependencies: Vec<DependencyNode>,
+    pub modified_dependencies: Vec<DependencyNode>,
+    pub cycles_introduced: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DependencyNode {
+    pub source: String,
+    pub targets: Vec<String>,
+}

@@ -1,0 +1,16 @@
+[package]
+name = "excel-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+excel-core = { path = "../excel-core" }
+excel-diff = { path = "../excel-diff" }
+excel-types = { path = "../excel-types" }
+
+[[bin]]
+name = "excel-mcp"
+path = "src/main.rs"

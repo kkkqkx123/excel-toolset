@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 
 /// Aggregation function for pivot table data fields.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum PivotAggregation {
+    #[default]
     Sum,
     Count,
     Average,
@@ -15,12 +16,6 @@ pub enum PivotAggregation {
     StdDevP,
     Var,
     VarP,
-}
-
-impl Default for PivotAggregation {
-    fn default() -> Self {
-        PivotAggregation::Sum
-    }
 }
 
 /// A pivot table field configuration.
@@ -65,6 +60,21 @@ pub struct PivotTableConfig {
     /// Layout style
     #[serde(default)]
     pub layout: PivotLayout,
+    /// Custom label for grand total row (default: "Grand Total")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grand_total_caption: Option<String>,
+    /// Subtotals configuration
+    #[serde(default)]
+    pub subtotals: PivotSubtotals,
+    /// Sort configuration
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort: Option<PivotSort>,
+    /// Whether to repeat row labels (fill down)
+    #[serde(default)]
+    pub repeat_labels: bool,
+    /// Grouping configuration for date fields
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date_grouping: Option<DateGrouping>,
 }
 
 fn default_true() -> bool {
@@ -103,19 +113,78 @@ pub enum PivotShowAs {
 }
 
 /// Pivot table layout style.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum PivotLayout {
-    /// Compact form (default Excel style)
+    /// Compact form (default Excel style): row fields nested in one column
+    #[default]
     Compact,
-    /// Outline form
+    /// Outline form: each row field in its own column, children below parents
     Outline,
-    /// Tabular form
+    /// Tabular form: like compact but field names in header row
     Tabular,
 }
 
-impl Default for PivotLayout {
-    fn default() -> Self {
-        PivotLayout::Compact
-    }
+/// Subtotals configuration for pivot table.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum PivotSubtotals {
+    /// Show subtotals at each group level
+    On,
+    /// Hide all subtotals
+    #[default]
+    Off,
+    /// Show subtotals only at the top
+    Top,
+}
+
+/// Sort configuration for pivot table fields.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PivotSort {
+    /// Sort by label or value
+    #[serde(default)]
+    pub sort_by: PivotSortBy,
+    /// Sort order
+    #[serde(default)]
+    pub order: PivotSortOrder,
+    /// 0-based index of the data field to sort by (only when sort_by=Value)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_field_index: Option<usize>,
+}
+
+/// What to sort by in a pivot table.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum PivotSortBy {
+    #[default]
+    Label,
+    Value,
+}
+
+/// Sort order for pivot table.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum PivotSortOrder {
+    #[default]
+    Ascending,
+    Descending,
+}
+
+/// Date grouping configuration for pivot table.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DateGrouping {
+    /// 0-based column index of the date field
+    pub column: u16,
+    /// Group by year
+    #[serde(default)]
+    pub by_year: bool,
+    /// Group by quarter
+    #[serde(default)]
+    pub by_quarter: bool,
+    /// Group by month
+    #[serde(default)]
+    pub by_month: bool,
+    /// Group by day
+    #[serde(default)]
+    pub by_day: bool,
 }

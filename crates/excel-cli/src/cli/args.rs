@@ -34,6 +34,9 @@ pub enum Commands {
     Table(TableArgs),
     DataValidation(DataValidationArgs),
     PivotTable(PivotTableArgs),
+    Sparkline(SparklineArgs),
+    Overview(OverviewArgs),
+    History(HistoryArgs),
 }
 
 #[derive(clap::Args)]
@@ -120,6 +123,10 @@ pub enum RangeSub {
         path: String,
         sheet: String,
         range: String,
+        #[arg(long, default_value = "detailed")]
+        mode: String,
+        #[arg(long)]
+        truncate: Option<usize>,
     },
     Write {
         path: String,
@@ -204,6 +211,10 @@ pub enum DataSub {
         path: String,
         sheet: String,
         query: String,
+        #[arg(long)]
+        session: bool,
+        #[arg(long)]
+        cache: bool,
     },
 }
 
@@ -260,6 +271,14 @@ pub enum FormulaSub {
         #[arg(long, default_value = "en")]
         language: String,
     },
+    Fill {
+        path: String,
+        sheet: String,
+        source: String,
+        target_range: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(clap::Args)]
@@ -308,6 +327,18 @@ pub enum ChartSub {
         position: Option<String>,
         #[arg(long)]
         dry_run: bool,
+        /// Trendline config as JSON, e.g. '{"trend_type":"linear","display_equation":true}'
+        #[arg(long)]
+        trendline: Option<String>,
+        /// Y error bars config as JSON, e.g. '{"error_type":"standard_error","direction":"both"}'
+        #[arg(long)]
+        y_error_bars: Option<String>,
+        /// X error bars config as JSON
+        #[arg(long)]
+        x_error_bars: Option<String>,
+        /// Logarithmic base for Y axis
+        #[arg(long)]
+        log_base: Option<u16>,
     },
 }
 
@@ -347,19 +378,48 @@ pub enum DiffSub {
         new_path: String,
         #[arg(long)]
         sheet: Option<String>,
+        #[arg(long)]
+        semantic: bool,
     },
     Range {
         old_path: String,
         new_path: String,
         sheet: String,
         range: String,
+        #[arg(long)]
+        semantic: bool,
+    },
+    Semantic {
+        old_path: String,
+        new_path: String,
+    },
+    FormulaDeps {
+        old_path: String,
+        new_path: String,
+        sheet: String,
     },
     /// Special command for git diff driver integration.
     /// Automatically reads file paths from environment variables (GIT_DIFF_PATH_OLD, GIT_DIFF_PATH_NEW)
     /// or from command line arguments.
     GitDriver,
-    InstallGitDriver {},
-    UninstallGitDriver {},
+    /// Install the git diff driver for Excel files.
+    /// By default configures the current repository only.
+    /// Use --global to apply system-wide.
+    InstallGitDriver {
+        /// Apply system-wide (all repositories)
+        #[arg(long)]
+        global: bool,
+        /// Comma-separated file patterns (default: *.xlsx,*.xls,*.xlsm,*.xlsb)
+        #[arg(long, value_delimiter = ',')]
+        patterns: Vec<String>,
+    },
+    /// Uninstall the git diff driver.
+    /// Use --global to remove system-wide configuration.
+    UninstallGitDriver {
+        /// Remove system-wide configuration
+        #[arg(long)]
+        global: bool,
+    },
 }
 
 #[derive(clap::Args)]
@@ -376,6 +436,15 @@ pub enum BatchSub {
         operations: String,
         #[arg(long)]
         dry_run: bool,
+        #[arg(long, default_value = "best-effort")]
+        strategy: String,
+        #[arg(long)]
+        validate_only: bool,
+    },
+    ValidateRefs {
+        path: String,
+        sheet: String,
+        formula: String,
     },
 }
 
@@ -551,6 +620,13 @@ pub enum TableSub {
         #[arg(long)]
         dry_run: bool,
     },
+    List {
+        path: String,
+    },
+    Get {
+        path: String,
+        name: String,
+    },
 }
 
 // ── Data Validation ──
@@ -597,4 +673,52 @@ pub enum PivotTableSub {
         #[arg(long)]
         dry_run: bool,
     },
+}
+
+// ── Sparkline ──
+
+#[derive(clap::Args)]
+pub struct SparklineArgs {
+    #[command(subcommand)]
+    pub command: SparklineSub,
+}
+
+#[derive(Subcommand)]
+pub enum SparklineSub {
+    Add {
+        path: String,
+        sheet: String,
+        /// Source data range, e.g., "'Sheet1'!A1:E1"
+        source_range: String,
+        /// Sparkline type: line, column, winlose
+        #[arg(long, default_value = "line")]
+        sparkline_type: String,
+        /// Target cell, e.g., "F1"
+        target_cell: String,
+        #[arg(long)]
+        style: Option<u8>,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    Remove {
+        path: String,
+        sheet: String,
+        target_cell: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
+
+// ── Overview / History ──
+
+#[derive(clap::Args)]
+pub struct OverviewArgs {
+    pub path: String,
+    #[arg(long)]
+    pub blueprint: bool,
+}
+
+#[derive(clap::Args)]
+pub struct HistoryArgs {
+    pub path: String,
 }

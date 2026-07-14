@@ -1,24 +1,6 @@
 use crate::security;
 use crate::types::*;
 
-#[derive(Debug, Clone)]
-pub enum SparklineType {
-    Line,
-    Column,
-    WinLose,
-}
-
-#[derive(Debug, Clone)]
-pub struct SparklineConfig {
-    pub sparkline_type: SparklineType,
-    pub sheet: String,
-    /// Source data range as sheet-qualified string, e.g., "'Sheet1'!A1:E1".
-    pub source_range: String,
-    pub target_row: u32,
-    pub target_col: u16,
-    pub style: Option<u8>,
-}
-
 pub fn parse_sparkline_type(s: &str) -> SparklineType {
     match s.to_lowercase().as_str() {
         "column" => SparklineType::Column,
@@ -54,7 +36,7 @@ pub fn add_sparkline(
             let sd = &old_data[*name];
             let ws = wb.add_worksheet();
             ws.set_name(*name).map_err(AppError::Xlsx)?;
-            crate::excel_write::core::write_sheet_data(ws, sd)?;
+            crate::excel_write::write_sheet_data(ws, sd)?;
         }
 
         let sheet_idx = sheet_names

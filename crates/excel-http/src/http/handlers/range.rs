@@ -11,6 +11,14 @@ pub struct RangeReadReq {
     pub path: String,
     pub sheet: String,
     pub range: String,
+    #[serde(default = "default_mode")]
+    pub mode: String,
+    #[serde(default)]
+    pub truncate: Option<usize>,
+}
+
+fn default_mode() -> String {
+    "detailed".into()
 }
 
 #[derive(Deserialize)]
@@ -42,8 +50,19 @@ pub struct RangeWriteCsvReq {
     pub dry_run: bool,
 }
 
-pub async fn range_read(Json(req): Json<RangeReadReq>) -> Json<ApiResponse<Vec<Vec<CellData>>>> {
-    match excel_read::read_range(&req.path, &req.sheet, &req.range) {
+pub async fn range_read(Json(req): Json<RangeReadReq>) -> Json<ApiResponse<ReadRangeResult>> {
+    let mode = match req.mode.as_str() {
+        "compact" => OutputMode::Compact,
+        "csv" => OutputMode::Csv,
+        _ => OutputMode::Detailed,
+    };
+    let options = ReadRangeOptions {
+        mode,
+        truncate: req.truncate,
+        include_context: Some(false),
+        context_size: Some(3),
+    };
+    match excel_read::read_range_with_options(&req.path, &req.sheet, &req.range, &options) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
     }

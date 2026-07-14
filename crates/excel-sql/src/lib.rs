@@ -1,3 +1,4 @@
+mod cache;
 mod config;
 mod converter;
 mod db;
@@ -5,6 +6,7 @@ mod error;
 mod ops;
 mod utils;
 
+pub use cache::{QueryCache, QueryCacheConfig};
 pub use config::SqlConfig;
 pub use converter::QueryResult;
 pub use error::SqlResult;

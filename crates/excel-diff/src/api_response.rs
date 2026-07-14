@@ -1,4 +1,3 @@
-#![expect(dead_code)]
 use crate::formula_tracker::FormulaTracker;
 use excel_types::FileDiff;
 use serde_json::Value;

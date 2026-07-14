@@ -280,20 +280,41 @@ excel-cli diff range <old-path> <new-path> <sheet> <range>
 
 ### Git Diff 驱动
 ```bash
-# 安装 Git 驱动
+# 在当前仓库安装 Git 驱动（默认覆盖 *.xlsx, *.xls, *.xlsm, *.xlsb）
 excel-cli diff install-git-driver
 
-# 卸载 Git 驱动
+# 全局安装（对所有仓库生效）
+excel-cli diff install-git-driver --global
+
+# 自定义文件匹配模式
+excel-cli diff install-git-driver --patterns '*.xlsx,*.xlsm'
+
+# 全局安装 + 自定义模式
+excel-cli diff install-git-driver --global --patterns '*.xlsx,*.xls,*.xlsm,*.xlsb'
+
+# 卸载当前仓库的驱动
 excel-cli diff uninstall-git-driver
+
+# 卸载全局驱动
+excel-cli diff uninstall-git-driver --global
 
 # 手动触发（由 git diff 自动调用）
 excel-cli diff git-driver
 ```
 
-安装后在 `.gitattributes` 中添加：
+安装后 Git 会自动在 `.gitattributes` 中添加：
 ```
-*.xls diff=excel-cli
-*.xlsx diff=excel-cli
+*.xlsx diff=excel-diff
+*.xls diff=excel-diff
+*.xlsm diff=excel-diff
+*.xlsb diff=excel-diff
+```
+
+全局安装还会设置 `git config --global core.attributesfile`，使所有仓库共享同一份 gitattributes 配置。
+
+也可以通过脚本一键完成全局安装：
+```bash
+./scripts/install-global.sh
 ```
 
 ---

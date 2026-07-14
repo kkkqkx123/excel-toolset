@@ -14,6 +14,14 @@ pub struct ChartCreateReq {
     pub title: Option<String>,
     #[serde(default)]
     pub dry_run: bool,
+    /// Optional trendline configuration
+    pub trendline: Option<ChartTrendlineConfig>,
+    /// Optional Y error bars configuration
+    pub y_error_bars: Option<ChartErrorBarsConfig>,
+    /// Optional X error bars configuration
+    pub x_error_bars: Option<ChartErrorBarsConfig>,
+    /// Logarithmic base for Y axis
+    pub log_base: Option<u16>,
 }
 
 pub async fn chart_create(Json(req): Json<ChartCreateReq>) -> Json<ApiResponse<WriteResult>> {
@@ -33,6 +41,10 @@ pub async fn chart_create(Json(req): Json<ChartCreateReq>) -> Json<ApiResponse<W
         sheet: req.sheet,
         row: r1,
         col: c1,
+        trendline: req.trendline,
+        y_error_bars: req.y_error_bars,
+        x_error_bars: req.x_error_bars,
+        log_base: req.log_base,
     };
     let params = SecurityParams {
         dry_run: req.dry_run,

@@ -30,7 +30,7 @@ fn cli() -> PathBuf {
     path.pop();
     path.push("target");
     path.push("debug");
-    path.push("excel");
+    path.push("excel-cli");
     path
 }
 

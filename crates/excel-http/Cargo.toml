@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 excel-core = { path = "../excel-core" }
 excel-diff = { path = "../excel-diff" }
+excel-sql = { path = "../excel-sql", optional = true }
 axum = "0.8"
 tokio = { version = "1.52", features = ["full"] }
 serde.workspace = true
@@ -14,7 +15,7 @@ chrono.workspace = true
 tower = { version = "0.5", features = ["util"] }
 
 [features]
-sql = ["excel-core/sql"]
+sql = ["excel-core/sql", "excel-sql"]
 
 [dev-dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking", "json"] }

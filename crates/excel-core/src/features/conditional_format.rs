@@ -109,6 +109,25 @@ fn parse_icon_type(s: &str) -> rust_xlsxwriter::ConditionalFormatIconType {
     }
 }
 
+/// Parse date occurring string to rust_xlsxwriter enum.
+fn parse_date_rule(s: &str) -> rust_xlsxwriter::ConditionalFormatDateRule {
+    match s.to_lowercase().as_str() {
+        "yesterday" => rust_xlsxwriter::ConditionalFormatDateRule::Yesterday,
+        "today" => rust_xlsxwriter::ConditionalFormatDateRule::Today,
+        "tomorrow" => rust_xlsxwriter::ConditionalFormatDateRule::Tomorrow,
+        "last7days" | "last_7_days" | "last7" => {
+            rust_xlsxwriter::ConditionalFormatDateRule::Last7Days
+        }
+        "lastweek" | "last_week" => rust_xlsxwriter::ConditionalFormatDateRule::LastWeek,
+        "thisweek" | "this_week" => rust_xlsxwriter::ConditionalFormatDateRule::ThisWeek,
+        "nextweek" | "next_week" => rust_xlsxwriter::ConditionalFormatDateRule::NextWeek,
+        "lastmonth" | "last_month" => rust_xlsxwriter::ConditionalFormatDateRule::LastMonth,
+        "thismonth" | "this_month" => rust_xlsxwriter::ConditionalFormatDateRule::ThisMonth,
+        "nextmonth" | "next_month" => rust_xlsxwriter::ConditionalFormatDateRule::NextMonth,
+        _ => rust_xlsxwriter::ConditionalFormatDateRule::Today,
+    }
+}
+
 // ── Public helpers for string-to-enum parsing (used by CLI/HTTP) ──
 
 pub fn parse_rule_type(s: &str) -> ConditionalFormatType {
@@ -291,10 +310,46 @@ pub fn add_conditional_format(
                     .add_conditional_format(r1, c1, r2, c2, &icon_set)
                     .map_err(|e| AppError::Write(e.to_string()))?;
             }
-            _ => {
-                return Err(AppError::InvalidInput(
-                    "Conditional format type not fully supported yet".to_string(),
-                ));
+            ConditionalFormatType::Top10 => {
+                let fmt = build_cf_format(&rule.format);
+                let cond_format = rust_xlsxwriter::ConditionalFormatTop::new()
+                    .set_rule(rust_xlsxwriter::ConditionalFormatTopRule::Top(
+                            rule.condition.parse::<u16>().unwrap_or(10),
+                    ))
+                    .set_format(&fmt);
+                worksheet
+                    .add_conditional_format(r1, c1, r2, c2, &cond_format)
+                    .map_err(|e| AppError::Write(e.to_string()))?;
+            }
+            ConditionalFormatType::AboveAverage => {
+                let fmt = build_cf_format(&rule.format);
+                let cond_format = rust_xlsxwriter::ConditionalFormatAverage::new()
+                    .set_rule(rust_xlsxwriter::ConditionalFormatAverageRule::AboveAverage)
+                    .set_format(&fmt);
+                worksheet
+                    .add_conditional_format(r1, c1, r2, c2, &cond_format)
+                    .map_err(|e| AppError::Write(e.to_string()))?;
+            }
+            ConditionalFormatType::TextContains => {
+                let fmt = build_cf_format(&rule.format);
+                let cond_format = rust_xlsxwriter::ConditionalFormatText::new()
+                    .set_rule(rust_xlsxwriter::ConditionalFormatTextRule::Contains(
+                        rule.condition.clone(),
+                    ))
+                    .set_format(&fmt);
+                worksheet
+                    .add_conditional_format(r1, c1, r2, c2, &cond_format)
+                    .map_err(|e| AppError::Write(e.to_string()))?;
+            }
+            ConditionalFormatType::DateOccurring => {
+                let fmt = build_cf_format(&rule.format);
+                let date_rule = parse_date_rule(&rule.condition);
+                let cond_format = rust_xlsxwriter::ConditionalFormatDate::new()
+                    .set_rule(date_rule)
+                    .set_format(&fmt);
+                worksheet
+                    .add_conditional_format(r1, c1, r2, c2, &cond_format)
+                    .map_err(|e| AppError::Write(e.to_string()))?;
             }
         }
 
@@ -325,7 +380,7 @@ fn build_cf_format(style: &Option<Style>) -> rust_xlsxwriter::Format {
             fmt = fmt.set_background_color(bg_color.as_str());
         }
         if let Some(nf) = &s.number_format {
-            fmt = fmt.set_num_format(nf);
+            fmt = fmt.set_num_format(crate::utils::helpers::resolve_number_format(nf));
         }
     }
     fmt

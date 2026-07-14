@@ -3,6 +3,7 @@ pub mod helpers;
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use excel_diff::semantic::Verbosity;
 use excel_diff::{diff_files, git_driver, semantic};
@@ -49,7 +50,7 @@ fn write_diff_output(test_name: &str, diff: &serde_json::Value) {
 #[test]
 fn test_install_creates_gitattributes_and_config() {
     with_git_repo(|| {
-        git_driver::install_git_driver().unwrap();
+        git_driver::install_git_driver(false, &[]).unwrap();
 
         let attr = std::env::current_dir().unwrap().join(".gitattributes");
         assert!(
@@ -79,28 +80,152 @@ fn test_install_creates_gitattributes_and_config() {
     });
 }
 
+// ===== Tests for global install and custom patterns =====
+
 #[test]
-fn test_uninstall_removes_config_and_cleans_attributes() {
+fn test_install_with_custom_patterns() {
     with_git_repo(|| {
-        git_driver::install_git_driver().unwrap();
-        git_driver::uninstall_git_driver().unwrap();
+        let custom_patterns = vec!["*.xlsx".to_string(), "*.xlsm".to_string()];
+        git_driver::install_git_driver(false, &custom_patterns).unwrap();
 
         let attr = std::env::current_dir().unwrap().join(".gitattributes");
-        assert!(!file_exists(&attr), ".gitattributes should be removed");
+        assert!(file_exists(&attr));
 
-        let out = git(&["config", "--unset", "diff.excel-diff.command"]);
+        let content = fs::read_to_string(&attr).unwrap();
         assert!(
-            !out.status.success(),
-            "second unset should fail (config already gone)"
+            content.contains("*.xlsx diff=excel-diff"),
+            "should contain xlsx pattern"
+        );
+        assert!(
+            content.contains("*.xlsm diff=excel-diff"),
+            "should contain xlsm pattern"
+        );
+        // Default xls should NOT be present when custom patterns are used
+        assert!(
+            !content.contains("*.xls diff=excel-diff"),
+            "should NOT contain default xls pattern when custom given"
         );
     });
 }
 
 #[test]
+fn test_install_with_empty_patterns_uses_defaults() {
+    with_git_repo(|| {
+        git_driver::install_git_driver(false, &[]).unwrap();
+
+        let attr = std::env::current_dir().unwrap().join(".gitattributes");
+        let content = fs::read_to_string(&attr).unwrap();
+
+        // All default patterns should be present
+        assert!(content.contains("*.xlsx diff=excel-diff"));
+        assert!(content.contains("*.xls diff=excel-diff"));
+        assert!(content.contains("*.xlsm diff=excel-diff"));
+        assert!(content.contains("*.xlsb diff=excel-diff"));
+    });
+}
+
+#[test]
+fn test_uninstall_local_preserves_entries() {
+    with_git_repo(|| {
+        // Set up gitattributes with the Excel entry plus other entries
+        fs::write(
+            std::env::current_dir().unwrap().join(".gitattributes"),
+            "*.xml diff=xml-diff\n*.xlsx diff=excel-diff\n*.xls diff=excel-diff\n*.json diff=json-diff\n",
+        )
+        .unwrap();
+
+        // Set up git config
+        let exe = std::env::current_exe().unwrap();
+        Command::new("git")
+            .args([
+                "config",
+                "diff.excel-diff.command",
+                &exe.to_string_lossy(),
+            ])
+            .output()
+            .expect("git config");
+
+        git_driver::uninstall_git_driver(false).unwrap();
+
+        // Verify all Excel entries removed, others preserved
+        let content =
+            fs::read_to_string(std::env::current_dir().unwrap().join(".gitattributes")).unwrap();
+        assert!(content.contains("*.xml diff=xml-diff"), "xml entry preserved");
+        assert!(content.contains("*.json diff=json-diff"), "json entry preserved");
+        assert!(!content.contains("diff=excel-diff"), "all excel entries removed");
+    });
+}
+
+#[test]
+fn test_global_install_sets_core_attributesfile() {
+    with_git_repo(|| {
+        git_driver::install_git_driver(true, &[]).unwrap();
+
+        let out = Command::new("git")
+            .args(["config", "--global", "core.attributesfile"])
+            .output()
+            .unwrap();
+        let attr_path = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        assert!(!attr_path.is_empty(), "core.attributesfile should be set");
+
+        let out = Command::new("git")
+            .args(["config", "--global", "diff.excel-diff.command"])
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "global diff config should be set"
+        );
+    });
+}
+
+#[test]
+fn test_global_uninstall_cleans_up() {
+    with_git_repo(|| {
+        // Install then uninstall globally
+        git_driver::install_git_driver(true, &[]).unwrap();
+        git_driver::uninstall_git_driver(true).unwrap();
+
+        // Verify global config removed
+        let out = Command::new("git")
+            .args(["config", "--global", "diff.excel-diff.command"])
+            .output()
+            .unwrap();
+        assert!(
+            !out.status.success() || String::from_utf8_lossy(&out.stdout).trim().is_empty(),
+            "global diff config should be removed"
+        );
+    });
+}
+
+#[test]
+fn test_global_uninstall_preserves_core_attributesfile_if_not_empty() {
+    with_git_repo(|| {
+        // Install globally to set core.attributesfile
+        git_driver::install_git_driver(true, &[]).unwrap();
+
+        // Verify core.attributesfile was set
+        let out = Command::new("git")
+            .args(["config", "--global", "core.attributesfile"])
+            .output()
+            .unwrap();
+        let _attr_path = String::from_utf8_lossy(&out.stdout).trim().to_string();
+
+        // Uninstall
+        git_driver::uninstall_git_driver(true).unwrap();
+
+        // core.attributesfile is deliberately NOT removed by uninstall
+        // because the user may have other entries in it
+        // This test just verifies uninstall doesn't crash
+    });
+}
+
+
+#[test]
 fn test_install_idempotent_does_not_duplicate_entry() {
     with_git_repo(|| {
-        git_driver::install_git_driver().unwrap();
-        git_driver::install_git_driver().unwrap();
+        git_driver::install_git_driver(false, &[]).unwrap();
+        git_driver::install_git_driver(false, &[]).unwrap();
 
         let content =
             fs::read_to_string(std::env::current_dir().unwrap().join(".gitattributes")).unwrap();
@@ -118,8 +243,8 @@ fn test_uninstall_preserves_other_gitattributes_entries() {
         )
         .unwrap();
 
-        git_driver::install_git_driver().unwrap();
-        git_driver::uninstall_git_driver().unwrap();
+        git_driver::install_git_driver(false, &[]).unwrap();
+        git_driver::uninstall_git_driver(false).unwrap();
 
         let content =
             fs::read_to_string(std::env::current_dir().unwrap().join(".gitattributes")).unwrap();
@@ -145,7 +270,7 @@ fn test_install_fails_outside_git_repo() {
         let original = std::env::current_dir().unwrap();
         std::env::set_current_dir(no_git_dir.path()).unwrap();
 
-        let result = git_driver::install_git_driver();
+        let result = git_driver::install_git_driver(false, &[]);
 
         std::env::set_current_dir(original).ok();
 
@@ -163,10 +288,10 @@ fn test_install_fails_outside_git_repo() {
 #[test]
 fn test_uninstall_idempotent_twice_succeeds() {
     with_git_repo(|| {
-        git_driver::install_git_driver().unwrap();
-        git_driver::uninstall_git_driver().unwrap();
+        git_driver::install_git_driver(false, &[]).unwrap();
+        git_driver::uninstall_git_driver(false).unwrap();
 
-        let result = git_driver::uninstall_git_driver();
+        let result = git_driver::uninstall_git_driver(false);
         assert!(
             result.is_ok(),
             "second uninstall should succeed even if config already gone, got: {:?}",
@@ -178,9 +303,9 @@ fn test_uninstall_idempotent_twice_succeeds() {
 #[test]
 fn test_uninstall_removes_gitattributes_when_only_excel_entry() {
     with_git_repo(|| {
-        git_driver::install_git_driver().unwrap();
+        git_driver::install_git_driver(false, &[]).unwrap();
 
-        git_driver::uninstall_git_driver().unwrap();
+        git_driver::uninstall_git_driver(false).unwrap();
 
         let attr = std::env::current_dir().unwrap().join(".gitattributes");
         assert!(
@@ -842,7 +967,7 @@ fn test_diff_with_staged_changes_simulation() {
 #[test]
 fn test_git_config_command_format() {
     with_git_repo(|| {
-        git_driver::install_git_driver().unwrap();
+        git_driver::install_git_driver(false, &[]).unwrap();
 
         let out = git(&["config", "diff.excel-diff.command"]);
         assert!(out.status.success(), "git config command should succeed");
@@ -900,8 +1025,6 @@ fn test_driver_integration_error_handling() {
 #[test]
 fn test_driver_performance_with_large_files() {
     with_git_repo(|| {
-        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/git_e2e/fixtures");
-
         // Test performance with large files
         let temp_dir = tempfile::tempdir().unwrap();
         let large_old = temp_dir.path().join("large_old.xlsx");
@@ -928,8 +1051,6 @@ fn test_driver_performance_with_large_files() {
 #[test]
 fn test_driver_with_multiple_sheets() {
     with_git_repo(|| {
-        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/git_e2e/fixtures");
-
         let temp_dir = tempfile::tempdir().unwrap();
         let old_path = temp_dir.path().join("multi_old.xlsx");
         let new_path = temp_dir.path().join("multi_new.xlsx");

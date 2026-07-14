@@ -110,12 +110,101 @@ pub fn parse_filter_op(s: &str) -> Result<FilterOp> {
 pub fn chart_type_from_str(s: &str) -> Result<ChartType> {
     match s.to_lowercase().as_str() {
         "column" => Ok(ChartType::Column),
+        "column_stacked" | "columnstacked" => Ok(ChartType::ColumnStacked),
+        "column_percent_stacked" | "columnpercentstacked" => Ok(ChartType::ColumnPercentStacked),
         "line" => Ok(ChartType::Line),
+        "line_stacked" | "linestacked" => Ok(ChartType::LineStacked),
+        "line_percent_stacked" | "linepercentstacked" => Ok(ChartType::LinePercentStacked),
         "pie" => Ok(ChartType::Pie),
+        "doughnut" => Ok(ChartType::Doughnut),
         "bar" => Ok(ChartType::Bar),
+        "bar_stacked" | "barstacked" => Ok(ChartType::BarStacked),
+        "bar_percent_stacked" | "barpercentstacked" => Ok(ChartType::BarPercentStacked),
         "area" => Ok(ChartType::Area),
+        "area_stacked" | "areastacked" => Ok(ChartType::AreaStacked),
+        "area_percent_stacked" | "areapercentstacked" => Ok(ChartType::AreaPercentStacked),
         "scatter" => Ok(ChartType::Scatter),
+        "scatter_straight" | "scatterstraight" => Ok(ChartType::ScatterStraight),
+        "scatter_straight_with_markers" | "scatterstraightwithmarkers" => {
+            Ok(ChartType::ScatterStraightWithMarkers)
+        }
+        "scatter_smooth" | "scattersmooth" => Ok(ChartType::ScatterSmooth),
+        "scatter_smooth_with_markers" | "scattersmoothwithmarkers" => {
+            Ok(ChartType::ScatterSmoothWithMarkers)
+        }
+        "stock" | "candlestick" | "k_line" | "kline" => Ok(ChartType::Stock),
+        "radar" => Ok(ChartType::Radar),
+        "radar_with_markers" | "radarwithmarkers" => Ok(ChartType::RadarWithMarkers),
         _ => Err(AppError::InvalidChartType(s.into())),
+    }
+}
+
+/// Predefined Excel number format constants.
+pub mod number_formats {
+    /// General (default)
+    pub const GENERAL: &str = "General";
+    /// 1000 -> "1,000"
+    pub const NUMBER: &str = "#,##0";
+    /// 1000.5 -> "1,000.50"
+    pub const NUMBER_2D: &str = "#,##0.00";
+    /// 1000 -> "$1,000"
+    pub const CURRENCY: &str = "$#,##0";
+    /// 1000.5 -> "$1,000.50"
+    pub const CURRENCY_2D: &str = "$#,##0.00";
+    /// Accounting format (aligns currency symbol)
+    pub const ACCOUNTING: &str = "_($* #,##0_);_($* (#,##0);_($* \"-\"_);_(@_)";
+    /// Accounting with 2 decimals
+    pub const ACCOUNTING_2D: &str = "_($* #,##0.00_);_($* (#,##0.00);_($* \"-\"??_);_(@_)";
+    /// 1 -> "100%"
+    pub const PERCENTAGE: &str = "0%";
+    /// 0.5 -> "50.00%"
+    pub const PERCENTAGE_2D: &str = "0.00%";
+    /// 1000000 -> "1,000,000"
+    pub const THOUSANDS: &str = "#,##0,";
+    /// 1000000 -> "1.00"
+    pub const MILLIONS: &str = "#,##0.00,,\"M\"";
+    /// 1.23e+05
+    pub const SCIENTIFIC: &str = "0.00E+00";
+    /// 2025-01-15
+    pub const DATE: &str = "yyyy-mm-dd";
+    /// 2025-01-15 13:30:00
+    pub const DATETIME: &str = "yyyy-mm-dd hh:mm:ss";
+    /// 13:30
+    pub const TIME: &str = "hh:mm";
+    /// 1.5 -> "1 1/2"
+    pub const FRACTION: &str = "# ?/?";
+    /// 1234 -> "00000"
+    pub const ZIP_CODE: &str = "00000";
+    /// 1234 -> "1,234.00" (text)
+    pub const TEXT: &str = "@";
+}
+
+/// Resolve a named number format to its Excel format string.
+/// Returns the original string if no match is found (pass-through for custom formats).
+pub fn resolve_number_format(name: &str) -> &str {
+    use number_formats::*;
+
+    match name.to_lowercase().as_str() {
+        "general" => GENERAL,
+        "number" | "integer" => NUMBER,
+        "number_2d" | "number2d" | "number.00" => NUMBER_2D,
+        "currency" | "dollar" => CURRENCY,
+        "currency_2d" | "currency2d" | "dollar.00" => CURRENCY_2D,
+        "accounting" | "accountant" => ACCOUNTING,
+        "accounting_2d" | "accounting2d" => ACCOUNTING_2D,
+        "percentage" | "percent" | "pct" => PERCENTAGE,
+        "percentage_2d" | "percent.00" | "pct.00" => PERCENTAGE_2D,
+        "thousands" => THOUSANDS,
+        "millions" => MILLIONS,
+        "scientific" | "sci" => SCIENTIFIC,
+        "date" => DATE,
+        "datetime" => DATETIME,
+        "time" => TIME,
+        "fraction" => FRACTION,
+        "zip" | "zipcode" | "zip_code" => ZIP_CODE,
+        "text" | "string" | "@" => TEXT,
+        // Pass through: treat as raw format string
+        _ => name,
     }
 }
 
