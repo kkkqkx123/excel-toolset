@@ -1,11 +1,11 @@
 // Range category tools: read, write, write_from_csv, clear.
 
-use std::collections::HashMap;
 use serde_json::Value;
+use std::collections::HashMap;
 
-use crate::server::{ToolDef, ToolHandler};
-use excel_core::types::{CellValue, SecurityParams, ReadRangeOptions};
 use super::helpers::*;
+use crate::server::{ToolDef, ToolHandler};
+use excel_core::types::{CellValue, ReadRangeOptions, SecurityParams};
 
 pub fn tools() -> Vec<ToolDef> {
     vec![
@@ -17,8 +17,14 @@ pub fn tools() -> Vec<ToolDef> {
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Sheet name", true)),
                     ("range", string_prop("Range like A1:C10", true)),
-                    ("mode", string_prop("Output mode: detailed, compact, or csv (default: detailed)", false)),
-                    ("truncate", int_prop("Max rows to return (optional)",)),
+                    (
+                        "mode",
+                        string_prop(
+                            "Output mode: detailed, compact, or csv (default: detailed)",
+                            false,
+                        ),
+                    ),
+                    ("truncate", int_prop("Max rows to return (optional)")),
                 ],
                 vec!["path", "sheet", "range"],
             ),
@@ -32,7 +38,10 @@ pub fn tools() -> Vec<ToolDef> {
                     ("sheet", string_prop("Sheet name", true)),
                     ("range", string_prop("Starting cell like A1", true)),
                     ("data", string_prop("JSON string of 2D array data", true)),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "sheet", "range", "data"],
             ),
@@ -45,8 +54,14 @@ pub fn tools() -> Vec<ToolDef> {
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Sheet name", true)),
                     ("range", string_prop("Starting cell like A1", true)),
-                    ("csv_path", string_prop("Path to the CSV file to import", true)),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "csv_path",
+                        string_prop("Path to the CSV file to import", true),
+                    ),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "sheet", "range", "csv_path"],
             ),
@@ -59,7 +74,10 @@ pub fn tools() -> Vec<ToolDef> {
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Sheet name", true)),
                     ("range", string_prop("Range like A1:C10", true)),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "sheet", "range"],
             ),
@@ -136,7 +154,13 @@ fn handle_range_write(args: Value) -> String {
         })
         .collect();
 
-    match excel_core::excel_write::write_range(&path, &params(&path, dry_run), &sheet, &range, &data) {
+    match excel_core::excel_write::write_range(
+        &path,
+        &params(&path, dry_run),
+        &sheet,
+        &range,
+        &data,
+    ) {
         Ok(result) => to_result_string(&result),
         Err(e) => format!("Error: {e}"),
     }
@@ -149,7 +173,13 @@ fn handle_range_write_csv(args: Value) -> String {
     let csv_path = get_string(&args, "csv_path").unwrap_or_default();
     let dry_run = get_bool(&args, "dry_run").unwrap_or(false);
 
-    match excel_core::excel_write::write_range_from_csv(&path, &params(&path, dry_run), &sheet, &range, &csv_path) {
+    match excel_core::excel_write::write_range_from_csv(
+        &path,
+        &params(&path, dry_run),
+        &sheet,
+        &range,
+        &csv_path,
+    ) {
         Ok(result) => to_result_string(&result),
         Err(e) => format!("Error: {e}"),
     }

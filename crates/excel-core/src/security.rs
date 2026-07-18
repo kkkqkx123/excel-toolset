@@ -73,10 +73,7 @@ pub fn create_backup_if_needed(params: &SecurityParams) -> io::Result<Option<Bac
     Ok(Some(backup))
 }
 
-pub fn append_history_entry(
-    path: &str,
-    entry: &WorkbookHistoryEntry,
-) -> io::Result<()> {
+pub fn append_history_entry(path: &str, entry: &WorkbookHistoryEntry) -> io::Result<()> {
     let history_path = history_file_path(path);
     let mut entries: Vec<WorkbookHistoryEntry> = Vec::new();
 

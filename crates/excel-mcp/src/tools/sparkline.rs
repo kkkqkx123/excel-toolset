@@ -1,11 +1,11 @@
 // Sparkline category tools.
 
-use std::collections::HashMap;
 use serde_json::Value;
+use std::collections::HashMap;
 
+use super::helpers::*;
 use crate::server::{ToolDef, ToolHandler};
 use excel_core::types::{SecurityParams, SparklineConfig};
-use super::helpers::*;
 
 pub fn tools() -> Vec<ToolDef> {
     vec![
@@ -15,8 +15,17 @@ pub fn tools() -> Vec<ToolDef> {
             input_schema: object_schema(
                 vec![
                     ("path", string_prop("Path to the .xlsx file", true)),
-                    ("config", string_prop("JSON SparklineConfig: {sheet, source_range, target_cell, sparkline_type?, style?}", true)),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "config",
+                        string_prop(
+                            "JSON SparklineConfig: {sheet, source_range, target_cell, sparkline_type?, style?}",
+                            true,
+                        ),
+                    ),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "config"],
             ),
@@ -28,8 +37,14 @@ pub fn tools() -> Vec<ToolDef> {
                 vec![
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Sheet name", true)),
-                    ("target_cell", string_prop("Cell containing the sparkline in row,col format", true)),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "target_cell",
+                        string_prop("Cell containing the sparkline in row,col format", true),
+                    ),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "sheet", "target_cell"],
             ),
@@ -71,7 +86,9 @@ fn handle_remove(args: Value) -> String {
     // Parse "row,col" format
     let parts: Vec<&str> = target_cell.split(',').collect();
     if parts.len() != 2 {
-        return format!("Error: target_cell must be in 'row,col' format (0-indexed), got '{target_cell}'");
+        return format!(
+            "Error: target_cell must be in 'row,col' format (0-indexed), got '{target_cell}'"
+        );
     }
     let row: u32 = match parts[0].trim().parse() {
         Ok(r) => r,
@@ -82,7 +99,13 @@ fn handle_remove(args: Value) -> String {
         Err(e) => return format!("Error parsing col: {e}"),
     };
 
-    match excel_core::excel_write::remove_sparkline(&path, &params(&path, dry_run), &sheet, row, col) {
+    match excel_core::excel_write::remove_sparkline(
+        &path,
+        &params(&path, dry_run),
+        &sheet,
+        row,
+        col,
+    ) {
         Ok(r) => to_result_string(&r),
         Err(e) => format!("Error: {e}"),
     }

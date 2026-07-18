@@ -513,8 +513,7 @@ pub fn build_workbook_with_ops(
                 .position(|n| *n == config.target_sheet)
                 .ok_or_else(|| AppError::SheetNotFound(config.target_sheet.clone()))?;
             if let Ok(ws) = wb.worksheet_from_index(target_sheet_idx) {
-                let (target_r, target_c) =
-                    cell_ref::parse_cell_ref(&config.target_cell)?;
+                let (target_r, target_c) = cell_ref::parse_cell_ref(&config.target_cell)?;
                 // Write pivot table label as a placeholder
                 ws.write(target_r, target_c, &format!("PivotTable: {}", config.name))
                     .map_err(AppError::Xlsx)?;

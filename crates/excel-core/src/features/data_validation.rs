@@ -1,4 +1,6 @@
-use rust_xlsxwriter::{DataValidation, DataValidationErrorStyle as XlsxErrorStyle, DataValidationRule, Formula};
+use rust_xlsxwriter::{
+    DataValidation, DataValidationErrorStyle as XlsxErrorStyle, DataValidationRule, Formula,
+};
 
 use crate::security;
 use crate::types::*;
@@ -75,13 +77,12 @@ pub(crate) fn build_data_validation(config: &DataValidationConfig) -> Result<Dat
             DataValidation::new().allow_time_formula(rule)
         }
         DataValidationType::TextLength => {
-            let rule =
-                build_numeric_rule::<u32>(&config.operator, &formula1, &formula2)?;
+            let rule = build_numeric_rule::<u32>(&config.operator, &formula1, &formula2)?;
             DataValidation::new().allow_text_length(rule)
         }
-        DataValidationType::Custom => DataValidation::new().allow_custom(Formula::new(
-            formula1.as_deref().unwrap_or(""),
-        )),
+        DataValidationType::Custom => {
+            DataValidation::new().allow_custom(Formula::new(formula1.as_deref().unwrap_or("")))
+        }
     };
 
     let dv = dv
@@ -129,9 +130,7 @@ fn map_error_style(style: &DataValidationErrorStyle) -> XlsxErrorStyle {
 
 /// Normalize validation formulas based on type.
 /// Returns (formula1, formula2) as Option<String> for date/time serial conversion.
-fn normalize_validation_formula(
-    config: &DataValidationConfig,
-) -> (Option<String>, Option<String>) {
+fn normalize_validation_formula(config: &DataValidationConfig) -> (Option<String>, Option<String>) {
     match &config.validation_type {
         DataValidationType::List => {
             // For list type, if list_values is not provided, use formula1 as a
@@ -140,10 +139,7 @@ fn normalize_validation_formula(
                 let trimmed = f.trim();
                 if trimmed.starts_with('=') || trimmed.starts_with('"') {
                     f
-                } else if trimmed.contains(',')
-                    || trimmed.contains(' ')
-                    || trimmed.contains(';')
-                {
+                } else if trimmed.contains(',') || trimmed.contains(' ') || trimmed.contains(';') {
                     // Wrap comma-separated values: each value gets quoted
                     let quoted: Vec<String> = trimmed
                         .split(',')
@@ -158,14 +154,26 @@ fn normalize_validation_formula(
         }
         DataValidationType::Date => {
             // Convert date strings (YYYY-MM-DD) to Excel serial numbers
-            let f1 = config.formula1.as_ref().and_then(|f| date_to_excel_serial(f));
-            let f2 = config.formula2.as_ref().and_then(|f| date_to_excel_serial(f));
+            let f1 = config
+                .formula1
+                .as_ref()
+                .and_then(|f| date_to_excel_serial(f));
+            let f2 = config
+                .formula2
+                .as_ref()
+                .and_then(|f| date_to_excel_serial(f));
             (f1, f2)
         }
         DataValidationType::Time => {
             // Convert time strings (HH:MM or HH:MM:SS) to Excel time fractions
-            let f1 = config.formula1.as_ref().and_then(|f| time_to_excel_serial(f));
-            let f2 = config.formula2.as_ref().and_then(|f| time_to_excel_serial(f));
+            let f1 = config
+                .formula1
+                .as_ref()
+                .and_then(|f| time_to_excel_serial(f));
+            let f2 = config
+                .formula2
+                .as_ref()
+                .and_then(|f| time_to_excel_serial(f));
             (f1, f2)
         }
         DataValidationType::Custom => {
@@ -293,13 +301,17 @@ where
         .parse::<T>()
         .map_err(|e| AppError::Custom(format!("Failed to parse formula1: {:?}", e)))?;
 
-    let op = operator.as_ref().unwrap_or(&DataValidationOperator::Between);
+    let op = operator
+        .as_ref()
+        .unwrap_or(&DataValidationOperator::Between);
 
     match op {
         DataValidationOperator::Between => {
             let f2 = formula2
                 .as_deref()
-                .ok_or_else(|| AppError::Custom("formula2 is required for Between operator".into()))?
+                .ok_or_else(|| {
+                    AppError::Custom("formula2 is required for Between operator".into())
+                })?
                 .parse::<T>()
                 .map_err(|e| AppError::Custom(format!("Failed to parse formula2: {:?}", e)))?;
             Ok(DataValidationRule::Between(f1, f2))
@@ -318,7 +330,9 @@ where
         DataValidationOperator::NotEqual => Ok(DataValidationRule::NotEqualTo(f1)),
         DataValidationOperator::GreaterThan => Ok(DataValidationRule::GreaterThan(f1)),
         DataValidationOperator::LessThan => Ok(DataValidationRule::LessThan(f1)),
-        DataValidationOperator::GreaterThanOrEqual => Ok(DataValidationRule::GreaterThanOrEqualTo(f1)),
+        DataValidationOperator::GreaterThanOrEqual => {
+            Ok(DataValidationRule::GreaterThanOrEqualTo(f1))
+        }
         DataValidationOperator::LessThanOrEqual => Ok(DataValidationRule::LessThanOrEqualTo(f1)),
     }
 }
@@ -330,7 +344,9 @@ fn build_formula_rule(
     formula2: &Option<String>,
 ) -> DataValidationRule<Formula> {
     let f1 = Formula::new(formula1.as_deref().unwrap_or(""));
-    let op = operator.as_ref().unwrap_or(&DataValidationOperator::Between);
+    let op = operator
+        .as_ref()
+        .unwrap_or(&DataValidationOperator::Between);
 
     match op {
         DataValidationOperator::Between => {

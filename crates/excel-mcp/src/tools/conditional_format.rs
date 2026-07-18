@@ -1,13 +1,11 @@
 // Conditional format category tools.
 
-use std::collections::HashMap;
 use serde_json::Value;
+use std::collections::HashMap;
 
-use crate::server::{ToolDef, ToolHandler};
-use excel_core::features::conditional_format::{
-    ConditionalFormatRule, parse_rule_type,
-};
 use super::helpers::*;
+use crate::server::{ToolDef, ToolHandler};
+use excel_core::features::conditional_format::{ConditionalFormatRule, parse_rule_type};
 
 pub fn tools() -> Vec<ToolDef> {
     vec![
@@ -19,11 +17,34 @@ pub fn tools() -> Vec<ToolDef> {
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Sheet name", true)),
                     ("range", string_prop("Target range like A1:C10", true)),
-                    ("rule_type", enum_prop("Rule type", &["cell_value","formula","duplicate","above_average","top10","text_contains","date_occurring","databar","colorscale","iconset"])),
+                    (
+                        "rule_type",
+                        enum_prop(
+                            "Rule type",
+                            &[
+                                "cell_value",
+                                "formula",
+                                "duplicate",
+                                "above_average",
+                                "top10",
+                                "text_contains",
+                                "date_occurring",
+                                "databar",
+                                "colorscale",
+                                "iconset",
+                            ],
+                        ),
+                    ),
                     ("condition", string_prop("Condition expression", true)),
                     ("style", string_prop("JSON style to apply", false)),
-                    ("config", string_prop("JSON config for DataBar/ColorScale/IconSet types", false)),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "config",
+                        string_prop("JSON config for DataBar/ColorScale/IconSet types", false),
+                    ),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "sheet", "range", "rule_type", "condition"],
             ),
@@ -35,8 +56,14 @@ pub fn tools() -> Vec<ToolDef> {
                 vec![
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Sheet name", true)),
-                    ("range", string_prop("Range to remove formatting from", true)),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "range",
+                        string_prop("Range to remove formatting from", true),
+                    ),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "sheet", "range"],
             ),
@@ -48,7 +75,6 @@ pub fn register(handlers: &mut HashMap<String, ToolHandler>) {
     handlers.insert("excel_conditional_format_add".into(), handle_add);
     handlers.insert("excel_conditional_format_remove".into(), handle_remove);
 }
-
 
 fn handle_add(args: Value) -> String {
     let path = get_string(&args, "path").unwrap_or_default();
@@ -84,7 +110,11 @@ fn handle_add(args: Value) -> String {
     };
 
     match excel_core::features::conditional_format::add_conditional_format(
-        &path, &sheet, &range, &rule, &security_params(&path, dry_run),
+        &path,
+        &sheet,
+        &range,
+        &rule,
+        &security_params(&path, dry_run),
     ) {
         Ok(r) => to_result_string(&r),
         Err(e) => format!("Error: {e}"),
@@ -97,7 +127,12 @@ fn handle_remove(args: Value) -> String {
     let range = get_string(&args, "range").unwrap_or_default();
     let dry_run = get_bool(&args, "dry_run").unwrap_or(false);
 
-    match excel_core::features::conditional_format::remove_conditional_format(&path, &sheet, &range, &security_params(&path, dry_run)) {
+    match excel_core::features::conditional_format::remove_conditional_format(
+        &path,
+        &sheet,
+        &range,
+        &security_params(&path, dry_run),
+    ) {
         Ok(r) => to_result_string(&r),
         Err(e) => format!("Error: {e}"),
     }

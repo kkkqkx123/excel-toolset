@@ -1,5 +1,5 @@
 use crate::excel_read::{list_sheets, read_sheet_all};
-use crate::security::{list_history_entries};
+use crate::security::list_history_entries;
 use crate::types::{
     BlueprintSheet, ColumnSummary, DataFlow, Result, SheetOverview, WorkbookBlueprint,
     WorkbookOverview,
@@ -112,8 +112,9 @@ pub fn get_column_summary(path: &str, sheet: &str, col: &str) -> Result<ColumnSu
                 if row_idx < sample_end {
                     match cell.data_type {
                         crate::types::CellDataType::String => string_count += 1,
-                        crate::types::CellDataType::Float
-                        | crate::types::CellDataType::Int => number_count += 1,
+                        crate::types::CellDataType::Float | crate::types::CellDataType::Int => {
+                            number_count += 1
+                        }
                         crate::types::CellDataType::DateTime => date_count += 1,
                         _ => {}
                     }
@@ -169,8 +170,7 @@ pub fn get_workbook_blueprint(path: &str) -> Result<WorkbookBlueprint> {
         for (row_idx, row) in data.rows.iter().enumerate() {
             for (col_idx, cell) in row.iter().enumerate() {
                 if let Some(ref formula) = cell.formula {
-                    let cell_ref =
-                        cell_ref::format_cell_ref(row_idx as u32, col_idx as u16);
+                    let cell_ref = cell_ref::format_cell_ref(row_idx as u32, col_idx as u16);
                     sheet_formula_refs.push((cell_ref, formula.clone()));
                 }
             }

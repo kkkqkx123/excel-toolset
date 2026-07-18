@@ -1,10 +1,10 @@
 // VBA category tools: export, import, has.
 
-use std::collections::HashMap;
 use serde_json::Value;
+use std::collections::HashMap;
 
-use crate::server::{ToolDef, ToolHandler};
 use super::helpers::*;
+use crate::server::{ToolDef, ToolHandler};
 
 pub fn tools() -> Vec<ToolDef> {
     vec![
@@ -23,7 +23,10 @@ pub fn tools() -> Vec<ToolDef> {
                 vec![
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("data", string_prop("Base64-encoded VBA binary data", true)),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "data"],
             ),
@@ -49,14 +52,12 @@ fn handle_export(args: Value) -> String {
     let path = get_string(&args, "path").unwrap_or_default();
 
     match excel_core::features::vba_util::export_vba(&path) {
-        Ok(data) => {
-            serde_json::json!({
-                "success": true,
-                "size": data.len(),
-                "base64": base64_encode(&data)
-            })
-            .to_string()
-        }
+        Ok(data) => serde_json::json!({
+            "success": true,
+            "size": data.len(),
+            "base64": base64_encode(&data)
+        })
+        .to_string(),
         Err(e) => format!("Error: {e}"),
     }
 }

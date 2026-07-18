@@ -7,29 +7,35 @@ use std::collections::HashMap;
 
 use crate::server::{ToolDef, ToolHandler};
 
-mod helpers;
-mod file;
-mod sheet;
-mod cell;
-mod range;
-mod data;
-mod formula;
-mod format;
-mod chart;
-mod vba;
-mod diff;
+mod auto_filter;
 mod batch;
-mod rollback;
+mod cell;
+mod chart;
 mod comments;
-mod named_range;
-mod search;
 mod conditional_format;
-mod table;
+mod data;
 mod data_validation;
-mod pivot_table;
-mod sparkline;
-mod overview;
+mod diff;
+mod file;
+mod format;
+mod formula;
+mod freeze_panes;
+mod helpers;
 mod history;
+mod image;
+mod named_range;
+mod overview;
+mod page_setup;
+mod pivot_table;
+mod range;
+mod rollback;
+mod search;
+mod sheet;
+mod sheet_protection;
+mod slicer;
+mod sparkline;
+mod table;
+mod vba;
 
 /// Register all tools and their handlers.
 /// Returns (tool_definitions, handler_map).
@@ -113,6 +119,10 @@ pub fn register_all() -> (Vec<ToolDef>, HashMap<String, ToolHandler>) {
     tools.extend(pivot_table::tools());
     pivot_table::register(&mut handlers);
 
+    // Slicer
+    tools.extend(slicer::tools());
+    slicer::register(&mut handlers);
+
     // Sparkline
     tools.extend(sparkline::tools());
     sparkline::register(&mut handlers);
@@ -124,6 +134,26 @@ pub fn register_all() -> (Vec<ToolDef>, HashMap<String, ToolHandler>) {
     // History
     tools.extend(history::tools());
     history::register(&mut handlers);
+
+    // Freeze panes
+    tools.extend(freeze_panes::tools());
+    freeze_panes::register(&mut handlers);
+
+    // AutoFilter
+    tools.extend(auto_filter::tools());
+    auto_filter::register(&mut handlers);
+
+    // Sheet protection
+    tools.extend(sheet_protection::tools());
+    sheet_protection::register(&mut handlers);
+
+    // Page setup
+    tools.extend(page_setup::tools());
+    page_setup::register(&mut handlers);
+
+    // Image and shape
+    tools.extend(image::tools());
+    image::register(&mut handlers);
 
     (tools, handlers)
 }

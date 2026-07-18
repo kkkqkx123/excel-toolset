@@ -4,10 +4,7 @@
 use serde_json::{Value, json};
 
 /// Build a JSON Schema object type with required properties.
-pub fn object_schema(
-    properties: Vec<(&str, Value)>,
-    required: Vec<&str>,
-) -> Value {
+pub fn object_schema(properties: Vec<(&str, Value)>, required: Vec<&str>) -> Value {
     let mut props = serde_json::Map::new();
     for (name, schema) in properties {
         props.insert(name.to_string(), schema);
@@ -70,6 +67,21 @@ pub fn enum_prop(description: &str, values: &[&str]) -> Value {
     })
 }
 
+/// Build an array property schema with object items.
+pub fn array_prop(description: &str, required: bool) -> Value {
+    let s = json!({
+        "type": "array",
+        "description": description,
+        "items": { "type": "object" }
+    });
+    if required {
+        s
+    } else {
+        let mut s = s;
+        s
+    }
+}
+
 /// Build an array of strings property schema.
 pub fn string_array_prop(description: &str) -> Value {
     json!({
@@ -81,7 +93,9 @@ pub fn string_array_prop(description: &str) -> Value {
 
 /// Get a string argument from the arguments JSON value.
 pub fn get_string(args: &Value, key: &str) -> Option<String> {
-    args.get(key).and_then(|v| v.as_str()).map(|s| s.to_string())
+    args.get(key)
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
 }
 
 /// Get a boolean argument from the arguments JSON value.

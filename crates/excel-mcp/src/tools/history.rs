@@ -1,10 +1,10 @@
 // History tool: operation history for a workbook.
 
-use std::collections::HashMap;
 use serde_json::Value;
+use std::collections::HashMap;
 
-use crate::server::{ToolDef, ToolHandler};
 use super::helpers::*;
+use crate::server::{ToolDef, ToolHandler};
 
 pub fn tools() -> Vec<ToolDef> {
     vec![ToolDef {

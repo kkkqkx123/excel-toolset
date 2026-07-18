@@ -34,9 +34,15 @@ pub enum Commands {
     Table(TableArgs),
     DataValidation(DataValidationArgs),
     PivotTable(PivotTableArgs),
+    Slicer(SlicerArgs),
     Sparkline(SparklineArgs),
     Overview(OverviewArgs),
     History(HistoryArgs),
+    FreezePane(FreezePaneArgs),
+    AutoFilter(AutoFilterArgs),
+    Protection(ProtectionArgs),
+    PageSetup(PageSetupArgs),
+    Image(ImageArgs),
 }
 
 #[derive(clap::Args)]
@@ -85,6 +91,15 @@ pub enum SheetSub {
         path: String,
         old: String,
         new: String,
+    },
+    SetVisibility {
+        path: String,
+        name: String,
+        /// Visibility: visible, hidden, very_hidden
+        #[arg(long)]
+        visibility: String,
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 
@@ -232,6 +247,8 @@ pub enum FormulaSub {
         cell: String,
         formula: String,
         #[arg(long)]
+        eval: bool,
+        #[arg(long)]
         dry_run: bool,
     },
     Refresh {
@@ -276,6 +293,23 @@ pub enum FormulaSub {
         sheet: String,
         source: String,
         target_range: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    Eval {
+        path: String,
+        sheet: String,
+        cell: String,
+        formula: String,
+        #[arg(long)]
+        no_eval: bool,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    EvalBatch {
+        path: String,
+        sheet: String,
+        formulas: String,
         #[arg(long)]
         dry_run: bool,
     },
@@ -675,6 +709,26 @@ pub enum PivotTableSub {
     },
 }
 
+// ── Slicer ──
+
+#[derive(clap::Args)]
+pub struct SlicerArgs {
+    #[command(subcommand)]
+    pub command: SlicerSub,
+}
+
+#[derive(Subcommand)]
+pub enum SlicerSub {
+    Create {
+        path: String,
+        /// JSON SlicerConfig
+        #[arg(long)]
+        config: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
+
 // ── Sparkline ──
 
 #[derive(clap::Args)]
@@ -721,4 +775,175 @@ pub struct OverviewArgs {
 #[derive(clap::Args)]
 pub struct HistoryArgs {
     pub path: String,
+}
+
+// ── Freeze Pane ──
+
+#[derive(clap::Args)]
+pub struct FreezePaneArgs {
+    #[command(subcommand)]
+    pub command: FreezePaneSub,
+}
+
+#[derive(Subcommand)]
+pub enum FreezePaneSub {
+    Set {
+        path: String,
+        sheet: String,
+        /// Number of rows to freeze from top (0 = no row freeze)
+        #[arg(long, default_value = "0")]
+        rows: u32,
+        /// Number of columns to freeze from left (0 = no column freeze)
+        #[arg(long, default_value = "0")]
+        cols: u16,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    Clear {
+        path: String,
+        sheet: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
+
+// ── AutoFilter ──
+
+#[derive(clap::Args)]
+pub struct AutoFilterArgs {
+    #[command(subcommand)]
+    pub command: AutoFilterSub,
+}
+
+#[derive(Subcommand)]
+pub enum AutoFilterSub {
+    Set {
+        path: String,
+        sheet: String,
+        /// Autofilter range including header row, e.g. "A1:D100"
+        range: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    Remove {
+        path: String,
+        sheet: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    Get {
+        path: String,
+        sheet: String,
+    },
+}
+
+// ── Protection ──
+
+#[derive(clap::Args)]
+pub struct ProtectionArgs {
+    #[command(subcommand)]
+    pub command: ProtectionSub,
+}
+
+#[derive(Subcommand)]
+pub enum ProtectionSub {
+    Protect {
+        path: String,
+        sheet: String,
+        /// Optional password for protection
+        #[arg(long)]
+        password: Option<String>,
+        /// JSON ProtectionOptions config
+        #[arg(long)]
+        options: Option<String>,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    Unprotect {
+        path: String,
+        sheet: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    IsProtected {
+        path: String,
+        sheet: String,
+    },
+}
+
+// ── Page Setup ──
+
+#[derive(clap::Args)]
+pub struct PageSetupArgs {
+    #[command(subcommand)]
+    pub command: PageSetupSub,
+}
+
+#[derive(Subcommand)]
+pub enum PageSetupSub {
+    /// Configure page setup (orientation, paper size, margins, etc.)
+    Configure {
+        path: String,
+        sheet: String,
+        /// JSON PageSetupConfig (without the 'sheet' field which is taken from the positional arg)
+        #[arg(long)]
+        config: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Set page breaks
+    PageBreaks {
+        path: String,
+        /// JSON PageBreakConfig (includes sheet field)
+        #[arg(long)]
+        config: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Clear all page breaks
+    ClearBreaks {
+        path: String,
+        sheet: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
+
+// ── Image ──
+
+#[derive(clap::Args)]
+pub struct ImageArgs {
+    #[command(subcommand)]
+    pub command: ImageSub,
+}
+
+#[derive(Subcommand)]
+pub enum ImageSub {
+    /// Insert an image into a worksheet
+    Insert {
+        path: String,
+        /// JSON ImageConfig
+        #[arg(long)]
+        config: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Remove an image from a worksheet
+    Remove {
+        path: String,
+        sheet: String,
+        /// Anchor cell where the image was placed, e.g. "B2"
+        anchor_cell: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Insert a shape (rectangle, ellipse, line) into a worksheet
+    ShapeInsert {
+        path: String,
+        /// JSON ShapeConfig
+        #[arg(long)]
+        config: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
 }

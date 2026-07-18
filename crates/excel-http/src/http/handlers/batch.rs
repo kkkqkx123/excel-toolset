@@ -93,9 +93,7 @@ pub async fn batch_modify(Json(req): Json<BatchModifyReq>) -> impl IntoResponse 
     }
 }
 
-pub async fn batch_validate_formula(
-    Json(req): Json<BatchValidateRefsReq>,
-) -> impl IntoResponse {
+pub async fn batch_validate_formula(Json(req): Json<BatchValidateRefsReq>) -> impl IntoResponse {
     match excel_write::validate_formula_references(&req.path, &req.sheet, &req.formula) {
         Ok(result) => Ok((
             StatusCode::OK,

@@ -244,7 +244,10 @@ mod tests {
         assert!(cache.is_empty());
         assert_eq!(cache.len(), 0);
 
-        cache.put(QueryCache::make_key("/a.xlsx", "SELECT 1"), make_result("x"));
+        cache.put(
+            QueryCache::make_key("/a.xlsx", "SELECT 1"),
+            make_result("x"),
+        );
         assert_eq!(cache.len(), 1);
         assert!(!cache.is_empty());
 

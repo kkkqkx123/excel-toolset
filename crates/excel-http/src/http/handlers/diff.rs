@@ -60,9 +60,9 @@ pub async fn diff_file(Json(req): Json<DiffFileReq>) -> impl IntoResponse {
                     return Ok((StatusCode::OK, [("content-type", "application/json")], body));
                 }
                 Err(e) => {
-                    let body = serde_json::to_string(&ApiResponse::<()>::err(
-                        AppError::Serialize(e.to_string()),
-                    ))
+                    let body = serde_json::to_string(&ApiResponse::<()>::err(AppError::Serialize(
+                        e.to_string(),
+                    )))
                     .unwrap_or_default();
                     return Err((
                         StatusCode::INTERNAL_SERVER_ERROR,
@@ -141,8 +141,7 @@ pub async fn handle_diff_range(Json(req): Json<DiffRangeReq>) -> impl IntoRespon
         let range_diff = match diff_range(&req.old_path, &req.new_path, &req.sheet, &req.range) {
             Ok(d) => d,
             Err(e) => {
-                let body =
-                    serde_json::to_string(&ApiResponse::<()>::err(e)).unwrap_or_default();
+                let body = serde_json::to_string(&ApiResponse::<()>::err(e)).unwrap_or_default();
                 return Err((
                     StatusCode::INTERNAL_SERVER_ERROR,
                     [("content-type", "application/json")],
@@ -165,14 +164,13 @@ pub async fn handle_diff_range(Json(req): Json<DiffRangeReq>) -> impl IntoRespon
         let text = semantic::to_natural_text(&fd, None, Verbosity::Detail);
         match serde_json::to_value(serde_json::json!({"raw_text": text})) {
             Ok(val) => {
-                let body =
-                    serde_json::to_string(&ApiResponse::ok(Some(val))).unwrap_or_default();
+                let body = serde_json::to_string(&ApiResponse::ok(Some(val))).unwrap_or_default();
                 Ok((StatusCode::OK, [("content-type", "application/json")], body))
             }
             Err(e) => {
-                let body = serde_json::to_string(&ApiResponse::<()>::err(
-                    AppError::Serialize(e.to_string()),
-                ))
+                let body = serde_json::to_string(&ApiResponse::<()>::err(AppError::Serialize(
+                    e.to_string(),
+                )))
                 .unwrap_or_default();
                 Err((
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -207,9 +205,8 @@ pub async fn handle_diff_range(Json(req): Json<DiffRangeReq>) -> impl IntoRespon
                 } else {
                     match serde_json::to_value(data) {
                         Ok(val) => {
-                            let body =
-                                serde_json::to_string(&ApiResponse::ok(Some(val)))
-                                    .unwrap_or_default();
+                            let body = serde_json::to_string(&ApiResponse::ok(Some(val)))
+                                .unwrap_or_default();
                             Ok((StatusCode::OK, [("content-type", "application/json")], body))
                         }
                         Err(e) => {
@@ -242,14 +239,13 @@ pub async fn diff_semantic(Json(req): Json<SemanticDiffReq>) -> impl IntoRespons
     match diff_with_semantic(&req.old_path, &req.new_path) {
         Ok(sd) => match serde_json::to_value(sd) {
             Ok(val) => {
-                let body =
-                    serde_json::to_string(&ApiResponse::ok(Some(val))).unwrap_or_default();
+                let body = serde_json::to_string(&ApiResponse::ok(Some(val))).unwrap_or_default();
                 Ok((StatusCode::OK, [("content-type", "application/json")], body))
             }
             Err(e) => {
-                let body = serde_json::to_string(&ApiResponse::<()>::err(
-                    AppError::Serialize(e.to_string()),
-                ))
+                let body = serde_json::to_string(&ApiResponse::<()>::err(AppError::Serialize(
+                    e.to_string(),
+                )))
                 .unwrap_or_default();
                 Err((
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -275,14 +271,13 @@ pub async fn diff_formula_dependencies_handler(
     match diff_formula_dependencies(&req.old_path, &req.new_path, &req.sheet) {
         Ok(deps) => match serde_json::to_value(deps) {
             Ok(val) => {
-                let body =
-                    serde_json::to_string(&ApiResponse::ok(Some(val))).unwrap_or_default();
+                let body = serde_json::to_string(&ApiResponse::ok(Some(val))).unwrap_or_default();
                 Ok((StatusCode::OK, [("content-type", "application/json")], body))
             }
             Err(e) => {
-                let body = serde_json::to_string(&ApiResponse::<()>::err(
-                    AppError::Serialize(e.to_string()),
-                ))
+                let body = serde_json::to_string(&ApiResponse::<()>::err(AppError::Serialize(
+                    e.to_string(),
+                )))
                 .unwrap_or_default();
                 Err((
                     StatusCode::INTERNAL_SERVER_ERROR,

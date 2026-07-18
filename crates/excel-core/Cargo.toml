@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 excel-types = { path = "../excel-types" }
 excel-sql = { path = "../excel-sql", optional = true }
+excel-formula = { path = "../excel-formula" }
 calamine.workspace = true
 rust_xlsxwriter.workspace = true
 serde.workspace = true
@@ -15,6 +16,7 @@ chrono.workspace = true
 csv = "1.4"
 regex = "1.12"
 zip = "8.6"
+flate2 = "1"
 thiserror.workspace = true
 
 [features]

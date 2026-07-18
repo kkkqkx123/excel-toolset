@@ -1,6 +1,5 @@
 use rust_xlsxwriter::{
-    Formula, Table, TableColumn, TableFunction as XlsxTableFunc,
-    TableStyle as XlsxTableStyle,
+    Formula, Table, TableColumn, TableFunction as XlsxTableFunc, TableStyle as XlsxTableStyle,
 };
 
 use crate::excel_read;
@@ -92,12 +91,7 @@ fn map_total_function(func: &TotalFunction) -> XlsxTableFunc {
 
 /// Normalize a range so that r1 <= r2 and c1 <= c2.
 fn normalize_range(r1: u32, c1: u16, r2: u32, c2: u16) -> (u32, u16, u32, u16) {
-    (
-        r1.min(r2),
-        c1.min(c2),
-        r1.max(r2),
-        c1.max(c2),
-    )
+    (r1.min(r2), c1.min(c2), r1.max(r2), c1.max(c2))
 }
 
 /// Check if two ranges overlap.
@@ -188,9 +182,7 @@ pub fn create_table(
         let existing_tables = list_tables(path)?;
         for t in &existing_tables {
             if t.sheet.eq_ignore_ascii_case(&target_sheet) {
-                if let Ok((er1, ec1, er2, ec2)) =
-                    crate::utils::cell_ref::parse_range(&t.range)
-                {
+                if let Ok((er1, ec1, er2, ec2)) = crate::utils::cell_ref::parse_range(&t.range) {
                     if ranges_overlap(r1, c1, r2, c2, er1, ec1, er2, ec2) {
                         return Err(AppError::InvalidInput(format!(
                             "Table range '{}' overlaps with existing table '{}' at '{}' on sheet '{}'",
@@ -249,9 +241,7 @@ pub fn create_table(
                             .set_total_function(map_total_function(&tf.function));
                         if let TotalFunction::Custom(ref label) = tf.function {
                             columns[tf.column as usize] =
-                                columns[tf.column as usize]
-                                    .clone()
-                                    .set_total_label(label);
+                                columns[tf.column as usize].clone().set_total_label(label);
                         }
                     }
                 }
@@ -259,23 +249,16 @@ pub fn create_table(
             table = table.set_columns(&columns);
         } else if let Some(ref total_funcs) = config.total_row_functions {
             // Set total row functions without column names
-            let max_col = total_funcs
-                .iter()
-                .map(|tf| tf.column)
-                .max()
-                .unwrap_or(0);
-            let mut columns: Vec<TableColumn> = (0..=max_col)
-                .map(|_| TableColumn::new())
-                .collect();
+            let max_col = total_funcs.iter().map(|tf| tf.column).max().unwrap_or(0);
+            let mut columns: Vec<TableColumn> = (0..=max_col).map(|_| TableColumn::new()).collect();
             for tf in total_funcs {
                 if (tf.column as usize) < columns.len() {
                     columns[tf.column as usize] = columns[tf.column as usize]
                         .clone()
                         .set_total_function(map_total_function(&tf.function));
                     if let TotalFunction::Custom(ref label) = tf.function {
-                        columns[tf.column as usize] = columns[tf.column as usize]
-                            .clone()
-                            .set_total_label(label);
+                        columns[tf.column as usize] =
+                            columns[tf.column as usize].clone().set_total_label(label);
                     }
                 }
             }
@@ -296,11 +279,7 @@ pub fn create_table(
 
 /// Remove a table from the workbook by name.
 /// The table is removed by rebuilding the workbook without re-adding it.
-pub fn remove_table(
-    path: &str,
-    table_name: &str,
-    params: &SecurityParams,
-) -> Result<WriteResult> {
+pub fn remove_table(path: &str, table_name: &str, params: &SecurityParams) -> Result<WriteResult> {
     if params.dry_run {
         return Ok(WriteResult::dry_run_success());
     }
@@ -309,7 +288,10 @@ pub fn remove_table(
 
     // Verify table exists
     let existing = list_tables(path)?;
-    if !existing.iter().any(|t| t.name.eq_ignore_ascii_case(table_name)) {
+    if !existing
+        .iter()
+        .any(|t| t.name.eq_ignore_ascii_case(table_name))
+    {
         return Err(AppError::InvalidInput(format!(
             "Table '{}' not found in workbook",
             table_name
@@ -325,14 +307,13 @@ pub fn remove_table(
 pub fn list_tables(path: &str) -> Result<Vec<TableInfo>> {
     // Since rust_xlsxwriter doesn't support reading tables from existing files,
     // we use calamine to read table metadata from the xlsx archive.
-    use std::io::Read;
     use std::io::BufReader;
+    use std::io::Read;
 
     let file = std::fs::File::open(path)
         .map_err(|e| AppError::Custom(format!("Failed to open file: {}", e)))?;
-    let mut archive =
-        zip::ZipArchive::new(BufReader::new(file))
-            .map_err(|e| AppError::Custom(format!("Failed to read zip: {}", e)))?;
+    let mut archive = zip::ZipArchive::new(BufReader::new(file))
+        .map_err(|e| AppError::Custom(format!("Failed to read zip: {}", e)))?;
 
     let mut tables: Vec<TableInfo> = Vec::new();
 
@@ -383,9 +364,7 @@ pub fn list_tables(path: &str) -> Result<Vec<TableInfo>> {
                     if line.contains("table") && line.contains("Target=") {
                         if let Some(target) = extract_xml_attr(line, "Target") {
                             // Match table target to the tables we found
-                            let table_file = target
-                                .strip_prefix("../tables/")
-                                .unwrap_or(&target);
+                            let table_file = target.strip_prefix("../tables/").unwrap_or(&target);
                             for table in &mut tables {
                                 // Set the sheet name based on relationship
                                 if table.sheet.is_empty() {
@@ -471,81 +450,75 @@ fn parse_table_xml(xml: &str) -> Option<TableInfo> {
     // Map style name back to our preset
     let style = match style_name.as_deref() {
         Some("TableStyleNone") | None => TableStylePreset::None,
-        Some(s) if s.starts_with("TableStyleLight") => {
-            match &s["TableStyleLight".len()..] {
-                "1" => TableStylePreset::Light1,
-                "2" => TableStylePreset::Light2,
-                "3" => TableStylePreset::Light3,
-                "4" => TableStylePreset::Light4,
-                "5" => TableStylePreset::Light5,
-                "6" => TableStylePreset::Light6,
-                "7" => TableStylePreset::Light7,
-                "8" => TableStylePreset::Light8,
-                "9" => TableStylePreset::Light9,
-                "10" => TableStylePreset::Light10,
-                "11" => TableStylePreset::Light11,
-                "12" => TableStylePreset::Light12,
-                "13" => TableStylePreset::Light13,
-                "14" => TableStylePreset::Light14,
-                "15" => TableStylePreset::Light15,
-                "16" => TableStylePreset::Light16,
-                "17" => TableStylePreset::Light17,
-                "18" => TableStylePreset::Light18,
-                "19" => TableStylePreset::Light19,
-                "20" => TableStylePreset::Light20,
-                "21" => TableStylePreset::Light21,
-                _ => TableStylePreset::Medium2,
-            }
-        }
-        Some(s) if s.starts_with("TableStyleMedium") => {
-            match &s["TableStyleMedium".len()..] {
-                "1" => TableStylePreset::Medium1,
-                "2" => TableStylePreset::Medium2,
-                "3" => TableStylePreset::Medium3,
-                "4" => TableStylePreset::Medium4,
-                "5" => TableStylePreset::Medium5,
-                "6" => TableStylePreset::Medium6,
-                "7" => TableStylePreset::Medium7,
-                "8" => TableStylePreset::Medium8,
-                "9" => TableStylePreset::Medium9,
-                "10" => TableStylePreset::Medium10,
-                "11" => TableStylePreset::Medium11,
-                "12" => TableStylePreset::Medium12,
-                "13" => TableStylePreset::Medium13,
-                "14" => TableStylePreset::Medium14,
-                "15" => TableStylePreset::Medium15,
-                "16" => TableStylePreset::Medium16,
-                "17" => TableStylePreset::Medium17,
-                "18" => TableStylePreset::Medium18,
-                "19" => TableStylePreset::Medium19,
-                "20" => TableStylePreset::Medium20,
-                "21" => TableStylePreset::Medium21,
-                "22" => TableStylePreset::Medium22,
-                "23" => TableStylePreset::Medium23,
-                "24" => TableStylePreset::Medium24,
-                "25" => TableStylePreset::Medium25,
-                "26" => TableStylePreset::Medium26,
-                "27" => TableStylePreset::Medium27,
-                "28" => TableStylePreset::Medium28,
-                _ => TableStylePreset::Medium2,
-            }
-        }
-        Some(s) if s.starts_with("TableStyleDark") => {
-            match &s["TableStyleDark".len()..] {
-                "1" => TableStylePreset::Dark1,
-                "2" => TableStylePreset::Dark2,
-                "3" => TableStylePreset::Dark3,
-                "4" => TableStylePreset::Dark4,
-                "5" => TableStylePreset::Dark5,
-                "6" => TableStylePreset::Dark6,
-                "7" => TableStylePreset::Dark7,
-                "8" => TableStylePreset::Dark8,
-                "9" => TableStylePreset::Dark9,
-                "10" => TableStylePreset::Dark10,
-                "11" => TableStylePreset::Dark11,
-                _ => TableStylePreset::Medium2,
-            }
-        }
+        Some(s) if s.starts_with("TableStyleLight") => match &s["TableStyleLight".len()..] {
+            "1" => TableStylePreset::Light1,
+            "2" => TableStylePreset::Light2,
+            "3" => TableStylePreset::Light3,
+            "4" => TableStylePreset::Light4,
+            "5" => TableStylePreset::Light5,
+            "6" => TableStylePreset::Light6,
+            "7" => TableStylePreset::Light7,
+            "8" => TableStylePreset::Light8,
+            "9" => TableStylePreset::Light9,
+            "10" => TableStylePreset::Light10,
+            "11" => TableStylePreset::Light11,
+            "12" => TableStylePreset::Light12,
+            "13" => TableStylePreset::Light13,
+            "14" => TableStylePreset::Light14,
+            "15" => TableStylePreset::Light15,
+            "16" => TableStylePreset::Light16,
+            "17" => TableStylePreset::Light17,
+            "18" => TableStylePreset::Light18,
+            "19" => TableStylePreset::Light19,
+            "20" => TableStylePreset::Light20,
+            "21" => TableStylePreset::Light21,
+            _ => TableStylePreset::Medium2,
+        },
+        Some(s) if s.starts_with("TableStyleMedium") => match &s["TableStyleMedium".len()..] {
+            "1" => TableStylePreset::Medium1,
+            "2" => TableStylePreset::Medium2,
+            "3" => TableStylePreset::Medium3,
+            "4" => TableStylePreset::Medium4,
+            "5" => TableStylePreset::Medium5,
+            "6" => TableStylePreset::Medium6,
+            "7" => TableStylePreset::Medium7,
+            "8" => TableStylePreset::Medium8,
+            "9" => TableStylePreset::Medium9,
+            "10" => TableStylePreset::Medium10,
+            "11" => TableStylePreset::Medium11,
+            "12" => TableStylePreset::Medium12,
+            "13" => TableStylePreset::Medium13,
+            "14" => TableStylePreset::Medium14,
+            "15" => TableStylePreset::Medium15,
+            "16" => TableStylePreset::Medium16,
+            "17" => TableStylePreset::Medium17,
+            "18" => TableStylePreset::Medium18,
+            "19" => TableStylePreset::Medium19,
+            "20" => TableStylePreset::Medium20,
+            "21" => TableStylePreset::Medium21,
+            "22" => TableStylePreset::Medium22,
+            "23" => TableStylePreset::Medium23,
+            "24" => TableStylePreset::Medium24,
+            "25" => TableStylePreset::Medium25,
+            "26" => TableStylePreset::Medium26,
+            "27" => TableStylePreset::Medium27,
+            "28" => TableStylePreset::Medium28,
+            _ => TableStylePreset::Medium2,
+        },
+        Some(s) if s.starts_with("TableStyleDark") => match &s["TableStyleDark".len()..] {
+            "1" => TableStylePreset::Dark1,
+            "2" => TableStylePreset::Dark2,
+            "3" => TableStylePreset::Dark3,
+            "4" => TableStylePreset::Dark4,
+            "5" => TableStylePreset::Dark5,
+            "6" => TableStylePreset::Dark6,
+            "7" => TableStylePreset::Dark7,
+            "8" => TableStylePreset::Dark8,
+            "9" => TableStylePreset::Dark9,
+            "10" => TableStylePreset::Dark10,
+            "11" => TableStylePreset::Dark11,
+            _ => TableStylePreset::Medium2,
+        },
         _ => TableStylePreset::Medium2,
     };
 

@@ -1,10 +1,10 @@
 // Comments category tools.
 
-use std::collections::HashMap;
 use serde_json::Value;
+use std::collections::HashMap;
 
-use crate::server::{ToolDef, ToolHandler};
 use super::helpers::*;
+use crate::server::{ToolDef, ToolHandler};
 
 pub fn tools() -> Vec<ToolDef> {
     vec![
@@ -29,7 +29,10 @@ pub fn tools() -> Vec<ToolDef> {
                     ("sheet", string_prop("Sheet name", true)),
                     ("cell", string_prop("Cell reference like A1", true)),
                     ("text", string_prop("Comment text", true)),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "sheet", "cell", "text"],
             ),
@@ -43,7 +46,10 @@ pub fn tools() -> Vec<ToolDef> {
                     ("sheet", string_prop("Sheet name", true)),
                     ("cell", string_prop("Cell reference like A1", true)),
                     ("text", string_prop("New comment text", true)),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "sheet", "cell", "text"],
             ),
@@ -56,7 +62,10 @@ pub fn tools() -> Vec<ToolDef> {
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Sheet name", true)),
                     ("cell", string_prop("Cell reference like A1", true)),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "sheet", "cell"],
             ),
@@ -89,7 +98,13 @@ fn handle_add(args: Value) -> String {
     let text = get_string(&args, "text").unwrap_or_default();
     let dry_run = get_bool(&args, "dry_run").unwrap_or(false);
 
-    match excel_core::features::comments::add_comment(&path, &sheet, &cell, &text, &security_params(&path, dry_run)) {
+    match excel_core::features::comments::add_comment(
+        &path,
+        &sheet,
+        &cell,
+        &text,
+        &security_params(&path, dry_run),
+    ) {
         Ok(r) => to_result_string(&r),
         Err(e) => format!("Error: {e}"),
     }
@@ -102,7 +117,13 @@ fn handle_update(args: Value) -> String {
     let text = get_string(&args, "text").unwrap_or_default();
     let dry_run = get_bool(&args, "dry_run").unwrap_or(false);
 
-    match excel_core::features::comments::update_comment(&path, &sheet, &cell, &text, &security_params(&path, dry_run)) {
+    match excel_core::features::comments::update_comment(
+        &path,
+        &sheet,
+        &cell,
+        &text,
+        &security_params(&path, dry_run),
+    ) {
         Ok(r) => to_result_string(&r),
         Err(e) => format!("Error: {e}"),
     }
@@ -114,7 +135,12 @@ fn handle_delete(args: Value) -> String {
     let cell = get_string(&args, "cell").unwrap_or_default();
     let dry_run = get_bool(&args, "dry_run").unwrap_or(false);
 
-    match excel_core::features::comments::delete_comment(&path, &sheet, &cell, &security_params(&path, dry_run)) {
+    match excel_core::features::comments::delete_comment(
+        &path,
+        &sheet,
+        &cell,
+        &security_params(&path, dry_run),
+    ) {
         Ok(r) => to_result_string(&r),
         Err(e) => format!("Error: {e}"),
     }

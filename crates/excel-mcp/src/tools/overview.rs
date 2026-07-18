@@ -1,10 +1,10 @@
 // Overview tool: workbook overview with optional blueprint.
 
-use std::collections::HashMap;
 use serde_json::Value;
+use std::collections::HashMap;
 
-use crate::server::{ToolDef, ToolHandler};
 use super::helpers::*;
+use crate::server::{ToolDef, ToolHandler};
 
 pub fn tools() -> Vec<ToolDef> {
     vec![ToolDef {
@@ -13,7 +13,13 @@ pub fn tools() -> Vec<ToolDef> {
         input_schema: object_schema(
             vec![
                 ("path", string_prop("Path to the .xlsx file", true)),
-                ("blueprint", bool_prop("Generate a compact blueprint for LLM processing", Some(false))),
+                (
+                    "blueprint",
+                    bool_prop(
+                        "Generate a compact blueprint for LLM processing",
+                        Some(false),
+                    ),
+                ),
             ],
             vec!["path"],
         ),

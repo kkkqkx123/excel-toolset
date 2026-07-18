@@ -48,9 +48,7 @@ pub fn fill_formula(
 
                 let offset_formula =
                     offset_cell_references(&source_formula, row_offset, col_offset);
-                let cleaned = offset_formula
-                    .strip_prefix('=')
-                    .unwrap_or(&offset_formula);
+                let cleaned = offset_formula.strip_prefix('=').unwrap_or(&offset_formula);
 
                 ensure_dimensions(sd, target_row as usize, target_col as usize);
                 sd.rows[target_row as usize][target_col as usize] = CellData {
@@ -82,10 +80,9 @@ fn offset_cell_references(formula: &str, row_offset: i64, col_offset: i64) -> St
         return formula.to_string();
     }
 
-    let sheet_cell_re = Regex::new(
-        r"[A-Za-z_][A-Za-z0-9_]*!(\$?[A-Za-z]{1,3}\$?\d+)(:\$?[A-Za-z]{1,3}\$?\d+)?",
-    )
-    .expect("valid regex");
+    let sheet_cell_re =
+        Regex::new(r"[A-Za-z_][A-Za-z0-9_]*!(\$?[A-Za-z]{1,3}\$?\d+)(:\$?[A-Za-z]{1,3}\$?\d+)?")
+            .expect("valid regex");
     let simple_re =
         Regex::new(r"(\$?[A-Za-z]{1,3}\$?\d+)(:\$?[A-Za-z]{1,3}\$?\d+)?").expect("valid regex");
 

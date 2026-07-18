@@ -34,7 +34,12 @@ pub fn validate_batch_operations(
                     });
                 } else if let Some(sheet_data) = data.get(sheet) {
                     if *row as usize >= sheet_data.rows.len()
-                        || *col as usize >= sheet_data.rows.get(*row as usize).map(|r| r.len()).unwrap_or(0)
+                        || *col as usize
+                            >= sheet_data
+                                .rows
+                                .get(*row as usize)
+                                .map(|r| r.len())
+                                .unwrap_or(0)
                     {
                         warnings.push(format!(
                             "WriteCell at {} row={} col={} is outside existing data range, will create new cell",
@@ -44,7 +49,9 @@ pub fn validate_batch_operations(
                 }
             }
             BatchOperation::WriteRange {
-                sheet, range, data: grid,
+                sheet,
+                range,
+                data: grid,
             } => {
                 if !sheets.contains(sheet) {
                     errors.push(ValidationError {
@@ -139,7 +146,9 @@ pub fn validate_batch_operations(
                 }
             }
             BatchOperation::InsertRows {
-                sheet, at_row, data: grid,
+                sheet,
+                at_row,
+                data: grid,
             } => {
                 if !sheets.contains(sheet) {
                     errors.push(ValidationError {
@@ -248,10 +257,7 @@ pub fn validate_batch_operations(
                     });
                 }
                 if columns.is_empty() {
-                    warnings.push(format!(
-                        "SortSheet '{}': no sort columns specified",
-                        sheet
-                    ));
+                    warnings.push(format!("SortSheet '{}': no sort columns specified", sheet));
                 }
             }
             BatchOperation::DedupSheet { sheet, columns } => {
@@ -530,12 +536,12 @@ pub fn execute_batch_operations_with_strategy(
     }
 
     // Create backup for AllOrNothing strategy
-    let backup_info = if params.create_backup || matches!(strategy, BatchExecutionStrategy::AllOrNothing)
-    {
-        Some(create_backup(path, &old_hash).map_err(AppError::Io)?)
-    } else {
-        None
-    };
+    let backup_info =
+        if params.create_backup || matches!(strategy, BatchExecutionStrategy::AllOrNothing) {
+            Some(create_backup(path, &old_hash).map_err(AppError::Io)?)
+        } else {
+            None
+        };
 
     let all_ops_count = operations.len();
 
@@ -633,7 +639,12 @@ pub fn execute_batch_operations(
     params: &SecurityParams,
     operations: &[BatchOperation],
 ) -> Result<BatchWriteResult> {
-    execute_batch_operations_with_strategy(path, params, operations, &BatchExecutionStrategy::BestEffort)
+    execute_batch_operations_with_strategy(
+        path,
+        params,
+        operations,
+        &BatchExecutionStrategy::BestEffort,
+    )
 }
 
 /// Result of formula reference validation.
@@ -670,16 +681,13 @@ pub fn validate_formula_references(
 
     // Regex for cross-sheet refs: SheetName!CellRef or SheetName!CellRef:CellRef
     // Uses {1,3} column width to avoid matching function names
-    let cross_re = Regex::new(
-        r"([A-Za-z_][A-Za-z0-9_]*)!\$?[A-Za-z]{1,3}\$?\d+(?::\$?[A-Za-z]{1,3}\$?\d+)?",
-    )
-    .expect("invalid cross-sheet regex");
+    let cross_re =
+        Regex::new(r"([A-Za-z_][A-Za-z0-9_]*)!\$?[A-Za-z]{1,3}\$?\d+(?::\$?[A-Za-z]{1,3}\$?\d+)?")
+            .expect("invalid cross-sheet regex");
 
     // Regex for local refs: CellRef or CellRef:CellRef (range)
-    let simple_re = Regex::new(
-        r"(\$?[A-Za-z]{1,3}\$?\d+)(:\$?[A-Za-z]{1,3}\$?\d+)?",
-    )
-    .expect("invalid simple ref regex");
+    let simple_re = Regex::new(r"(\$?[A-Za-z]{1,3}\$?\d+)(:\$?[A-Za-z]{1,3}\$?\d+)?")
+        .expect("invalid simple ref regex");
 
     let mut all_refs: Vec<String> = Vec::new();
     let mut invalid: Vec<String> = Vec::new();
@@ -825,8 +833,7 @@ mod tests {
     #[test]
     fn test_validate_simple_formula() {
         with_test_file("simple", |path| {
-            let result =
-                validate_formula_references(path, "Sheet1", "A1 + B2").expect("validate");
+            let result = validate_formula_references(path, "Sheet1", "A1 + B2").expect("validate");
             assert!(result.valid);
             assert_eq!(result.references.len(), 2);
             assert!(result.references.contains(&"Sheet1!A1".to_string()));
@@ -840,8 +847,8 @@ mod tests {
     #[test]
     fn test_validate_range_formula() {
         with_test_file("range", |path| {
-            let result = validate_formula_references(path, "Sheet1", "SUM(A1:B5)")
-                .expect("validate");
+            let result =
+                validate_formula_references(path, "Sheet1", "SUM(A1:B5)").expect("validate");
             assert!(result.valid);
             assert_eq!(result.references.len(), 2);
             assert!(result.references.contains(&"Sheet1!A1".to_string()));
@@ -856,8 +863,7 @@ mod tests {
     fn test_validate_cross_sheet_formula() {
         with_test_file("cross", |path| {
             let result =
-                validate_formula_references(path, "Sheet1", "Sheet2!A1 + C3")
-                    .expect("validate");
+                validate_formula_references(path, "Sheet1", "Sheet2!A1 + C3").expect("validate");
             assert!(result.valid);
             assert_eq!(result.references.len(), 2);
             assert!(result.references.contains(&"Sheet2!A1".to_string()));
@@ -872,8 +878,7 @@ mod tests {
     fn test_validate_cross_sheet_range_formula() {
         with_test_file("cross_range", |path| {
             let result =
-                validate_formula_references(path, "Sheet1", "SUM(Sheet2!A1:B5)")
-                    .expect("validate");
+                validate_formula_references(path, "Sheet1", "SUM(Sheet2!A1:B5)").expect("validate");
             assert!(result.valid);
             // Both A1 and B5 are captured as cross-sheet refs
             assert_eq!(result.references.len(), 2);
@@ -888,12 +893,8 @@ mod tests {
     #[test]
     fn test_validate_nonexistent_sheet() {
         with_test_file("nosheet", |path| {
-            let result = validate_formula_references(
-                path,
-                "Sheet1",
-                "Sheet99!A1 + B2",
-            )
-            .expect("validate");
+            let result =
+                validate_formula_references(path, "Sheet1", "Sheet99!A1 + B2").expect("validate");
             assert!(!result.valid);
             assert_eq!(result.invalid_references.len(), 1);
             assert_eq!(result.invalid_references[0], "Sheet99!A1");
@@ -907,12 +908,8 @@ mod tests {
     fn test_validate_invalid_cell_ref() {
         with_test_file("badcell", |path| {
             // "ZZZ999999999" has an overflowing row number
-            let result = validate_formula_references(
-                path,
-                "Sheet1",
-                "ZZZ999999999",
-            )
-            .expect("validate");
+            let result =
+                validate_formula_references(path, "Sheet1", "ZZZ999999999").expect("validate");
             assert!(!result.valid);
             assert_eq!(result.invalid_references.len(), 1);
             Ok(())
@@ -923,12 +920,8 @@ mod tests {
     #[test]
     fn test_validate_absolute_refs() {
         with_test_file("absolute", |path| {
-            let result = validate_formula_references(
-                path,
-                "Sheet1",
-                "$A$1 + $B2 + C$3",
-            )
-            .expect("validate");
+            let result =
+                validate_formula_references(path, "Sheet1", "$A$1 + $B2 + C$3").expect("validate");
             assert!(result.valid);
             assert_eq!(result.references.len(), 3);
             assert!(result.invalid_references.is_empty());
@@ -940,12 +933,9 @@ mod tests {
     #[test]
     fn test_validate_mixed_formula() {
         with_test_file("mixed", |path| {
-            let result = validate_formula_references(
-                path,
-                "Sheet1",
-                "SUM(Sheet2!$A$1:$B$5, C10, D20:E30)",
-            )
-            .expect("validate");
+            let result =
+                validate_formula_references(path, "Sheet1", "SUM(Sheet2!$A$1:$B$5, C10, D20:E30)")
+                    .expect("validate");
             assert!(result.valid);
             // Sheet2!$A$1:$B$5 → cross-sheet A1 + B5;
             // C10 → local; D20:E30 → local D20 + E30 = 5 refs

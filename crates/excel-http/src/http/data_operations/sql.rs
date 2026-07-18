@@ -44,9 +44,7 @@ static GLOBAL_CACHE: std::sync::LazyLock<std::sync::Mutex<excel_sql::QueryCache>
 #[cfg(feature = "sql")]
 static GLOBAL_SESSIONS: std::sync::LazyLock<
     std::sync::Mutex<HashMap<String, excel_sql::QuerySession>>,
-> = std::sync::LazyLock::new(|| {
-    std::sync::Mutex::new(HashMap::new())
-});
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
 
 /// Atomic counter for generating session IDs.
 #[cfg(feature = "sql")]
@@ -77,23 +75,22 @@ pub async fn data_sql(Json(req): Json<SqlReq>) -> Json<ApiResponse<Vec<Vec<CellD
         if req.cache {
             let key = excel_sql::QueryCache::make_key(&req.path, &req.query);
             {
-                let mut cache = GLOBAL_CACHE
-                    .lock()
-                    .expect("global SQL cache lock poisoned");
+                let mut cache = GLOBAL_CACHE.lock().expect("global SQL cache lock poisoned");
                 if let Some(cached) = cache.get(&key) {
                     return Json(ApiResponse::ok(Some(cached.rows.clone())));
                 }
             }
             match operations::sql_query(&req.path, &req.sheet, &req.query) {
                 Ok(data) => {
-                    let mut cache = GLOBAL_CACHE
-                        .lock()
-                        .expect("global SQL cache lock poisoned");
-                    cache.put(key, excel_sql::QueryResult {
-                        columns: Vec::new(),
-                        rows: data.clone(),
-                        row_count: data.len(),
-                    });
+                    let mut cache = GLOBAL_CACHE.lock().expect("global SQL cache lock poisoned");
+                    cache.put(
+                        key,
+                        excel_sql::QueryResult {
+                            columns: Vec::new(),
+                            rows: data.clone(),
+                            row_count: data.len(),
+                        },
+                    );
                     Json(ApiResponse::ok(Some(data)))
                 }
                 Err(e) => Json(ApiResponse::err(e)),
@@ -146,9 +143,7 @@ pub async fn create_session(
     }
 }
 
-pub async fn close_session(
-    Path(id): Path<String>,
-) -> Json<ApiResponse<String>> {
+pub async fn close_session(Path(id): Path<String>) -> Json<ApiResponse<String>> {
     #[cfg(feature = "sql")]
     {
         let mut sessions = GLOBAL_SESSIONS

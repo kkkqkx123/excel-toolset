@@ -1,11 +1,11 @@
 // Format category tools: set style, merge cells.
 
-use std::collections::HashMap;
 use serde_json::Value;
+use std::collections::HashMap;
 
+use super::helpers::*;
 use crate::server::{ToolDef, ToolHandler};
 use excel_core::types::{SecurityParams, Style};
-use super::helpers::*;
 
 pub fn tools() -> Vec<ToolDef> {
     vec![
@@ -18,7 +18,10 @@ pub fn tools() -> Vec<ToolDef> {
                     ("sheet", string_prop("Sheet name", true)),
                     ("range", string_prop("Target range like A1:C10", true)),
                     ("style", string_prop("JSON style definition", true)),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "sheet", "range", "style"],
             ),
@@ -32,7 +35,10 @@ pub fn tools() -> Vec<ToolDef> {
                     ("sheet", string_prop("Sheet name", true)),
                     ("range", string_prop("Range to merge like A1:C1", true)),
                     ("value", string_prop("Value for the merged cell", true)),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "sheet", "range", "value"],
             ),
@@ -61,7 +67,13 @@ fn handle_set(args: Value) -> String {
         Err(e) => return format!("Error parsing style JSON: {e}"),
     };
 
-    match excel_core::excel_write::set_format(&path, &params(&path, dry_run), &sheet, &range, &style) {
+    match excel_core::excel_write::set_format(
+        &path,
+        &params(&path, dry_run),
+        &sheet,
+        &range,
+        &style,
+    ) {
         Ok(r) => to_result_string(&r),
         Err(e) => format!("Error: {e}"),
     }
@@ -74,7 +86,13 @@ fn handle_merge(args: Value) -> String {
     let value = get_string(&args, "value").unwrap_or_default();
     let dry_run = get_bool(&args, "dry_run").unwrap_or(false);
 
-    match excel_core::excel_write::merge_cells(&path, &params(&path, dry_run), &sheet, &range, &value) {
+    match excel_core::excel_write::merge_cells(
+        &path,
+        &params(&path, dry_run),
+        &sheet,
+        &range,
+        &value,
+    ) {
         Ok(r) => to_result_string(&r),
         Err(e) => format!("Error: {e}"),
     }

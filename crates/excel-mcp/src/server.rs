@@ -122,11 +122,7 @@ impl Server {
         let handler = match self.handlers.get(&tool_name) {
             Some(h) => h,
             None => {
-                return JsonRpcResponse::error(
-                    id,
-                    -32602,
-                    format!("Unknown tool: {tool_name}"),
-                );
+                return JsonRpcResponse::error(id, -32602, format!("Unknown tool: {tool_name}"));
             }
         };
 

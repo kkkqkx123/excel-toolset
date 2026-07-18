@@ -1,11 +1,11 @@
 // Cell category tools: read, write.
 
-use std::collections::HashMap;
 use serde_json::Value;
+use std::collections::HashMap;
 
+use super::helpers::*;
 use crate::server::{ToolDef, ToolHandler};
 use excel_core::types::CellValue;
-use super::helpers::*;
 
 pub fn tools() -> Vec<ToolDef> {
     vec![
@@ -30,7 +30,10 @@ pub fn tools() -> Vec<ToolDef> {
                     ("sheet", string_prop("Sheet name", true)),
                     ("cell", string_prop("Cell reference, e.g. A1", true)),
                     ("value", string_prop("Value to write", true)),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "sheet", "cell", "value"],
             ),
@@ -95,7 +98,9 @@ fn parse_cell(cell: &str) -> Result<(u32, u16), String> {
         .fold(0u16, |acc, c| acc * 26 + (c as u16 - b'A' as u16 + 1))
         .saturating_sub(1);
 
-    let row = row_str.parse::<u32>().map_err(|_| format!("Invalid row number in: {cell}"))?;
+    let row = row_str
+        .parse::<u32>()
+        .map_err(|_| format!("Invalid row number in: {cell}"))?;
 
     Ok((row.saturating_sub(1), col))
 }

@@ -102,9 +102,7 @@ fn parse_icon_type(s: &str) -> rust_xlsxwriter::ConditionalFormatIconType {
         "5_quadrants" | "five_quadrants" => {
             rust_xlsxwriter::ConditionalFormatIconType::FiveQuadrants
         }
-        "5_boxes" | "five_boxes" => {
-            rust_xlsxwriter::ConditionalFormatIconType::FiveBoxes
-        }
+        "5_boxes" | "five_boxes" => rust_xlsxwriter::ConditionalFormatIconType::FiveBoxes,
         _ => rust_xlsxwriter::ConditionalFormatIconType::ThreeTrafficLights,
     }
 }
@@ -279,8 +277,7 @@ pub fn add_conditional_format(
                 let mut icon_set = rust_xlsxwriter::ConditionalFormatIconSet::new();
 
                 let icon_type = if let Some(ConditionalFormatConfig::IconSet {
-                    icon_type,
-                    ..
+                    icon_type, ..
                 }) = &rule.config
                 {
                     parse_icon_type(icon_type)
@@ -314,7 +311,7 @@ pub fn add_conditional_format(
                 let fmt = build_cf_format(&rule.format);
                 let cond_format = rust_xlsxwriter::ConditionalFormatTop::new()
                     .set_rule(rust_xlsxwriter::ConditionalFormatTopRule::Top(
-                            rule.condition.parse::<u16>().unwrap_or(10),
+                        rule.condition.parse::<u16>().unwrap_or(10),
                     ))
                     .set_format(&fmt);
                 worksheet

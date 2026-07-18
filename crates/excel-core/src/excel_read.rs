@@ -50,12 +50,7 @@ pub fn read_cell(path: &str, sheet: &str, row: u32, col: u16) -> Result<CellData
 
 /// Original read_range for backward compatibility.
 pub fn read_range(path: &str, sheet: &str, range_spec: &str) -> Result<Vec<Vec<CellData>>> {
-    let result = read_range_with_options(
-        path,
-        sheet,
-        range_spec,
-        &ReadRangeOptions::default(),
-    )?;
+    let result = read_range_with_options(path, sheet, range_spec, &ReadRangeOptions::default())?;
     match result.data {
         ReadRangeData::Detailed(data) => Ok(data),
         _ => unreachable!("Detailed mode always returns Detailed variant"),
@@ -88,9 +83,7 @@ pub fn read_range_with_options(
     for row in r_start..r_start + effective_rows as u32 {
         let mut row_data = Vec::new();
         for col in c_start..=c_end {
-            let cell = range
-                .get_value((row, col as u32))
-                .unwrap_or(&Data::Empty);
+            let cell = range.get_value((row, col as u32)).unwrap_or(&Data::Empty);
             let formula = ws_formulas
                 .as_ref()
                 .and_then(|f| f.get_value((row, col as u32)).map(|s| s.to_string()));

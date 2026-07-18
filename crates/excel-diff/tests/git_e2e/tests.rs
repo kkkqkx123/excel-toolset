@@ -137,11 +137,7 @@ fn test_uninstall_local_preserves_entries() {
         // Set up git config
         let exe = std::env::current_exe().unwrap();
         Command::new("git")
-            .args([
-                "config",
-                "diff.excel-diff.command",
-                &exe.to_string_lossy(),
-            ])
+            .args(["config", "diff.excel-diff.command", &exe.to_string_lossy()])
             .output()
             .expect("git config");
 
@@ -150,9 +146,18 @@ fn test_uninstall_local_preserves_entries() {
         // Verify all Excel entries removed, others preserved
         let content =
             fs::read_to_string(std::env::current_dir().unwrap().join(".gitattributes")).unwrap();
-        assert!(content.contains("*.xml diff=xml-diff"), "xml entry preserved");
-        assert!(content.contains("*.json diff=json-diff"), "json entry preserved");
-        assert!(!content.contains("diff=excel-diff"), "all excel entries removed");
+        assert!(
+            content.contains("*.xml diff=xml-diff"),
+            "xml entry preserved"
+        );
+        assert!(
+            content.contains("*.json diff=json-diff"),
+            "json entry preserved"
+        );
+        assert!(
+            !content.contains("diff=excel-diff"),
+            "all excel entries removed"
+        );
     });
 }
 
@@ -172,10 +177,7 @@ fn test_global_install_sets_core_attributesfile() {
             .args(["config", "--global", "diff.excel-diff.command"])
             .output()
             .unwrap();
-        assert!(
-            out.status.success(),
-            "global diff config should be set"
-        );
+        assert!(out.status.success(), "global diff config should be set");
     });
 }
 
@@ -219,7 +221,6 @@ fn test_global_uninstall_preserves_core_attributesfile_if_not_empty() {
         // This test just verifies uninstall doesn't crash
     });
 }
-
 
 #[test]
 fn test_install_idempotent_does_not_duplicate_entry() {

@@ -39,7 +39,11 @@ fn main() {
             Ok(req) => req,
             Err(e) => {
                 let resp = protocol::JsonRpcResponse::parse_error();
-                let _ = writeln!(stdout, "{}", serde_json::to_string(&resp).unwrap_or_default());
+                let _ = writeln!(
+                    stdout,
+                    "{}",
+                    serde_json::to_string(&resp).unwrap_or_default()
+                );
                 let _ = stdout.flush();
                 eprintln!("Parse error: {e}");
                 continue;

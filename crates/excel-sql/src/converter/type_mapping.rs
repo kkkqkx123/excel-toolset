@@ -66,10 +66,7 @@ pub fn infer_column_types(data: &[Vec<CellDataType>]) -> Vec<CellDataType> {
 
                 *col_type = combine_types(col_type, cell_type);
 
-                if matches!(
-                    *col_type,
-                    CellDataType::String | CellDataType::DateTime
-                ) {
+                if matches!(*col_type, CellDataType::String | CellDataType::DateTime) {
                     break;
                 }
             }

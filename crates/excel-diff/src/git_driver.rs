@@ -117,14 +117,11 @@ pub fn install_git_driver(global: bool, patterns: &[String]) -> Result<()> {
 
         if need_set_attr {
             let output = Command::new("git")
-                .args([
-                    "config",
-                    "--global",
-                    "core.attributesfile",
-                    &attr_path_str,
-                ])
+                .args(["config", "--global", "core.attributesfile", &attr_path_str])
                 .output()
-                .map_err(|e| AppError::Custom(format!("Failed to set core.attributesfile: {}", e)))?;
+                .map_err(|e| {
+                    AppError::Custom(format!("Failed to set core.attributesfile: {}", e))
+                })?;
 
             if !output.status.success() {
                 return Err(AppError::Custom(format!(
@@ -189,12 +186,7 @@ fn uninstall_global() -> Result<()> {
 
     // Unset global git config
     let output = Command::new("git")
-        .args([
-            "config",
-            "--global",
-            "--unset",
-            "diff.excel-diff.command",
-        ])
+        .args(["config", "--global", "--unset", "diff.excel-diff.command"])
         .output()
         .map_err(|e| AppError::Custom(format!("Failed to unset global git config: {}", e)))?;
 
@@ -682,8 +674,8 @@ mod tests {
     #[test]
     fn test_gitattributes_trailing_newline_is_preserved() {
         let content = "*.xml diff=xml-diff\n";
-        let new_content = content.to_string()
-            + &format!("{} {}\n", DEFAULT_PATTERNS[0], GITATTR_PATTERN);
+        let new_content =
+            content.to_string() + &format!("{} {}\n", DEFAULT_PATTERNS[0], GITATTR_PATTERN);
         assert!(new_content.ends_with('\n'));
         assert!(new_content.contains("*.xlsx"));
         assert!(new_content.contains("*.xml"));

@@ -353,7 +353,7 @@ pub(crate) fn build_chart_error_bars(
         _ => ChartErrorBarsType::StandardError,
     };
 
-        error_bars.set_type(error_type);
+    error_bars.set_type(error_type);
 
     if let Some(ref dir) = cfg.direction {
         let direction = match dir.to_lowercase().as_str() {
@@ -499,11 +499,7 @@ pub fn create_table(
     crate::features::table::create_table(path, config, params)
 }
 
-pub fn remove_table(
-    path: &str,
-    params: &SecurityParams,
-    table_name: &str,
-) -> Result<WriteResult> {
+pub fn remove_table(path: &str, params: &SecurityParams, table_name: &str) -> Result<WriteResult> {
     crate::features::table::remove_table(path, table_name, params)
 }
 
@@ -525,6 +521,16 @@ pub fn create_pivot_table(
     crate::features::pivot_table::create_pivot_table(path, config, params)
 }
 
+// ── Slicer ──
+
+pub fn create_slicer(
+    path: &str,
+    params: &SecurityParams,
+    config: &SlicerConfig,
+) -> Result<WriteResult> {
+    crate::features::slicer::create_slicer(path, config, params)
+}
+
 // ── Sparkline ──
 
 pub fn add_sparkline(
@@ -543,6 +549,135 @@ pub fn remove_sparkline(
     target_col: u16,
 ) -> Result<WriteResult> {
     crate::features::sparkline::remove_sparkline(path, sheet, target_row, target_col, params)
+}
+
+// ── Sheet Visibility ──
+
+pub fn set_sheet_visibility(
+    path: &str,
+    sheet: &str,
+    visibility: &SheetVisibility,
+    params: &SecurityParams,
+) -> Result<WriteResult> {
+    crate::features::sheet_visibility::set_sheet_visibility(path, sheet, visibility, params)
+}
+
+// ── Freeze Panes ──
+
+pub fn set_freeze_panes(
+    path: &str,
+    params: &SecurityParams,
+    config: &FreezePanesConfig,
+) -> Result<WriteResult> {
+    crate::features::freeze_panes::set_freeze_panes(path, config, params)
+}
+
+pub fn clear_freeze_panes(path: &str, params: &SecurityParams, sheet: &str) -> Result<WriteResult> {
+    crate::features::freeze_panes::clear_freeze_panes(path, sheet, params)
+}
+
+// ── AutoFilter ──
+
+pub fn set_auto_filter(
+    path: &str,
+    params: &SecurityParams,
+    config: &AutoFilterConfig,
+) -> Result<WriteResult> {
+    crate::features::auto_filter::set_auto_filter(path, config, params)
+}
+
+pub fn remove_auto_filter(path: &str, params: &SecurityParams, sheet: &str) -> Result<WriteResult> {
+    crate::features::auto_filter::remove_auto_filter(path, sheet, params)
+}
+
+pub fn get_auto_filter(path: &str, sheet: &str) -> Result<AutoFilterInfo> {
+    crate::features::auto_filter::get_auto_filter(path, sheet)
+}
+
+// ── Sheet Protection ──
+
+pub fn protect_sheet(
+    path: &str,
+    params: &SecurityParams,
+    config: &SheetProtectionConfig,
+) -> Result<WriteResult> {
+    crate::features::sheet_protection::protect_sheet(path, config, params)
+}
+
+pub fn unprotect_sheet(path: &str, params: &SecurityParams, sheet: &str) -> Result<WriteResult> {
+    crate::features::sheet_protection::unprotect_sheet(path, sheet, params)
+}
+
+pub fn is_sheet_protected(path: &str, sheet: &str) -> Result<bool> {
+    crate::features::sheet_protection::is_sheet_protected(path, sheet)
+}
+
+// ── Page Setup ──
+
+pub fn configure_page_setup(
+    path: &str,
+    params: &SecurityParams,
+    config: &PageSetupConfig,
+) -> Result<WriteResult> {
+    crate::features::page_setup::configure_page_setup(path, config, params)
+}
+
+pub fn set_page_breaks(
+    path: &str,
+    params: &SecurityParams,
+    config: &PageBreakConfig,
+) -> Result<WriteResult> {
+    crate::features::page_setup::set_page_breaks(path, config, params)
+}
+
+pub fn clear_page_breaks(path: &str, params: &SecurityParams, sheet: &str) -> Result<WriteResult> {
+    crate::features::page_setup::clear_page_breaks(path, sheet, params)
+}
+
+// ── Image / Shape ──
+
+pub fn insert_image(
+    path: &str,
+    params: &SecurityParams,
+    config: &ImageConfig,
+) -> Result<WriteResult> {
+    crate::features::image::insert_image(path, config, params)
+}
+
+pub fn remove_image(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    anchor_cell: &str,
+) -> Result<WriteResult> {
+    crate::features::image::remove_image(path, sheet, anchor_cell, params)
+}
+
+pub fn insert_shape(
+    path: &str,
+    params: &SecurityParams,
+    config: &ShapeConfig,
+) -> Result<WriteResult> {
+    crate::features::image::insert_shape(path, config, params)
+}
+
+pub fn insert_textbox(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    anchor_cell: &str,
+    _text: &str,
+    width: u32,
+    height: u32,
+    _font_size: Option<f64>,
+    _font_color: Option<&str>,
+    fill_color: Option<&str>,
+    alt_text: Option<&str>,
+) -> Result<WriteResult> {
+    crate::features::image::insert_textbox(
+        path, sheet, anchor_cell, _text, width, height, _font_size, _font_color, fill_color,
+        alt_text, params,
+    )
 }
 
 #[cfg(test)]

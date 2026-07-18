@@ -1,11 +1,11 @@
 // Data category tools: append_row, insert_row, delete_row, filter, sort, dedup, sql.
 
-use std::collections::HashMap;
 use serde_json::Value;
+use std::collections::HashMap;
 
+use super::helpers::*;
 use crate::server::{ToolDef, ToolHandler};
 use excel_core::types::{CellValue, FilterCondition, FilterOp, SecurityParams, SortColumn};
-use super::helpers::*;
 
 pub fn tools() -> Vec<ToolDef> {
     vec![
@@ -16,8 +16,14 @@ pub fn tools() -> Vec<ToolDef> {
                 vec![
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Sheet name", true)),
-                    ("values", string_array_prop("Array of values for the new row")),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "values",
+                        string_array_prop("Array of values for the new row"),
+                    ),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "sheet", "values"],
             ),
@@ -30,8 +36,14 @@ pub fn tools() -> Vec<ToolDef> {
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Sheet name", true)),
                     ("row", int_prop("Row number to insert at (1-indexed)")),
-                    ("values", string_array_prop("Array of values for the new row")),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "values",
+                        string_array_prop("Array of values for the new row"),
+                    ),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "sheet", "row", "values"],
             ),
@@ -44,7 +56,10 @@ pub fn tools() -> Vec<ToolDef> {
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Sheet name", true)),
                     ("row", int_prop("Row number to delete (1-indexed)")),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "sheet", "row"],
             ),
@@ -57,7 +72,23 @@ pub fn tools() -> Vec<ToolDef> {
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Sheet name", true)),
                     ("column", int_prop("Column number (1-indexed)")),
-                    ("op", enum_prop("Filter operator", &["eq","neq","gt","gte","lt","lte","contains","startswith","endswith"])),
+                    (
+                        "op",
+                        enum_prop(
+                            "Filter operator",
+                            &[
+                                "eq",
+                                "neq",
+                                "gt",
+                                "gte",
+                                "lt",
+                                "lte",
+                                "contains",
+                                "startswith",
+                                "endswith",
+                            ],
+                        ),
+                    ),
                     ("value", string_prop("Value to compare against", true)),
                 ],
                 vec!["path", "sheet", "column", "op", "value"],
@@ -71,8 +102,14 @@ pub fn tools() -> Vec<ToolDef> {
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Sheet name", true)),
                     ("column", int_prop("Column number to sort by (1-indexed)")),
-                    ("desc", bool_prop("Sort descending (default: false)", Some(false))),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "desc",
+                        bool_prop("Sort descending (default: false)", Some(false)),
+                    ),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "sheet", "column"],
             ),
@@ -84,8 +121,14 @@ pub fn tools() -> Vec<ToolDef> {
                 vec![
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Sheet name", true)),
-                    ("column", int_prop("Optional: only check this column for duplicates (0-indexed)")),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "column",
+                        int_prop("Optional: only check this column for duplicates (0-indexed)"),
+                    ),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "sheet"],
             ),
@@ -96,7 +139,10 @@ pub fn tools() -> Vec<ToolDef> {
             input_schema: object_schema(
                 vec![
                     ("path", string_prop("Path to the .xlsx file", true)),
-                    ("sheet", string_prop("Sheet name to register as table", true)),
+                    (
+                        "sheet",
+                        string_prop("Sheet name to register as table", true),
+                    ),
                     ("query", string_prop("SQL query string", true)),
                 ],
                 vec!["path", "sheet", "query"],
@@ -124,18 +170,29 @@ fn strings_to_cell_values(values: &[String]) -> Vec<CellValue> {
 }
 
 fn string_to_cell_value(s: &str) -> CellValue {
-    if s.is_empty() { return CellValue::Empty; }
-    if s.eq_ignore_ascii_case("true") { return CellValue::Bool(true); }
-    if s.eq_ignore_ascii_case("false") { return CellValue::Bool(false); }
-    if let Ok(n) = s.parse::<f64>() { return CellValue::Number(n); }
+    if s.is_empty() {
+        return CellValue::Empty;
+    }
+    if s.eq_ignore_ascii_case("true") {
+        return CellValue::Bool(true);
+    }
+    if s.eq_ignore_ascii_case("false") {
+        return CellValue::Bool(false);
+    }
+    if let Ok(n) = s.parse::<f64>() {
+        return CellValue::Number(n);
+    }
     CellValue::String(s.to_string())
 }
 
 fn parse_filter_op(op: &str) -> FilterOp {
     match op {
-        "eq" => FilterOp::Eq, "neq" => FilterOp::Ne,
-        "gt" => FilterOp::Gt, "gte" => FilterOp::Ge,
-        "lt" => FilterOp::Lt, "lte" => FilterOp::Le,
+        "eq" => FilterOp::Eq,
+        "neq" => FilterOp::Ne,
+        "gt" => FilterOp::Gt,
+        "gte" => FilterOp::Ge,
+        "lt" => FilterOp::Lt,
+        "lte" => FilterOp::Le,
         "contains" => FilterOp::Contains,
         "startswith" => FilterOp::StartsWith,
         "endswith" => FilterOp::EndsWith,
@@ -166,7 +223,13 @@ fn handle_insert_row(args: Value) -> String {
 
     let new_rows: Vec<Vec<CellValue>> = vec![strings_to_cell_values(&values)];
 
-    match excel_core::excel_write::insert_rows(&path, &params(&path, dry_run), &sheet, row, &new_rows) {
+    match excel_core::excel_write::insert_rows(
+        &path,
+        &params(&path, dry_run),
+        &sheet,
+        row,
+        &new_rows,
+    ) {
         Ok(result) => to_result_string(&result),
         Err(e) => format!("Error: {e}"),
     }
@@ -210,9 +273,13 @@ fn handle_sort(args: Value) -> String {
     let desc = get_bool(&args, "desc").unwrap_or(false);
     let dry_run = get_bool(&args, "dry_run").unwrap_or(false);
 
-    let sort_columns = vec![SortColumn { column, descending: desc }];
+    let sort_columns = vec![SortColumn {
+        column,
+        descending: desc,
+    }];
 
-    match excel_core::operations::sort_sheet(&path, &params(&path, dry_run), &sheet, &sort_columns) {
+    match excel_core::operations::sort_sheet(&path, &params(&path, dry_run), &sheet, &sort_columns)
+    {
         Ok(result) => to_result_string(&result),
         Err(e) => format!("Error: {e}"),
     }

@@ -1,11 +1,11 @@
 // Data validation category tools.
 
-use std::collections::HashMap;
 use serde_json::Value;
+use std::collections::HashMap;
 
-use crate::server::{ToolDef, ToolHandler};
-use excel_core::types::{SecurityParams, DataValidationConfig};
 use super::helpers::*;
+use crate::server::{ToolDef, ToolHandler};
+use excel_core::types::{DataValidationConfig, SecurityParams};
 
 pub fn tools() -> Vec<ToolDef> {
     vec![
@@ -17,7 +17,10 @@ pub fn tools() -> Vec<ToolDef> {
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Sheet name", true)),
                     ("config", string_prop("JSON DataValidationConfig", true)),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "sheet", "config"],
             ),
@@ -29,8 +32,14 @@ pub fn tools() -> Vec<ToolDef> {
                 vec![
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Sheet name", true)),
-                    ("range", string_prop("Range to remove validation from", true)),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "range",
+                        string_prop("Range to remove validation from", true),
+                    ),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "sheet", "range"],
             ),
@@ -58,7 +67,12 @@ fn handle_add(args: Value) -> String {
         Err(e) => return format!("Error parsing config JSON: {e}"),
     };
 
-    match excel_core::excel_write::add_data_validation(&path, &params(&path, dry_run), &sheet, &config) {
+    match excel_core::excel_write::add_data_validation(
+        &path,
+        &params(&path, dry_run),
+        &sheet,
+        &config,
+    ) {
         Ok(r) => to_result_string(&r),
         Err(e) => format!("Error: {e}"),
     }
@@ -70,7 +84,12 @@ fn handle_remove(args: Value) -> String {
     let range = get_string(&args, "range").unwrap_or_default();
     let dry_run = get_bool(&args, "dry_run").unwrap_or(false);
 
-    match excel_core::excel_write::remove_data_validation(&path, &params(&path, dry_run), &sheet, &range) {
+    match excel_core::excel_write::remove_data_validation(
+        &path,
+        &params(&path, dry_run),
+        &sheet,
+        &range,
+    ) {
         Ok(r) => to_result_string(&r),
         Err(e) => format!("Error: {e}"),
     }

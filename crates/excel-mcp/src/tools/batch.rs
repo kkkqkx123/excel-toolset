@@ -1,27 +1,31 @@
 // Batch category tools.
 
-use std::collections::HashMap;
 use serde_json::Value;
+use std::collections::HashMap;
 
+use super::helpers::*;
 use crate::server::{ToolDef, ToolHandler};
 use excel_core::types::BatchOperation;
-use super::helpers::*;
 
 pub fn tools() -> Vec<ToolDef> {
-    vec![
-        ToolDef {
-            name: "excel_batch_modify",
-            description: "Execute multiple operations atomically. Operations are a JSON string of BatchOperation array.",
-            input_schema: object_schema(
-                vec![
-                    ("path", string_prop("Path to the .xlsx file", true)),
-                    ("operations", string_prop("JSON string of BatchOperation array", true)),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
-                ],
-                vec!["path", "operations"],
-            ),
-        },
-    ]
+    vec![ToolDef {
+        name: "excel_batch_modify",
+        description: "Execute multiple operations atomically. Operations are a JSON string of BatchOperation array.",
+        input_schema: object_schema(
+            vec![
+                ("path", string_prop("Path to the .xlsx file", true)),
+                (
+                    "operations",
+                    string_prop("JSON string of BatchOperation array", true),
+                ),
+                (
+                    "dry_run",
+                    bool_prop("If true, simulate without writing", Some(false)),
+                ),
+            ],
+            vec!["path", "operations"],
+        ),
+    }]
 }
 
 pub fn register(handlers: &mut HashMap<String, ToolHandler>) {

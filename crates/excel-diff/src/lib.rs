@@ -72,18 +72,14 @@ pub fn diff_with_semantic(old_path: &str, new_path: &str) -> excel_types::Result
             .unwrap_or_default();
         let (cell, change_type, impact) = match op {
             semantic::grouper::LogicalOperation::CellModified {
-                sheet,
-                cell_ref,
-                ..
+                sheet, cell_ref, ..
             } => (
                 format!("{}!{}", sheet, cell_ref),
                 "modified".to_string(),
                 None,
             ),
             semantic::grouper::LogicalOperation::CellPassive {
-                sheet,
-                cell_ref,
-                ..
+                sheet, cell_ref, ..
             } => (
                 format!("{}!{}", sheet, cell_ref),
                 "passive".to_string(),
@@ -464,20 +460,24 @@ mod tests {
 
     #[test]
     fn test_formula_tracker_detect_cycles() {
-        use std::collections::HashMap;
         use crate::formula_tracker::FormulaTracker;
+        use std::collections::HashMap;
 
         // No cycles
         let mut deps1 = HashMap::new();
         deps1.insert("A1".to_string(), ["B1".to_string()].into());
         deps1.insert("B1".to_string(), ["C1".to_string()].into());
-        let tracker1 = FormulaTracker { dependencies: deps1 };
+        let tracker1 = FormulaTracker {
+            dependencies: deps1,
+        };
         assert!(tracker1.detect_cycles().is_empty());
 
         // Self-reference cycle
         let mut deps2 = HashMap::new();
         deps2.insert("A1".to_string(), ["A1".to_string()].into());
-        let tracker2 = FormulaTracker { dependencies: deps2 };
+        let tracker2 = FormulaTracker {
+            dependencies: deps2,
+        };
         assert_eq!(tracker2.detect_cycles(), vec!["A1".to_string()]);
 
         // Multi-cell cycle — any of A1, B1, C1 may be reported first
@@ -485,7 +485,9 @@ mod tests {
         deps3.insert("A1".to_string(), ["B1".to_string()].into());
         deps3.insert("B1".to_string(), ["C1".to_string()].into());
         deps3.insert("C1".to_string(), ["A1".to_string()].into());
-        let tracker3 = FormulaTracker { dependencies: deps3 };
+        let tracker3 = FormulaTracker {
+            dependencies: deps3,
+        };
         let cycles3 = tracker3.detect_cycles();
         assert_eq!(cycles3.len(), 1);
         assert!(
@@ -507,13 +509,11 @@ mod tests {
         // Build two in-memory sheets to verify FormulaTracker comparison logic
         let sheet_old = SheetData {
             name: "S1".into(),
-            rows: vec![
-                vec![CellData {
-                    value: Some("1".into()),
-                    data_type: CellDataType::Float,
-                    formula: None,
-                }],
-            ],
+            rows: vec![vec![CellData {
+                value: Some("1".into()),
+                data_type: CellDataType::Float,
+                formula: None,
+            }]],
         };
         let sheet_new = SheetData {
             name: "S1".into(),

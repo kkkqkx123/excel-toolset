@@ -300,10 +300,7 @@ mod tests {
         session.load_sheet("s1", &sheet1(), false).unwrap();
         session.load_sheet("s2", &sheet2(), false).unwrap();
         let results = session
-            .execute_multi(&[
-                "SELECT * FROM \"s1\"",
-                "SELECT COUNT(*) AS cnt FROM \"s2\"",
-            ])
+            .execute_multi(&["SELECT * FROM \"s1\"", "SELECT COUNT(*) AS cnt FROM \"s2\""])
             .unwrap();
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].row_count, 2);

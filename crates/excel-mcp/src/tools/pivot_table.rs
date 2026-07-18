@@ -1,11 +1,11 @@
 // Pivot table category tools.
 
-use std::collections::HashMap;
 use serde_json::Value;
+use std::collections::HashMap;
 
+use super::helpers::*;
 use crate::server::{ToolDef, ToolHandler};
 use excel_core::types::PivotTableConfig;
-use super::helpers::*;
 
 pub fn tools() -> Vec<ToolDef> {
     vec![ToolDef {
@@ -15,7 +15,10 @@ pub fn tools() -> Vec<ToolDef> {
             vec![
                 ("path", string_prop("Path to the .xlsx file", true)),
                 ("config", string_prop("JSON PivotTableConfig", true)),
-                ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                (
+                    "dry_run",
+                    bool_prop("If true, simulate without writing", Some(false)),
+                ),
             ],
             vec!["path", "config"],
         ),

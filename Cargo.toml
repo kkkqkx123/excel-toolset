@@ -8,6 +8,7 @@ members = [
     "crates/excel-cli",
     "crates/excel-http",
     "crates/excel-mcp",
+    "crates/excel-formula",
 ]
 
 [workspace.package]

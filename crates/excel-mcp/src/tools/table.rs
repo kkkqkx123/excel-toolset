@@ -1,11 +1,11 @@
 // Table (ListObject) category tools.
 
-use std::collections::HashMap;
 use serde_json::Value;
+use std::collections::HashMap;
 
+use super::helpers::*;
 use crate::server::{ToolDef, ToolHandler};
 use excel_core::types::{SecurityParams, TableConfig};
-use super::helpers::*;
 
 pub fn tools() -> Vec<ToolDef> {
     vec![
@@ -15,8 +15,14 @@ pub fn tools() -> Vec<ToolDef> {
             input_schema: object_schema(
                 vec![
                     ("path", string_prop("Path to the .xlsx file", true)),
-                    ("config", string_prop("JSON TableConfig: {sheet, range, name?, style?}", true)),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "config",
+                        string_prop("JSON TableConfig: {sheet, range, name?, style?}", true),
+                    ),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "config"],
             ),
@@ -28,7 +34,10 @@ pub fn tools() -> Vec<ToolDef> {
                 vec![
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("name", string_prop("Table name to remove", true)),
-                    ("dry_run", bool_prop("If true, simulate without writing", Some(false))),
+                    (
+                        "dry_run",
+                        bool_prop("If true, simulate without writing", Some(false)),
+                    ),
                 ],
                 vec!["path", "name"],
             ),

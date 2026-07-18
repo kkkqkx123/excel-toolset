@@ -75,6 +75,9 @@ pub struct PivotTableConfig {
     /// Grouping configuration for date fields
     #[serde(skip_serializing_if = "Option::is_none")]
     pub date_grouping: Option<DateGrouping>,
+    /// Calculated fields defined from existing data fields
+    #[serde(default)]
+    pub calculated_fields: Vec<PivotCalculatedField>,
 }
 
 fn default_true() -> bool {
@@ -187,4 +190,24 @@ pub struct DateGrouping {
     /// Group by day
     #[serde(default)]
     pub by_day: bool,
+}
+
+/// A calculated field in a pivot table.
+///
+/// Allows defining a virtual field based on an arithmetic expression
+/// involving existing data columns. The expression supports the
+/// four basic arithmetic operators (+, -, *, /) and parentheses.
+/// Field names in the expression are matched against column headers.
+///
+/// Example formulas:
+///   "=Revenue - Cost"
+///   "=Price * Quantity"
+///   "=(Income - Expense) * TaxRate"
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PivotCalculatedField {
+    /// Display name for the calculated field
+    pub name: String,
+    /// Formula expression using existing field names
+    /// Supports +, -, *, / and parentheses
+    pub formula: String,
 }

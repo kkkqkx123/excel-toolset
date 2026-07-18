@@ -23,6 +23,13 @@ pub struct SheetListReq {
     pub path: String,
 }
 
+#[derive(Deserialize)]
+pub struct SheetVisibilityReq {
+    pub path: String,
+    pub name: String,
+    pub visibility: SheetVisibility,
+}
+
 pub async fn sheet_list(Json(req): Json<SheetListReq>) -> Json<ApiResponse<Vec<String>>> {
     match excel_read::list_sheets(&req.path) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
@@ -61,6 +68,20 @@ pub async fn sheet_rename(Json(req): Json<RenameSheetReq>) -> Json<ApiResponse<W
         file_path: req.path.clone(),
     };
     match excel_write::rename_sheet(&req.path, &params, &req.old, &req.new) {
+        Ok(data) => Json(ApiResponse::ok(Some(data))),
+        Err(e) => Json(ApiResponse::err(e)),
+    }
+}
+
+pub async fn sheet_set_visibility(
+    Json(req): Json<SheetVisibilityReq>,
+) -> Json<ApiResponse<WriteResult>> {
+    let params = SecurityParams {
+        dry_run: false,
+        create_backup: true,
+        file_path: req.path.clone(),
+    };
+    match excel_write::set_sheet_visibility(&req.path, &req.name, &req.visibility, &params) {
         Ok(data) => Json(ApiResponse::ok(Some(data))),
         Err(e) => Json(ApiResponse::err(e)),
     }

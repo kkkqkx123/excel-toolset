@@ -1,11 +1,11 @@
 // Search category tools.
 
-use std::collections::HashMap;
 use serde_json::Value;
+use std::collections::HashMap;
 
-use crate::server::{ToolDef, ToolHandler};
-use excel_core::features::search::{SearchQuery, SearchType, MatchType};
 use super::helpers::*;
+use crate::server::{ToolDef, ToolHandler};
+use excel_core::features::search::{MatchType, SearchQuery, SearchType};
 
 pub fn tools() -> Vec<ToolDef> {
     vec![
@@ -16,10 +16,25 @@ pub fn tools() -> Vec<ToolDef> {
                 vec![
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("pattern", string_prop("Search pattern", true)),
-                    ("match_type", enum_prop("Match type", &["contains", "exact", "regex"])),
-                    ("search_type", enum_prop("Search in values, formulas, or both", &["values", "formulas", "both"])),
-                    ("case_sensitive", bool_prop("Case sensitive search", Some(false))),
-                    ("sheets", string_array_prop("Optional: specific sheets to search")),
+                    (
+                        "match_type",
+                        enum_prop("Match type", &["contains", "exact", "regex"]),
+                    ),
+                    (
+                        "search_type",
+                        enum_prop(
+                            "Search in values, formulas, or both",
+                            &["values", "formulas", "both"],
+                        ),
+                    ),
+                    (
+                        "case_sensitive",
+                        bool_prop("Case sensitive search", Some(false)),
+                    ),
+                    (
+                        "sheets",
+                        string_array_prop("Optional: specific sheets to search"),
+                    ),
                 ],
                 vec!["path", "pattern"],
             ),
@@ -32,9 +47,21 @@ pub fn tools() -> Vec<ToolDef> {
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Sheet name", true)),
                     ("pattern", string_prop("Search pattern", true)),
-                    ("match_type", enum_prop("Match type", &["contains", "exact", "regex"])),
-                    ("search_type", enum_prop("Search in values, formulas, or both", &["values", "formulas", "both"])),
-                    ("case_sensitive", bool_prop("Case sensitive search", Some(false))),
+                    (
+                        "match_type",
+                        enum_prop("Match type", &["contains", "exact", "regex"]),
+                    ),
+                    (
+                        "search_type",
+                        enum_prop(
+                            "Search in values, formulas, or both",
+                            &["values", "formulas", "both"],
+                        ),
+                    ),
+                    (
+                        "case_sensitive",
+                        bool_prop("Case sensitive search", Some(false)),
+                    ),
                 ],
                 vec!["path", "sheet", "pattern"],
             ),

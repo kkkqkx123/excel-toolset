@@ -1,10 +1,10 @@
 // Diff category tools: file, range, semantic, formula_deps.
 
-use std::collections::HashMap;
 use serde_json::Value;
+use std::collections::HashMap;
 
-use crate::server::{ToolDef, ToolHandler};
 use super::helpers::*;
+use crate::server::{ToolDef, ToolHandler};
 
 pub fn tools() -> Vec<ToolDef> {
     vec![
@@ -15,7 +15,10 @@ pub fn tools() -> Vec<ToolDef> {
                 vec![
                     ("old_path", string_prop("Path to the old .xlsx file", true)),
                     ("new_path", string_prop("Path to the new .xlsx file", true)),
-                    ("sheet", string_prop("Optional: only diff a specific sheet", false)),
+                    (
+                        "sheet",
+                        string_prop("Optional: only diff a specific sheet", false),
+                    ),
                 ],
                 vec!["old_path", "new_path"],
             ),

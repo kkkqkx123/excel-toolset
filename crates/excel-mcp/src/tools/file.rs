@@ -1,10 +1,10 @@
 // File category tools: create, info, backup.
 
-use std::collections::HashMap;
 use serde_json::Value;
+use std::collections::HashMap;
 
-use crate::server::{ToolDef, ToolHandler};
 use super::helpers::*;
+use crate::server::{ToolDef, ToolHandler};
 
 pub fn tools() -> Vec<ToolDef> {
     vec![
@@ -14,7 +14,10 @@ pub fn tools() -> Vec<ToolDef> {
             input_schema: object_schema(
                 vec![
                     ("path", string_prop("Path to the new .xlsx file", true)),
-                    ("sheet", string_prop("Name of the initial sheet (default: Sheet1)", false)),
+                    (
+                        "sheet",
+                        string_prop("Name of the initial sheet (default: Sheet1)", false),
+                    ),
                 ],
                 vec!["path"],
             ),
@@ -23,9 +26,7 @@ pub fn tools() -> Vec<ToolDef> {
             name: "excel_file_info",
             description: "Get information about an Excel file, including sheets, size, and SHA-256 hash.",
             input_schema: object_schema(
-                vec![
-                    ("path", string_prop("Path to the .xlsx file", true)),
-                ],
+                vec![("path", string_prop("Path to the .xlsx file", true))],
                 vec!["path"],
             ),
         },
@@ -33,9 +34,7 @@ pub fn tools() -> Vec<ToolDef> {
             name: "excel_file_backup",
             description: "Create a timestamped backup of an Excel file.",
             input_schema: object_schema(
-                vec![
-                    ("path", string_prop("Path to the .xlsx file", true)),
-                ],
+                vec![("path", string_prop("Path to the .xlsx file", true))],
                 vec!["path"],
             ),
         },
