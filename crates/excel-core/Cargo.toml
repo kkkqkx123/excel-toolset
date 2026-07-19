@@ -3,24 +3,27 @@ name = "excel-core"
 version.workspace = true
 edition.workspace = true
 
+[features]
+default = ["full"]
+full = ["excel-formula", "rust_xlsxwriter", "regex", "zip", "flate2"]
+minimal = []
+sql = ["excel-sql"]
+
 [dependencies]
 excel-types = { path = "../excel-types" }
 excel-sql = { path = "../excel-sql", optional = true }
-excel-formula = { path = "../excel-formula" }
+excel-formula = { path = "../excel-formula", optional = true }
 calamine.workspace = true
-rust_xlsxwriter.workspace = true
+rust_xlsxwriter = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
 sha2 = "0.11"
 chrono.workspace = true
 csv = "1.4"
-regex = "1.12"
-zip = "8.6"
-flate2 = "1"
+regex = { version = "1.12", optional = true }
+zip = { version = "8.6", optional = true }
+flate2 = { version = "1", optional = true }
 thiserror.workspace = true
-
-[features]
-sql = ["excel-sql"]
 
 [dev-dependencies]
 tempfile = "3"

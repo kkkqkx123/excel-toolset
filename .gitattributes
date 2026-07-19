@@ -1,1 +1,4 @@
 *.xlsx diff=excel-diff
+*.xls diff=excel-diff
+*.xlsm diff=excel-diff
+*.xlsb diff=excel-diff

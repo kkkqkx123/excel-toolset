@@ -9,7 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 excel-types = { path = "../excel-types" }
-excel-core = { path = "../excel-core" }
+excel-core = { path = "../excel-core", features = ["minimal"] }
 serde.workspace = true
 serde_json.workspace = true
 

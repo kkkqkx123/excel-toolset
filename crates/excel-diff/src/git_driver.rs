@@ -301,7 +301,12 @@ fn get_invocation_command() -> Result<String> {
         }
 
         // For global installs, prefer the command name so it survives binary upgrades.
-        // Check if the binary is on PATH (global install scenario).
+        // Priority 1: standalone excel-diff binary (lightweight, no clap dependency)
+        if let Ok(_path) = which_binary("excel-diff") {
+            return Ok("excel-diff git-driver".to_string());
+        }
+
+        // Priority 2: excel-cli gateway (heavier, but works as fallback)
         if let Ok(_path) = which_binary("excel-cli") {
             return Ok("excel-cli diff git-driver".to_string());
         }
@@ -339,34 +344,32 @@ fn which_binary(name: &str) -> Result<String> {
 const DEFAULT_COMMAND_NAME: &str = "excel-cli";
 
 /// Get file paths for git diff driver.
-/// Supports both environment variables (standard Git diff driver protocol)
-/// and command line arguments.
+///
+/// Resolution order (first match wins):
+///   1. Environment variables `GIT_DIFF_PATH_OLD` / `GIT_DIFF_PATH_NEW`
+///   2. Git diff driver protocol (positional arguments):
+///      `<path> <old-file> <old-hex> <old-mode> <new-file> <new-hex> <new-mode>`
+///   3. Heuristic CLI argument parsing (for direct invocation with file paths)
 pub fn get_git_diff_file_paths() -> Result<(String, String)> {
-    // Priority 1: Use environment variables (standard Git diff driver protocol)
+    // Priority 1: Use environment variables
     if let (Ok(old), Ok(new)) = (env::var(GIT_DIFF_PATH_OLD), env::var(GIT_DIFF_PATH_NEW)) {
-        // Skip validation for empty paths - let downstream functions handle errors
         return Ok((old, new));
     }
 
-    // Priority 2: Use command line arguments
     let args: Vec<String> = env::args().collect();
 
-    // Skip the executable path and subcommands
-    // Expected format: <exe> diff file <old> <new>
-    // Or: <exe> diff git-driver <old> <new>
-    // Or: <exe> <old> <new> (when called directly)
+    // Priority 2: Parse git diff driver protocol by position.
+    // Git calls external diff drivers with:
+    //   <path> <old-file> <old-hex> <old-mode> <new-file> <new-hex> <new-mode>
+    // After skipping the subcommand, old-file is at index 1 and new-file at index 4.
+    if let Some((old, new)) = parse_git_driver_args(&args) {
+        return Ok((old, new));
+    }
 
+    // Priority 3: Fall back to heuristic parsing (e.g. `excel-diff <old> <new>`)
     let paths = parse_cli_args(&args)?;
-
     if paths.len() >= 2 {
-        let old = paths[0].clone();
-        let new = paths[1].clone();
-
-        // Validate paths before returning
-        validate_path(&old)?;
-        validate_path(&new)?;
-
-        Ok((old, new))
+        Ok((paths[0].clone(), paths[1].clone()))
     } else {
         Err(AppError::Custom(format!(
             "Failed to get file paths. Expected 2 paths, got {}. \
@@ -376,6 +379,30 @@ pub fn get_git_diff_file_paths() -> Result<(String, String)> {
             GIT_DIFF_PATH_NEW
         )))
     }
+}
+
+/// Parse arguments using the git diff driver positional protocol.
+///
+/// Git calls external diff drivers with 7 trailing arguments:
+///   `<path> <old-file> <old-hex> <old-mode> <new-file> <new-hex> <new-mode>`
+///
+/// After skipping the executable (index 0) and subcommand (`git-driver`):
+///   - Index 0: path (repo-relative, not needed)
+///   - Index 1: old-file (temp file for old version)
+///   - Index 2: old-hex
+///   - Index 3: old-mode
+///   - Index 4: new-file (temp file for new version)
+fn parse_git_driver_args(args: &[String]) -> Option<(String, String)> {
+    // Skip executable, then skip trailing subcommand keywords
+    let mut iter = args.iter().skip(1).skip_while(|a| a.as_str() == "git-driver");
+
+    let _path = iter.next()?; // repo path, skip
+    let old_file = iter.next()?; // old-file temp path
+    let _ = iter.next(); // old-hex
+    let _ = iter.next(); // old-mode
+    let new_file = iter.next()?; // new-file temp path
+
+    Some((old_file.clone(), new_file.clone()))
 }
 
 /// Parse command line arguments to extract file paths.

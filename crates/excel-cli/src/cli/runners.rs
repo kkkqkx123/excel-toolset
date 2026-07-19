@@ -1002,7 +1002,7 @@ fn run_diff(args: &DiffArgs, format: &str) -> Result<serde_json::Value> {
             let deps = excel_diff::diff_formula_dependencies(old_path, new_path, sheet)?;
             Ok(serde_json::to_value(deps).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
-        DiffSub::GitDriver => {
+        DiffSub::GitDriver { args: _ } => {
             // Get file paths from environment variables or command line arguments
             let (old_path, new_path) = get_git_diff_file_paths()?;
 

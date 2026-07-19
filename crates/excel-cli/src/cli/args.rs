@@ -435,7 +435,18 @@ pub enum DiffSub {
     /// Special command for git diff driver integration.
     /// Automatically reads file paths from environment variables (GIT_DIFF_PATH_OLD, GIT_DIFF_PATH_NEW)
     /// or from command line arguments.
-    GitDriver,
+    ///
+    /// Git calls the external diff driver with 7 trailing arguments:
+    /// <path> <old-file> <old-hex> <old-mode> <new-file> <new-hex> <new-mode>
+    /// These must be accepted (via trailing_var_arg) even though they are parsed
+    /// manually by get_git_diff_file_paths() rather than by clap.
+    #[command(trailing_var_arg = true)]
+    GitDriver {
+        /// Git-provided arguments (path, old-file, old-hex, old-mode, new-file, new-hex, new-mode).
+        /// Parsed manually by get_git_diff_file_paths() using env vars or positional args.
+        #[arg(hide = true)]
+        args: Vec<String>,
+    },
     /// Install the git diff driver for Excel files.
     /// By default configures the current repository only.
     /// Use --global to apply system-wide.
