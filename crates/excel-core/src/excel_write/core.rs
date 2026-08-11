@@ -1,11 +1,52 @@
 use rust_xlsxwriter::{Chart, Format, Table as XlsxTable, Workbook, Worksheet};
 
 use crate::excel_read::read_all_sheets_to_map;
-use crate::security::{compute_file_hash, create_backup};
+use crate::security::{append_history_entry, compute_file_hash, create_backup};
 use crate::types::*;
 use crate::utils::cell_ref;
 
 use super::format::{build_format, map_chart_type};
+
+/// Deterministic worksheet ordering.
+///
+/// `read_all_sheets_to_map` returns a `HashMap`, so iterating it directly
+/// re-shuffled the workbook's sheets on every single write. We keep the
+/// workbook's original sheet order for sheets that still exist and append any
+/// newly created sheets in name order, so repeated writes are reproducible.
+fn ordered_sheet_names(
+    path: &str,
+    data: &std::collections::HashMap<String, SheetData>,
+) -> Vec<String> {
+    let original = crate::excel_read::list_sheets(path).unwrap_or_default();
+    let mut names: Vec<String> = original
+        .into_iter()
+        .filter(|n| data.contains_key(n))
+        .collect();
+    let mut extras: Vec<String> = data
+        .keys()
+        .filter(|n| !names.contains(n))
+        .cloned()
+        .collect();
+    extras.sort();
+    names.extend(extras);
+    names
+}
+
+/// 把一次成功写操作记录到审计历史（非致命，失败不影响主流程）。T2.30。
+fn record_write_history(path: &str, op: &str, old_hash: &str, new_hash: &str, dry_run: bool) {
+    if dry_run {
+        return;
+    }
+    let entry = WorkbookHistoryEntry {
+        timestamp: chrono::Utc::now(),
+        operation_type: op.to_string(),
+        target_path: path.to_string(),
+        old_hash: old_hash.to_string(),
+        new_hash: new_hash.to_string(),
+        result: "success".to_string(),
+    };
+    let _ = append_history_entry(path, &entry);
+}
 
 pub fn modify_file<F>(path: &str, params: &SecurityParams, modifier: F) -> Result<WriteResult>
 where
@@ -31,9 +72,10 @@ where
     }
 
     let mut wb = Workbook::new();
-    for (name, data) in &new_data {
+    for name in ordered_sheet_names(path, &new_data) {
+        let data = &new_data[&name];
         let ws = wb.add_worksheet();
-        ws.set_name(name).map_err(AppError::Xlsx)?;
+        ws.set_name(&name).map_err(AppError::Xlsx)?;
         write_sheet_data(ws, data)?;
     }
 
@@ -43,6 +85,8 @@ where
         wb.save(path).map_err(AppError::Xlsx)?;
         compute_file_hash(path).map_err(AppError::Io)?
     };
+
+    record_write_history(path, "modify", &old_hash, &new_hash, params.dry_run);
 
     Ok(WriteResult {
         success: true,
@@ -73,9 +117,10 @@ where
     let old_data = read_all_sheets_to_map(path)?;
     let mut wb = Workbook::new();
 
-    for (name, data) in &old_data {
+    for name in ordered_sheet_names(path, &old_data) {
+        let data = &old_data[&name];
         let ws = wb.add_worksheet();
-        ws.set_name(name).map_err(AppError::Xlsx)?;
+        ws.set_name(&name).map_err(AppError::Xlsx)?;
         write_sheet_data(ws, data)?;
     }
 
@@ -87,6 +132,8 @@ where
         wb.save(path).map_err(AppError::Xlsx)?;
         compute_file_hash(path).map_err(AppError::Io)?
     };
+
+    record_write_history(path, "modify", &old_hash, &new_hash, params.dry_run);
 
     Ok(WriteResult {
         success: true,
@@ -165,6 +212,7 @@ pub fn add(data: &mut std::collections::HashMap<String, SheetData>, name: &str) 
         SheetData {
             name: name.to_string(),
             rows: Vec::new(),
+            ..Default::default()
         },
     );
     Ok(())
@@ -279,10 +327,24 @@ pub fn write_sheet_data(ws: &mut Worksheet, data: &SheetData) -> Result<()> {
     Ok(())
 }
 
+/// Build a formula carrying its cached result.
+///
+/// rust_xlsxwriter writes `<v>0</v>` unless `set_result` is called, which made
+/// every round-tripped formula read back as `0` under `data_only=True`. The
+/// value calamine cached for that cell is already in `CellData::value`, so we
+/// simply carry it through instead of recomputing anything.
+fn formula_with_cached_result(cell: &CellData, formula: &str) -> rust_xlsxwriter::Formula {
+    let f = rust_xlsxwriter::Formula::new(formula);
+    match cell.value.as_deref() {
+        Some(cached) if !cached.is_empty() => f.set_result(cached),
+        _ => f,
+    }
+}
+
 pub fn write_cell_data(ws: &mut Worksheet, row: u32, col: u16, cell: &CellData) -> Result<()> {
     if let Some(ref formula) = cell.formula {
-        ws.write_formula(row, col, formula.as_str())
-            .map_err(AppError::Xlsx)?;
+        let f = formula_with_cached_result(cell, formula.as_str());
+        ws.write_formula(row, col, f).map_err(AppError::Xlsx)?;
         return Ok(());
     }
     if let Some(ref val) = cell.value {
@@ -324,6 +386,14 @@ pub fn write_cell_with_format(
     cell: &CellData,
     fmt: &Format,
 ) -> Result<()> {
+    // Same cached-result handling as `write_cell_data`, otherwise formatting a
+    // formula cell silently drops its formula and cached value.
+    if let Some(ref formula) = cell.formula {
+        let f = formula_with_cached_result(cell, formula.as_str());
+        ws.write_formula_with_format(row, col, f, fmt)
+            .map_err(AppError::Xlsx)?;
+        return Ok(());
+    }
     if let Some(ref val) = cell.value {
         match cell.data_type {
             CellDataType::Float | CellDataType::Int | CellDataType::DateTime => {
@@ -349,11 +419,14 @@ pub fn write_cell_with_format(
 }
 
 pub fn build_workbook_with_ops(
+    path: &str,
     data: &std::collections::HashMap<String, SheetData>,
     operations: &[BatchOperation],
 ) -> Result<Workbook> {
     let mut wb = Workbook::new();
-    let sheet_names: Vec<&str> = data.keys().map(|s| s.as_str()).collect();
+    // Preserve the workbook's original sheet order instead of `HashMap` order.
+    let ordered = ordered_sheet_names(path, data);
+    let sheet_names: Vec<&str> = ordered.iter().map(|s| s.as_str()).collect();
 
     for name in &sheet_names {
         let sd = &data[*name];
@@ -565,6 +638,7 @@ mod tests {
         SheetData {
             name: name.to_string(),
             rows,
+            ..Default::default()
         }
     }
 
@@ -613,6 +687,7 @@ mod tests {
         let mut sheet = SheetData {
             name: "Test".to_string(),
             rows: vec![vec![make_cell("a", CellDataType::String)]],
+            ..Default::default()
         };
         ensure_dimensions(&mut sheet, 3, 0);
         assert_eq!(sheet.rows.len(), 4);
@@ -623,6 +698,7 @@ mod tests {
         let mut sheet = SheetData {
             name: "Test".to_string(),
             rows: vec![vec![make_cell("a", CellDataType::String)]],
+            ..Default::default()
         };
         ensure_dimensions(&mut sheet, 0, 3);
         assert_eq!(sheet.rows[0].len(), 4);

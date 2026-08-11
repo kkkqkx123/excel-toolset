@@ -61,16 +61,17 @@ impl QueryCache {
         let now = Instant::now();
         let ttl = Duration::from_secs(self.config.ttl_seconds);
 
-        if let Some(entry) = self.entries.get_mut(key) {
-            if now.duration_since(entry.created_at) > ttl {
-                self.entries.remove(key);
-                return None;
-            }
-            entry.last_accessed = now;
-            Some(&entry.result)
-        } else {
-            None
+        let expired = match self.entries.get(key) {
+            Some(entry) => now.duration_since(entry.created_at) > ttl,
+            None => return None,
+        };
+        if expired {
+            self.entries.remove(key);
+            return None;
         }
+        let entry = self.entries.get_mut(key)?;
+        entry.last_accessed = now;
+        Some(&entry.result)
     }
 
     /// Store a query result under the given key.

@@ -250,6 +250,7 @@ fn scenario_in_memory_diff() {
             vec![cell_data("Name"), cell_data("Age")],
             vec![cell_data("Alice"), cell_data("30")],
         ],
+        ..Default::default()
     };
     let new_sheet = SheetData {
         name: "Sheet1".into(),
@@ -257,6 +258,7 @@ fn scenario_in_memory_diff() {
             vec![cell_data("Name"), cell_data("Age")],
             vec![cell_data("Alice"), cell_data("31")],
         ],
+        ..Default::default()
     };
 
     let diffs = diff_sheet_data(&old_sheet, &new_sheet);
@@ -280,6 +282,7 @@ fn scenario_passive_formula_change() {
             vec![cell_data("10")],             // A1: input value
             vec![formula_cell("20", "=A1*2")], // A2: formula depends on A1
         ],
+        ..Default::default()
     };
     let new_sheet = SheetData {
         name: "Calc".into(),
@@ -287,6 +290,7 @@ fn scenario_passive_formula_change() {
             vec![cell_data("15")],             // A1: value changed
             vec![formula_cell("30", "=A1*2")], // A2: formula same, value recalculated
         ],
+        ..Default::default()
     };
 
     let diffs = diff_sheet_data(&old_sheet, &new_sheet);
@@ -315,6 +319,7 @@ fn scenario_row_add_delete_in_memory() {
             vec![cell_data("Row1"), cell_data("10")],
             vec![cell_data("Row2"), cell_data("20")],
         ],
+        ..Default::default()
     };
     let new_sheet = SheetData {
         name: "Data".into(),
@@ -322,6 +327,7 @@ fn scenario_row_add_delete_in_memory() {
             vec![cell_data("Header1"), cell_data("Header2")],
             vec![cell_data("Row1"), cell_data("10")],
         ],
+        ..Default::default()
     };
 
     let diffs = diff_sheet_data(&old_sheet, &new_sheet);
@@ -348,6 +354,7 @@ fn scenario_natural_language_diff() {
             vec![cell_data("Name"), cell_data("Value")],
             vec![cell_data("X"), cell_data("10")],
         ],
+        ..Default::default()
     };
     let new_sheet = SheetData {
         name: "Report".into(),
@@ -355,6 +362,7 @@ fn scenario_natural_language_diff() {
             vec![cell_data("Name"), cell_data("Value")],
             vec![cell_data("X"), cell_data("99")],
         ],
+        ..Default::default()
     };
 
     let diffs = diff_sheet_data(&old_sheet, &new_sheet);

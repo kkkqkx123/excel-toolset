@@ -3,6 +3,7 @@ use serde::Deserialize;
 
 use excel_core::excel_write;
 use excel_core::types::*;
+use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct AutoFilterSetReq {
@@ -17,7 +18,7 @@ pub struct AutoFilterSheetReq {
     pub sheet: String,
 }
 
-pub async fn auto_filter_set(Json(req): Json<AutoFilterSetReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn auto_filter_set(Json(req): Json<AutoFilterSetReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: false,
         create_backup: true,
@@ -28,30 +29,30 @@ pub async fn auto_filter_set(Json(req): Json<AutoFilterSetReq>) -> Json<ApiRespo
         range: req.range,
     };
     match excel_write::set_auto_filter(&req.path, &params, &config) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
 pub async fn auto_filter_remove(
     Json(req): Json<AutoFilterSheetReq>,
-) -> Json<ApiResponse<WriteResult>> {
+) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: false,
         create_backup: true,
         file_path: req.path.clone(),
     };
     match excel_write::remove_auto_filter(&req.path, &params, &req.sheet) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
 pub async fn auto_filter_get(
     Json(req): Json<AutoFilterSheetReq>,
-) -> Json<ApiResponse<AutoFilterInfo>> {
+) -> ApiJson<AutoFilterInfo> {
     match excel_write::get_auto_filter(&req.path, &req.sheet) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }

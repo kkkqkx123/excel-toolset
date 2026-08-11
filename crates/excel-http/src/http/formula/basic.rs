@@ -4,6 +4,7 @@ use serde::Deserialize;
 use excel_core::excel_read;
 use excel_core::excel_write;
 use excel_core::types::*;
+use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct FormulaSetReq {
@@ -23,27 +24,27 @@ pub struct FormulaRefreshReq {
     pub dry_run: bool,
 }
 
-pub async fn formula_set(Json(req): Json<FormulaSetReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn formula_set(Json(req): Json<FormulaSetReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,
         file_path: req.path.clone(),
     };
     match excel_write::set_formula(&req.path, &params, &req.sheet, &req.cell, &req.formula) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
-pub async fn formula_refresh(Json(req): Json<FormulaRefreshReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn formula_refresh(Json(req): Json<FormulaRefreshReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,
         file_path: req.path.clone(),
     };
     match excel_write::refresh_formulas(&req.path, &params, &req.sheet) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
@@ -62,21 +63,21 @@ pub struct CalcModeReq {
     pub dry_run: bool,
 }
 
-pub async fn formula_read(Json(req): Json<FormulaReadReq>) -> Json<ApiResponse<Option<String>>> {
+pub async fn formula_read(Json(req): Json<FormulaReadReq>) -> ApiJson<Option<String>> {
     match excel_read::read_formula(&req.path, &req.sheet, &req.cell) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
-pub async fn formula_calc_mode(Json(req): Json<CalcModeReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn formula_calc_mode(Json(req): Json<CalcModeReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,
         file_path: req.path.clone(),
     };
     match excel_write::set_calculation_mode(&req.path, &params, &req.mode) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }

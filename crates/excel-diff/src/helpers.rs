@@ -19,6 +19,16 @@ pub fn classify_diff(old_cell: Option<&CellData>, new_cell: Option<&CellData>) -
                 return DiffType::Modify;
             }
 
+            // One side has a formula and the other does not - that is a real
+            // change. The value comparison alone misses the case where a cell
+            // goes from empty to "=AVERAGE(E2:E12)" with NO cached value:
+            // old.value == new.value == None would otherwise be reported as
+            // NoChange and the newly added formula would silently vanish from
+            // the diff.
+            if old.formula != new.formula {
+                return DiffType::Modify;
+            }
+
             if old.value == new.value {
                 return DiffType::NoChange;
             }
@@ -33,11 +43,14 @@ pub fn all_cells_as_diff(sheet: &SheetData, diff_type: DiffType) -> Vec<CellDiff
 
     for (row_idx, row) in sheet.rows.iter().enumerate() {
         for (col_idx, cell) in row.iter().enumerate() {
-            let cell_ref = format_cell_ref(row_idx, col_idx);
+            // Report absolute worksheet coordinates, not used-range relative ones.
+            let abs_row = sheet.start_row as usize + row_idx;
+            let abs_col = sheet.start_col as usize + col_idx;
+            let cell_ref = format_cell_ref(abs_row, abs_col);
 
             diffs.push(CellDiff {
-                row: row_idx as u32,
-                col: col_idx as u16,
+                row: abs_row as u32,
+                col: abs_col as u16,
                 cell_ref,
                 diff_type: diff_type.clone(),
                 old_value: if diff_type == DiffType::Delete {
@@ -176,6 +189,7 @@ mod tests {
         let data = SheetData {
             name: "S".into(),
             rows: vec![vec![cell("A1"), cell("B1")], vec![cell("A2")]],
+            ..Default::default()
         };
         let diffs = all_cells_as_diff(&data, DiffType::Add);
         assert_eq!(diffs.len(), 3);
@@ -196,6 +210,7 @@ mod tests {
         let data = SheetData {
             name: "S".into(),
             rows: vec![vec![cell("X")]],
+            ..Default::default()
         };
         let diffs = all_cells_as_diff(&data, DiffType::Delete);
         assert_eq!(diffs.len(), 1);
@@ -209,6 +224,7 @@ mod tests {
         let data = SheetData {
             name: "S".into(),
             rows: vec![],
+            ..Default::default()
         };
         let diffs = all_cells_as_diff(&data, DiffType::Add);
         assert!(diffs.is_empty());
@@ -256,6 +272,7 @@ mod tests {
         let data = SheetData {
             name: "S".into(),
             rows: vec![vec![formula_cell("10", "=A2+1")]],
+            ..Default::default()
         };
         let diffs = all_cells_as_diff(&data, DiffType::Add);
         assert_eq!(diffs.len(), 1);
@@ -269,6 +286,7 @@ mod tests {
         let data = SheetData {
             name: "S".into(),
             rows: vec![vec![formula_cell("10", "=A2+1")]],
+            ..Default::default()
         };
         let diffs = all_cells_as_diff(&data, DiffType::Delete);
         assert_eq!(diffs.len(), 1);

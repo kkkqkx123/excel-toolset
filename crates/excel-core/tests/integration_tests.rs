@@ -1062,9 +1062,10 @@ mod business_scenarios {
             value: "100".into(),
         }];
         let filtered = filter_rows(&path, "Sales", &conditions).expect("filter");
-        assert_eq!(filtered.len(), 3);
-        assert_eq!(filtered[1][0].value.as_deref(), Some("Bob"));
-        assert_eq!(filtered[2][0].value.as_deref(), Some("Charlie"));
+        // 表头不计入结果：Amount>100 的数据行为 Bob(300)、Charlie(200)。
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered[0][0].value.as_deref(), Some("Bob"));
+        assert_eq!(filtered[1][0].value.as_deref(), Some("Charlie"));
 
         let params = default_params(&path);
         let sort_cols = vec![SortColumn {

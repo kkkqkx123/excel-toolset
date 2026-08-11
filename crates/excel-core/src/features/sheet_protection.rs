@@ -31,23 +31,8 @@ pub fn protect_sheet(
         .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
 
     crate::excel_write::modify_file_with_wb(path, params, |old_data, wb| {
-        *wb = rust_xlsxwriter::Workbook::new();
-
-        let sheet_names: Vec<&str> = old_data.keys().map(|s| s.as_str()).collect();
-        for name in &sheet_names {
-            let sd = &old_data[*name];
-            let ws = wb.add_worksheet();
-            ws.set_name(*name).map_err(AppError::Xlsx)?;
-            crate::excel_write::write_sheet_data(ws, sd)?;
-        }
-
-        let sheet_idx = sheet_names
-            .iter()
-            .position(|n| *n == config.sheet)
-            .ok_or_else(|| AppError::SheetNotFound(config.sheet.clone()))?;
-
         let ws = wb
-            .worksheet_from_index(sheet_idx)
+            .worksheet_from_name(&config.sheet)
             .map_err(|_e| AppError::SheetNotFound(config.sheet.clone()))?;
 
         let protection_options = rust_xlsxwriter::ProtectionOptions {
@@ -116,23 +101,10 @@ pub fn unprotect_sheet(path: &str, sheet: &str, params: &SecurityParams) -> Resu
     let old_hash = security::compute_file_hash(path)
         .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
 
-    crate::excel_write::modify_file_with_wb(path, params, |old_data, wb| {
-        *wb = rust_xlsxwriter::Workbook::new();
-
-        let sheet_names: Vec<&str> = old_data.keys().map(|s| s.as_str()).collect();
-        let _ = sheet_names
-            .iter()
-            .position(|n| *n == sheet)
-            .ok_or_else(|| AppError::SheetNotFound(sheet.to_string()))?;
-
-        for name in &sheet_names {
-            let sd = &old_data[*name];
-            let ws = wb.add_worksheet();
-            ws.set_name(*name).map_err(AppError::Xlsx)?;
-            crate::excel_write::write_sheet_data(ws, sd)?;
-        }
-        // The worksheet is rebuilt without calling protect(), so no protection remains.
-
+    crate::excel_write::modify_file_with_wb(path, params, |_old_data, wb| {
+        // Rebuilding without protect() drops any existing sheet protection.
+        wb.worksheet_from_name(sheet)
+            .map_err(|_e| AppError::SheetNotFound(sheet.to_string()))?;
         Ok(())
     })?;
 

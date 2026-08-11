@@ -12,9 +12,18 @@ use super::{
         freeze_panes, health, image, named_ranges, page_setup, pivot_table, range, search, sheet,
         sheet_protection, slicer, sparkline, table, vba, workbook_overview,
     },
+    middleware::guard,
 };
 
 pub fn create_router() -> Router {
+    // H4: layers run outermost-first, so authenticate before we bother parsing
+    // and validating the body.
+    routes()
+        .layer(axum::middleware::from_fn(guard::path_guard))
+        .layer(axum::middleware::from_fn(guard::auth))
+}
+
+fn routes() -> Router {
     Router::new()
         .route("/health", get(health::health))
         .route("/api/file/info", post(file::file_info))
@@ -56,7 +65,7 @@ pub fn create_router() -> Router {
         .route("/api/data/dedup", post(filter::data_dedup))
         .route("/api/data/sql", post(sql::data_sql))
         .route("/api/data/sql_session", post(sql::create_session))
-        .route("/api/data/sql_session/:id", delete(sql::close_session))
+        .route("/api/data/sql_session/{id}", delete(sql::close_session))
         .route("/api/formula/set", post(basic::formula_set))
         .route("/api/formula/refresh", post(basic::formula_refresh))
         .route("/api/formula/read", post(basic::formula_read))

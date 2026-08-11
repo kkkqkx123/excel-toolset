@@ -3,6 +3,7 @@ use serde::Deserialize;
 
 use excel_core::features::comments;
 use excel_core::types::*;
+use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct GetCommentReq {
@@ -42,14 +43,14 @@ pub struct DeleteCommentReq {
 
 pub async fn get_comment(
     Json(req): Json<GetCommentReq>,
-) -> Json<ApiResponse<Option<comments::Comment>>> {
+) -> ApiJson<Option<comments::Comment>> {
     match comments::get_comment(&req.path, &req.sheet, &req.cell) {
-        Ok(comment) => Json(ApiResponse::ok(Some(comment))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(comment) => ApiJson(ApiResponse::ok(Some(comment))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
-pub async fn add_comment(Json(req): Json<AddCommentReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn add_comment(Json(req): Json<AddCommentReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,
@@ -57,12 +58,12 @@ pub async fn add_comment(Json(req): Json<AddCommentReq>) -> Json<ApiResponse<Wri
     };
 
     match comments::add_comment(&req.path, &req.sheet, &req.cell, &req.comment, &params) {
-        Ok(result) => Json(ApiResponse::ok(Some(result))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(result) => ApiJson(ApiResponse::ok(Some(result))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
-pub async fn update_comment(Json(req): Json<UpdateCommentReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn update_comment(Json(req): Json<UpdateCommentReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,
@@ -70,12 +71,12 @@ pub async fn update_comment(Json(req): Json<UpdateCommentReq>) -> Json<ApiRespon
     };
 
     match comments::update_comment(&req.path, &req.sheet, &req.cell, &req.comment, &params) {
-        Ok(result) => Json(ApiResponse::ok(Some(result))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(result) => ApiJson(ApiResponse::ok(Some(result))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
-pub async fn delete_comment(Json(req): Json<DeleteCommentReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn delete_comment(Json(req): Json<DeleteCommentReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,
@@ -83,7 +84,7 @@ pub async fn delete_comment(Json(req): Json<DeleteCommentReq>) -> Json<ApiRespon
     };
 
     match comments::delete_comment(&req.path, &req.sheet, &req.cell, &params) {
-        Ok(result) => Json(ApiResponse::ok(Some(result))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(result) => ApiJson(ApiResponse::ok(Some(result))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }

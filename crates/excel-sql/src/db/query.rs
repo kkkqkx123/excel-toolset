@@ -141,32 +141,39 @@ pub fn duckdb_to_cell(value: &duckdb::types::Value) -> CellData {
     }
 }
 
-/// Execute a SQL query and return the results
-pub fn query(db: &duckdb::Connection, sql: &str) -> Result<QueryResult, AppError> {
-    let mut stmt = db
-        .prepare(sql)
-        .map_err(|e| AppError::DuckDb(e.to_string()))?;
-
-    let col_count = stmt.column_count();
-    let mut columns = Vec::with_capacity(col_count);
-    for i in 0..col_count {
-        columns.push(stmt.column_name(i).map_or("", |v| v).to_string());
+/// Read column metadata from an **already executed** result set.
+///
+/// duckdb-rs panics with "The statement was not executed yet" if
+/// `column_count()` / `column_name()` are called on a merely *prepared*
+/// statement, so metadata must always be taken from the live `Rows`.
+fn column_meta(rows: &duckdb::Rows<'_>) -> (usize, Vec<String>) {
+    match rows.as_ref() {
+        Some(stmt) => {
+            let count = stmt.column_count();
+            let names = (0..count)
+                .map(|i| {
+                    stmt.column_name(i)
+                        .map_or_else(|_| String::new(), |n| n.to_string())
+                })
+                .collect();
+            (count, names)
+        }
+        None => (0, Vec::new()),
     }
+}
 
-    let rows = stmt
-        .query_map([], |row| {
-            let mut cells = Vec::with_capacity(col_count);
-            for i in 0..col_count {
-                let value: duckdb::types::Value = row.get(i).unwrap_or(duckdb::types::Value::Null);
-                cells.push(duckdb_to_cell(&value));
-            }
-            Ok(cells)
-        })
-        .map_err(|e| AppError::DuckDb(e.to_string()))?;
+/// Collect all rows of an executed result set into `QueryResult`.
+fn collect_rows(mut rows: duckdb::Rows<'_>) -> Result<QueryResult, AppError> {
+    let (col_count, columns) = column_meta(&rows);
 
     let mut result_rows = Vec::new();
-    for row in rows {
-        result_rows.push(row.map_err(|e| AppError::DuckDb(e.to_string()))?);
+    while let Some(row) = rows.next().map_err(|e| AppError::DuckDb(e.to_string()))? {
+        let mut cells = Vec::with_capacity(col_count);
+        for i in 0..col_count {
+            let value: duckdb::types::Value = row.get(i).unwrap_or(duckdb::types::Value::Null);
+            cells.push(duckdb_to_cell(&value));
+        }
+        result_rows.push(cells);
     }
 
     let row_count = result_rows.len();
@@ -175,6 +182,20 @@ pub fn query(db: &duckdb::Connection, sql: &str) -> Result<QueryResult, AppError
         rows: result_rows,
         row_count,
     })
+}
+
+/// Execute a SQL query and return the results
+pub fn query(db: &duckdb::Connection, sql: &str) -> Result<QueryResult, AppError> {
+    let mut stmt = db
+        .prepare(sql)
+        .map_err(|e| AppError::DuckDb(e.to_string()))?;
+
+    // Execute *before* touching any column metadata.
+    let rows = stmt
+        .query([])
+        .map_err(|e| AppError::DuckDb(e.to_string()))?;
+
+    collect_rows(rows)
 }
 
 /// Executing SQL Queries with Parameters
@@ -187,34 +208,12 @@ pub fn query_with_params(
         .prepare(sql)
         .map_err(|e| AppError::DuckDb(e.to_string()))?;
 
-    let col_count = stmt.column_count();
-    let mut columns = Vec::with_capacity(col_count);
-    for i in 0..col_count {
-        columns.push(stmt.column_name(i).map_or("", |v| v).to_string());
-    }
-
+    // Execute *before* touching any column metadata (see `column_meta`).
     let rows = stmt
-        .query_map(duckdb::params_from_iter(params.iter()), |row| {
-            let mut cells = Vec::with_capacity(col_count);
-            for i in 0..col_count {
-                let value: duckdb::types::Value = row.get(i).unwrap_or(duckdb::types::Value::Null);
-                cells.push(duckdb_to_cell(&value));
-            }
-            Ok(cells)
-        })
+        .query(duckdb::params_from_iter(params.iter()))
         .map_err(|e| AppError::DuckDb(e.to_string()))?;
 
-    let mut result_rows = Vec::new();
-    for row in rows {
-        result_rows.push(row.map_err(|e| AppError::DuckDb(e.to_string()))?);
-    }
-
-    let row_count = result_rows.len();
-    Ok(QueryResult {
-        columns,
-        rows: result_rows,
-        row_count,
-    })
+    collect_rows(rows)
 }
 
 /// Query and return the original string (simplified format)

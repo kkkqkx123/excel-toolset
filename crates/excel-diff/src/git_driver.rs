@@ -393,8 +393,15 @@ pub fn get_git_diff_file_paths() -> Result<(String, String)> {
 ///   - Index 3: old-mode
 ///   - Index 4: new-file (temp file for new version)
 fn parse_git_driver_args(args: &[String]) -> Option<(String, String)> {
-    // Skip executable, then skip trailing subcommand keywords
-    let mut iter = args.iter().skip(1).skip_while(|a| a.as_str() == "git-driver");
+    // Skip the executable, then *all* leading subcommand tokens. The driver is
+    // registered as `excel-cli diff git-driver`, so argv is
+    // `[exe, "diff", "git-driver", <path>, <old-file>, ...]`. Only skipping the
+    // literal "git-driver" stopped at "diff" and shifted every field by one,
+    // making `old_file` the literal string "git-driver".
+    let mut iter = args
+        .iter()
+        .skip(1)
+        .skip_while(|a| matches!(a.as_str(), "diff" | "file" | "git-driver"));
 
     let _path = iter.next()?; // repo path, skip
     let old_file = iter.next()?; // old-file temp path

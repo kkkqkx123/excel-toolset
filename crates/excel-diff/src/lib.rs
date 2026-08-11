@@ -43,6 +43,7 @@ use excel_types::{
 ///         data_type: CellDataType::String,
 ///         formula: None,
 ///     }]],
+///     ..Default::default()
 /// };
 /// let new = SheetData {
 ///     name: "Sheet1".into(),
@@ -51,6 +52,7 @@ use excel_types::{
 ///         data_type: CellDataType::String,
 ///         formula: None,
 ///     }]],
+///     ..Default::default()
 /// };
 /// let diffs = compute_diffs(&old, &new);
 /// assert_eq!(diffs.len(), 1);
@@ -210,6 +212,7 @@ mod tests {
                 data_type: CellDataType::String,
                 formula: None,
             }]],
+            ..Default::default()
         };
         let new = SheetData {
             name: "S".into(),
@@ -218,6 +221,7 @@ mod tests {
                 data_type: CellDataType::String,
                 formula: None,
             }]],
+            ..Default::default()
         };
         let diffs = compute_diffs(&old, &new);
         assert_eq!(diffs.len(), 1);
@@ -229,6 +233,7 @@ mod tests {
         let data = SheetData {
             name: "S".into(),
             rows: vec![],
+            ..Default::default()
         };
         let diffs = compute_diffs(&data, &data);
         assert!(diffs.is_empty());
@@ -243,6 +248,7 @@ mod tests {
                 data_type: CellDataType::String,
                 formula: None,
             }]],
+            ..Default::default()
         };
         let new = SheetData {
             name: "Sheet1".into(),
@@ -251,6 +257,7 @@ mod tests {
                 data_type: CellDataType::String,
                 formula: None,
             }]],
+            ..Default::default()
         };
 
         let diffs = diff_sheet_data(&old, &new);
@@ -265,10 +272,12 @@ mod tests {
         let old = SheetData {
             name: "Sheet1".into(),
             rows: vec![],
+            ..Default::default()
         };
         let new = SheetData {
             name: "Sheet1".into(),
             rows: vec![],
+            ..Default::default()
         };
 
         let diffs = diff_sheet_data(&old, &new);
@@ -280,6 +289,7 @@ mod tests {
         let old = SheetData {
             name: "Sheet1".into(),
             rows: vec![],
+            ..Default::default()
         };
         let new = SheetData {
             name: "Sheet1".into(),
@@ -288,6 +298,7 @@ mod tests {
                 data_type: CellDataType::String,
                 formula: None,
             }]],
+            ..Default::default()
         };
 
         let diffs = diff_sheet_data(&old, &new);
@@ -304,10 +315,12 @@ mod tests {
                 data_type: CellDataType::String,
                 formula: None,
             }]],
+            ..Default::default()
         };
         let new = SheetData {
             name: "Sheet1".into(),
             rows: vec![],
+            ..Default::default()
         };
 
         let diffs = diff_sheet_data(&old, &new);
@@ -514,6 +527,7 @@ mod tests {
                 data_type: CellDataType::Float,
                 formula: None,
             }]],
+            ..Default::default()
         };
         let sheet_new = SheetData {
             name: "S1".into(),
@@ -529,6 +543,7 @@ mod tests {
                     formula: Some("=A1+B1".into()),
                 }],
             ],
+            ..Default::default()
         };
 
         let old_tracker = FormulaTracker::build_from_sheet(&sheet_old);

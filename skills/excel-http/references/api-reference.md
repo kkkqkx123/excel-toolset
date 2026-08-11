@@ -75,7 +75,7 @@ Returns sheet count, sheet names, file hash.
 ### `POST /api/sheet/rename`
 
 ```json
-{ "path": "data.xlsx", "old_name": "OldSheet", "new_name": "NewSheet" }
+{ "path": "data.xlsx", "old": "OldSheet", "new": "NewSheet" }
 ```
 
 ### `POST /api/sheet/visibility`
@@ -183,7 +183,7 @@ Supported operation types:
 | `write_range` | `sheet`, `range`, `data` |
 | `add_sheet` | `name` |
 | `delete_sheet` | `name` |
-| `rename_sheet` | `old_name`, `new_name` |
+| `rename_sheet` | `old`, `new` |
 | `set_format` | `sheet`, `range`, `style` |
 | `merge_cells` | `sheet`, `range` |
 | `append_row` | `sheet`, `values` |
@@ -390,13 +390,11 @@ Returns precedents and dependents.
 ```json
 {
   "path": "data.xlsx",
-  "query": {
-    "pattern": "keyword",
-    "match_type": "contains",
-    "search_type": "both",
-    "case_sensitive": false,
-    "sheets": ["Sheet1", "Sheet2"]
-  }
+  "pattern": "keyword",
+  "match_type": "contains",
+  "search_type": "both",
+  "case_sensitive": false,
+  "sheets": ["Sheet1", "Sheet2"]
 }
 ```
 
@@ -406,12 +404,10 @@ Returns precedents and dependents.
 {
   "path": "data.xlsx",
   "sheet": "Sheet1",
-  "query": {
-    "pattern": "keyword",
-    "match_type": "contains",
-    "search_type": "both",
-    "case_sensitive": false
-  }
+  "pattern": "keyword",
+  "match_type": "contains",
+  "search_type": "both",
+  "case_sensitive": false
 }
 ```
 
@@ -483,13 +479,13 @@ Chart types: `column`, `bar`, `line`, `pie`, `area`, `scatter`.
 ### `POST /api/comments/add`
 
 ```json
-{ "path": "data.xlsx", "sheet": "Sheet1", "cell": "A1", "text": "Review needed" }
+{ "path": "data.xlsx", "sheet": "Sheet1", "cell": "A1", "comment": "Review needed" }
 ```
 
 ### `POST /api/comments/update`
 
 ```json
-{ "path": "data.xlsx", "sheet": "Sheet1", "cell": "A1", "text": "Updated comment" }
+{ "path": "data.xlsx", "sheet": "Sheet1", "cell": "A1", "comment": "Updated comment" }
 ```
 
 ### `POST /api/comments/delete`

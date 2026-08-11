@@ -11,6 +11,15 @@ use crate::utils::cell_ref;
 use super::core::build_workbook_with_ops;
 use super::csv::read_csv_to_cell_values;
 
+/// Convert a batch `WriteCell` coordinate to the internal 0-based index.
+///
+/// `WriteCell` takes **1-based** row/col so it matches the single-cell
+/// `cell write` API and the documented examples. Feeding the raw value into the
+/// 0-based `SheetData` grid made `row:1, col:1` land in `B2` instead of `A1`.
+fn write_cell_to_zero_based(row: u32, col: u16) -> (u32, u16) {
+    (row.saturating_sub(1), col.saturating_sub(1))
+}
+
 pub fn validate_batch_operations(
     path: &str,
     operations: &[BatchOperation],
@@ -33,11 +42,12 @@ pub fn validate_batch_operations(
                         message: format!("Sheet '{}' not found", sheet),
                     });
                 } else if let Some(sheet_data) = data.get(sheet) {
-                    if *row as usize >= sheet_data.rows.len()
-                        || *col as usize
+                    let (r0, c0) = write_cell_to_zero_based(*row, *col);
+                    if r0 as usize >= sheet_data.rows.len()
+                        || c0 as usize
                             >= sheet_data
                                 .rows
-                                .get(*row as usize)
+                                .get(r0 as usize)
                                 .map(|r| r.len())
                                 .unwrap_or(0)
                     {
@@ -333,14 +343,17 @@ fn apply_data_operations(
                 row,
                 col,
                 value,
-            } => match super::data_mut::write(data, sheet, *row, *col, value) {
-                Ok(()) => succeeded += 1,
-                Err(e) => failed.push(FailedOperation {
-                    operation_index: idx,
-                    error: e.to_string(),
-                    operation_type: "write_cell".to_string(),
-                }),
-            },
+            } => {
+                let (r, c) = write_cell_to_zero_based(*row, *col);
+                match super::data_mut::write(data, sheet, r, c, value) {
+                    Ok(()) => succeeded += 1,
+                    Err(e) => failed.push(FailedOperation {
+                        operation_index: idx,
+                        error: e.to_string(),
+                        operation_type: "write_cell".to_string(),
+                    }),
+                }
+            }
             BatchOperation::WriteRange {
                 sheet,
                 range,
@@ -550,7 +563,7 @@ pub fn execute_batch_operations_with_strategy(
     let (data_succeeded, failed_ops) = apply_data_operations(&mut data, operations)?;
 
     // Build workbook with all operations (including format/visual ops)
-    let mut wb = match build_workbook_with_ops(&data, operations) {
+    let mut wb = match build_workbook_with_ops(path, &data, operations) {
         Ok(wb) => wb,
         Err(e) => {
             // If AllOrNothing with build failure, rollback

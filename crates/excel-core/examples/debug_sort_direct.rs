@@ -105,6 +105,7 @@ fn main() {
                 },
             ],
         ],
+        ..Default::default()
     };
 
     println!("Before sort:");

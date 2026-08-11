@@ -3,6 +3,7 @@ use serde::Deserialize;
 
 use excel_core::features::search::{self, MatchType, SearchQuery, SearchType};
 use excel_core::types::*;
+use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct SearchWorkbookReq {
@@ -58,7 +59,7 @@ fn parse_match_type(s: &str) -> MatchType {
 
 pub async fn search_workbook(
     Json(req): Json<SearchWorkbookReq>,
-) -> Json<ApiResponse<search::SearchResults>> {
+) -> ApiJson<search::SearchResults> {
     let query = SearchQuery {
         pattern: req.pattern,
         search_type: parse_search_type(&req.search_type),
@@ -68,14 +69,14 @@ pub async fn search_workbook(
     };
 
     match search::search_workbook(&req.path, &query) {
-        Ok(results) => Json(ApiResponse::ok(Some(results))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(results) => ApiJson(ApiResponse::ok(Some(results))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
 pub async fn search_sheet(
     Json(req): Json<SearchSheetReq>,
-) -> Json<ApiResponse<search::SearchResults>> {
+) -> ApiJson<search::SearchResults> {
     let query = SearchQuery {
         pattern: req.pattern,
         search_type: parse_search_type(&req.search_type),
@@ -85,7 +86,7 @@ pub async fn search_sheet(
     };
 
     match search::search_sheet(&req.path, &req.sheet, &query) {
-        Ok(results) => Json(ApiResponse::ok(Some(results))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(results) => ApiJson(ApiResponse::ok(Some(results))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }

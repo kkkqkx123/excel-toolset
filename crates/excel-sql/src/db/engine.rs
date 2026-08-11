@@ -112,6 +112,7 @@ mod tests {
                 vec![make_cell(Some("Alice"), String), make_cell(Some("30"), Int)],
                 vec![make_cell(Some("Bob"), String), make_cell(Some("25"), Int)],
             ],
+            ..Default::default()
         }
     }
 
@@ -141,6 +142,7 @@ mod tests {
                 vec![make_cell(Some("x"), String)],
                 vec![make_cell(Some("y"), String)],
             ],
+            ..Default::default()
         };
         engine.load_without_header("raw", &sheet).unwrap();
         let result = engine.query("SELECT * FROM \"raw\"").unwrap();

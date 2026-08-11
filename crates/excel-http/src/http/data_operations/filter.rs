@@ -3,6 +3,7 @@ use serde::Deserialize;
 
 use excel_core::operations;
 use excel_core::types::*;
+use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct FilterReq {
@@ -33,10 +34,10 @@ pub struct DedupReq {
     pub dry_run: bool,
 }
 
-pub async fn data_filter(Json(req): Json<FilterReq>) -> Json<ApiResponse<Vec<Vec<CellData>>>> {
+pub async fn data_filter(Json(req): Json<FilterReq>) -> ApiJson<Vec<Vec<CellData>>> {
     let filter_op = match excel_core::utils::helpers::parse_filter_op(&req.operator) {
         Ok(op) => op,
-        Err(e) => return Json(ApiResponse::err(e)),
+        Err(e) => return ApiJson(ApiResponse::err(e)),
     };
     let conditions = vec![FilterCondition {
         column: req.column,
@@ -44,12 +45,12 @@ pub async fn data_filter(Json(req): Json<FilterReq>) -> Json<ApiResponse<Vec<Vec
         value: req.value,
     }];
     match operations::filter_rows(&req.path, &req.sheet, &conditions) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
-pub async fn data_sort(Json(req): Json<SortReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn data_sort(Json(req): Json<SortReq>) -> ApiJson<WriteResult> {
     let sort_cols = vec![SortColumn {
         column: req.column,
         descending: req.descending,
@@ -60,12 +61,12 @@ pub async fn data_sort(Json(req): Json<SortReq>) -> Json<ApiResponse<WriteResult
         file_path: req.path.clone(),
     };
     match operations::sort_sheet(&req.path, &params, &req.sheet, &sort_cols) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
-pub async fn data_dedup(Json(req): Json<DedupReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn data_dedup(Json(req): Json<DedupReq>) -> ApiJson<WriteResult> {
     let cols = req.column.map(|c| vec![c]).unwrap_or_default();
     let params = SecurityParams {
         dry_run: req.dry_run,
@@ -73,7 +74,7 @@ pub async fn data_dedup(Json(req): Json<DedupReq>) -> Json<ApiResponse<WriteResu
         file_path: req.path.clone(),
     };
     match operations::dedup_sheet(&req.path, &params, &req.sheet, &cols) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }

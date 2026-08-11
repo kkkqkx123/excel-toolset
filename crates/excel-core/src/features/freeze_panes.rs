@@ -26,23 +26,8 @@ pub fn set_freeze_panes(
         .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
 
     crate::excel_write::modify_file_with_wb(path, params, |old_data, wb| {
-        *wb = rust_xlsxwriter::Workbook::new();
-
-        let sheet_names: Vec<&str> = old_data.keys().map(|s| s.as_str()).collect();
-        for name in &sheet_names {
-            let sd = &old_data[*name];
-            let ws = wb.add_worksheet();
-            ws.set_name(*name).map_err(AppError::Xlsx)?;
-            crate::excel_write::write_sheet_data(ws, sd)?;
-        }
-
-        let sheet_idx = sheet_names
-            .iter()
-            .position(|n| *n == config.sheet)
-            .ok_or_else(|| AppError::SheetNotFound(config.sheet.clone()))?;
-
         let ws = wb
-            .worksheet_from_index(sheet_idx)
+            .worksheet_from_name(&config.sheet)
             .map_err(|_e| AppError::SheetNotFound(config.sheet.clone()))?;
 
         ws.set_freeze_panes(config.rows, config.cols)

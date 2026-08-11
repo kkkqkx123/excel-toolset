@@ -3,6 +3,7 @@ use serde::Deserialize;
 
 use excel_core::features::conditional_format;
 use excel_core::types::*;
+use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct AddConditionalFormatReq {
@@ -29,7 +30,7 @@ pub struct RemoveConditionalFormatReq {
 
 pub async fn add_conditional_format(
     Json(req): Json<AddConditionalFormatReq>,
-) -> Json<ApiResponse<WriteResult>> {
+) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,
@@ -46,14 +47,14 @@ pub async fn add_conditional_format(
     match conditional_format::add_conditional_format(
         &req.path, &req.sheet, &req.range, &rule, &params,
     ) {
-        Ok(result) => Json(ApiResponse::ok(Some(result))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(result) => ApiJson(ApiResponse::ok(Some(result))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
 pub async fn remove_conditional_format(
     Json(req): Json<RemoveConditionalFormatReq>,
-) -> Json<ApiResponse<WriteResult>> {
+) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,
@@ -62,7 +63,7 @@ pub async fn remove_conditional_format(
 
     match conditional_format::remove_conditional_format(&req.path, &req.sheet, &req.range, &params)
     {
-        Ok(result) => Json(ApiResponse::ok(Some(result))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(result) => ApiJson(ApiResponse::ok(Some(result))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }

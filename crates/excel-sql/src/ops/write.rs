@@ -83,6 +83,7 @@ pub fn sort_sheet_on_data_impl(
         &SheetData {
             name: sheet_name.clone(),
             rows: original_rows.clone(),
+            ..Default::default()
         },
         false,
     )
@@ -103,6 +104,7 @@ pub fn sort_sheet_on_data_impl(
     Ok(SheetData {
         name: sheet_name.clone(),
         rows: sorted_rows,
+        ..Default::default()
     })
 }
 
@@ -139,6 +141,7 @@ pub fn dedup_sheet_on_data_impl(
         &SheetData {
             name: sheet_name.clone(),
             rows: data_rows.clone(),
+            ..Default::default()
         },
         false,
     )
@@ -160,6 +163,7 @@ pub fn dedup_sheet_on_data_impl(
     Ok(SheetData {
         name: sheet_name.clone(),
         rows: new_rows,
+        ..Default::default()
     })
 }
 
@@ -188,6 +192,7 @@ mod tests {
         let data = SheetData {
             name: "t".to_string(),
             rows: vec![vec![make_cell(Some("x"), String)]],
+            ..Default::default()
         };
         let result = sort_sheet_on_data(&data, &[]).unwrap();
         assert_eq!(result.rows.len(), 1);
@@ -202,6 +207,7 @@ mod tests {
                 vec![make_cell(Some("1"), Int)],
                 vec![make_cell(Some("2"), Int)],
             ],
+            ..Default::default()
         };
         let sort = SortColumn {
             column: 0,
@@ -225,6 +231,7 @@ mod tests {
                 vec![make_cell(Some("c"), String)],
                 vec![make_cell(Some("b"), String)],
             ],
+            ..Default::default()
         };
         let sort = SortColumn {
             column: 0,
@@ -249,6 +256,7 @@ mod tests {
                 vec![make_cell(Some("b"), String)],
                 vec![make_cell(Some("a"), String)], // duplicate
             ],
+            ..Default::default()
         };
         let result = dedup_sheet_on_data(&data, &[]).unwrap();
         // Header + 2 unique rows = 3
@@ -268,6 +276,7 @@ mod tests {
                 vec![make_cell(Some("a"), String), make_cell(Some("x"), String)],
                 vec![make_cell(Some("a"), String), make_cell(Some("y"), String)], // dup on col 0 only
             ],
+            ..Default::default()
         };
         let result = dedup_sheet_on_data(&data, &[0]).unwrap();
         assert_eq!(result.rows.len(), 2); // header + first row
@@ -282,6 +291,7 @@ mod tests {
                 vec![make_cell(Some("a"), String)],
                 vec![make_cell(Some("b"), String)],
             ],
+            ..Default::default()
         };
         let result = dedup_sheet_on_data(&data, &[]).unwrap();
         assert_eq!(result.rows.len(), 3);

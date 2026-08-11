@@ -233,7 +233,7 @@ excel-cli formula eval <path> <sheet> <cell> <formula> [--no-eval] [--dry-run]
 excel-cli formula eval-batch <path> <sheet> '<json-formulas>' [--dry-run]
 ```
 
-Batch format: `[["cell","=FORMULA"],...]`.
+Batch format: `[{"cell":"A1","formula":"=SUM(B1:B3)"},...]` (JSON object array).
 
 ### Read & Refresh
 
@@ -476,17 +476,23 @@ Example config:
 
 ```json
 {
-  "sheet": "Sheet1",
-  "data_range": "A1:E500",
-  "rows": ["Category", "Product"],
-  "columns": ["Region"],
-  "values": [
-    {"field": "Amount", "aggregation": "sum"},
-    {"field": "Quantity", "aggregation": "count"}
+  "name": "Pivot1",
+  "source_range": "Sheet1!A1:E500",
+  "target_sheet": "Sheet1",
+  "target_cell": "G1",
+  "row_fields": [{"column": 0}, {"column": 1}],
+  "column_fields": [{"column": 2}],
+  "data_fields": [
+    {"column": 3, "aggregation": "sum"},
+    {"column": 4, "aggregation": "count"}
   ],
-  "filters": ["Year"]
+  "filter_fields": [{"column": 5}]
 }
 ```
+
+> **NOTE**: this command writes a *flattened aggregate summary* — it does NOT
+> create a native Excel PivotTable (no pivot cache / field list / refresh). The
+> `success:true` response now says so explicitly.
 
 ### Slicer
 

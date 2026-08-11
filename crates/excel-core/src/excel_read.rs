@@ -41,9 +41,13 @@ pub fn read_cell(path: &str, sheet: &str, row: u32, col: u16) -> Result<CellData
         .get_value((row, col as u32))
         .unwrap_or(&calamine::Data::Empty);
 
-    let formula = ws_formulas
-        .as_ref()
-        .and_then(|f| f.get_value((row, col as u32)).map(|s| s.to_string()));
+    // calamine returns Some("") for non-formula cells; treat empty as "no formula"
+    // so we never emit an empty <f></f> element on write-back.
+    let formula = ws_formulas.as_ref().and_then(|f| {
+        f.get_value((row, col as u32))
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+    });
 
     Ok(data_to_cell_data(cell, formula))
 }
@@ -84,9 +88,12 @@ pub fn read_range_with_options(
         let mut row_data = Vec::new();
         for col in c_start..=c_end {
             let cell = range.get_value((row, col as u32)).unwrap_or(&Data::Empty);
-            let formula = ws_formulas
-                .as_ref()
-                .and_then(|f| f.get_value((row, col as u32)).map(|s| s.to_string()));
+            // Empty string means "not a formula" in calamine.
+            let formula = ws_formulas.as_ref().and_then(|f| {
+                f.get_value((row, col as u32))
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.to_string())
+            });
             row_data.push(data_to_cell_data(cell, formula));
         }
         raw_data.push(row_data);
@@ -177,13 +184,17 @@ pub fn read_formula(path: &str, sheet: &str, cell_spec: &str) -> Result<Option<S
 
     let formulas = workbook.worksheet_formula(sheet)?;
 
-    Ok(formulas.get_value((row, col as u32)).map(|s| {
+    Ok(formulas.get_value((row, col as u32)).and_then(|s| {
         let formula = s.to_string();
+        // calamine yields Some("") for plain cells - that is not a formula.
+        if formula.is_empty() {
+            return None;
+        }
         // Add = prefix if not present, as calamine stores formulas without it
         if formula.starts_with('=') {
-            formula
+            Some(formula)
         } else {
-            format!("={}", formula)
+            Some(format!("={}", formula))
         }
     }))
 }
@@ -192,18 +203,65 @@ pub fn read_sheet_all(path: &str, sheet: &str) -> Result<SheetData> {
     let mut workbook: Xlsx<_> = open_workbook(path)?;
 
     let range = workbook.worksheet_range(sheet)?;
-
     let ws_formulas = workbook.worksheet_formula(sheet).ok();
 
-    let mut rows = Vec::new();
-    for (row_idx, row) in range.rows().enumerate() {
-        let mut cells = Vec::new();
-        for (col_idx, cell) in row.iter().enumerate() {
+    // `worksheet_range` returns the *value* grid, and calamine crops it to the
+    // cells that actually hold values. A formula cell with **no cached value**
+    // (very common: files written by openpyxl, LibreOffice with "never
+    // calculate", or our own `formula set` without `--eval`) lives ONLY in the
+    // formula grid. Iterating just the value grid therefore silently dropped
+    // formula-only cells: `diff file` missed formula changes on single-row
+    // sheets and `diff formula-deps` always returned an empty graph.
+    //
+    // Fix: iterate the UNION of both grids' bounds, reading each cell's value
+    // from the value grid and its formula from the formula grid.
+    let v_start = range.start().unwrap_or((0, 0));
+    // An empty sheet has height == width == 0; `- 1` would underflow to
+    // u32::MAX and spawn a ~4-billion-row loop that OOMs the process
+    // (observed as rc=137 / SIGKILL on every write of a workbook containing an
+    // empty sheet). saturating arithmetic keeps empty ranges harmless.
+    let v_end = (
+        v_start
+            .0
+            .saturating_add(range.height() as u32)
+            .saturating_sub(1),
+        v_start
+            .1
+            .saturating_add(range.width() as u32)
+            .saturating_sub(1),
+    );
+    let (f_start, f_end) = match &ws_formulas {
+        Some(f) => {
+            let s = f.start().unwrap_or((0, 0));
+            (
+                s,
+                (
+                    s.0.saturating_add(f.height() as u32).saturating_sub(1),
+                    s.1.saturating_add(f.width() as u32).saturating_sub(1),
+                ),
+            )
+        }
+        None => ((0, 0), (0, 0)),
+    };
+    let end_row = v_end.0.max(f_end.0);
+    let end_col = v_end.1.max(f_end.1);
+
+    // Absolute coordinates: `rows[r][c]` is the cell at row r / column c with
+    // A1 == (0, 0). Consumers (write_sheet_data, data_mut::write, diff, formula
+    // evaluation) all index `rows[row][col]` as if the grid started at A1, so
+    // pushing any non-A1 origin into the grid keeps "index == coordinate" true
+    // everywhere and prevents silent data shifting on write-back.
+    let mut rows: Vec<Vec<CellData>> = Vec::with_capacity(end_row as usize + 1);
+    for row in 0..=end_row {
+        let mut cells: Vec<CellData> = Vec::with_capacity(end_col as usize + 1);
+        for col in 0..=end_col {
+            let value = range.get_value((row, col)).unwrap_or(&Data::Empty);
             let formula = ws_formulas.as_ref().and_then(|f| {
-                f.get_value((row_idx as u32, col_idx as u32))
+                f.get_value((row, col))
+                    .filter(|s| !s.is_empty())
                     .map(|s| s.to_string())
             });
-            cells.push(data_to_cell_data(cell, formula));
+            cells.push(data_to_cell_data(value, formula));
         }
         rows.push(cells);
     }
@@ -211,6 +269,9 @@ pub fn read_sheet_all(path: &str, sheet: &str) -> Result<SheetData> {
     Ok(SheetData {
         name: sheet.to_string(),
         rows,
+        // The grid is absolute; consumers must not re-apply any origin.
+        start_row: 0,
+        start_col: 0,
     })
 }
 

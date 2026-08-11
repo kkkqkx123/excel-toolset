@@ -3,6 +3,7 @@ use serde::Deserialize;
 
 use excel_core::features::named_ranges;
 use excel_core::types::*;
+use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct ListNamedRangesReq {
@@ -35,26 +36,26 @@ pub struct DeleteNamedRangeReq {
 
 pub async fn list_named_ranges(
     Json(req): Json<ListNamedRangesReq>,
-) -> Json<ApiResponse<Vec<named_ranges::NamedRange>>> {
+) -> ApiJson<Vec<named_ranges::NamedRange>> {
     match named_ranges::list_named_ranges(&req.path) {
-        Ok(ranges) => Json(ApiResponse::ok(Some(ranges))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(ranges) => ApiJson(ApiResponse::ok(Some(ranges))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
 pub async fn get_named_range_value(
     Json(req): Json<GetNamedRangeValueReq>,
-) -> Json<ApiResponse<Vec<Vec<CellData>>>> {
+) -> ApiJson<Vec<Vec<CellData>>> {
     match named_ranges::get_named_range_value(&req.path, &req.name) {
-        Ok(Some(data)) => Json(ApiResponse::ok(Some(data))),
-        Ok(None) => Json(ApiResponse::ok(None)),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(Some(data)) => ApiJson(ApiResponse::ok(Some(data))),
+        Ok(None) => ApiJson(ApiResponse::ok(None)),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
 pub async fn create_named_range(
     Json(req): Json<CreateNamedRangeReq>,
-) -> Json<ApiResponse<WriteResult>> {
+) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,
@@ -68,14 +69,14 @@ pub async fn create_named_range(
         req.sheet.as_deref(),
         &params,
     ) {
-        Ok(result) => Json(ApiResponse::ok(Some(result))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(result) => ApiJson(ApiResponse::ok(Some(result))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
 pub async fn delete_named_range(
     Json(req): Json<DeleteNamedRangeReq>,
-) -> Json<ApiResponse<WriteResult>> {
+) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,
@@ -83,7 +84,7 @@ pub async fn delete_named_range(
     };
 
     match named_ranges::delete_named_range(&req.path, &req.name, &params) {
-        Ok(result) => Json(ApiResponse::ok(Some(result))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(result) => ApiJson(ApiResponse::ok(Some(result))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }

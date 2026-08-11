@@ -1,6 +1,6 @@
 use excel_types::{CellData, CellDataType};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct QueryResult {
     pub columns: Vec<String>,
     pub rows: Vec<Vec<CellData>>,

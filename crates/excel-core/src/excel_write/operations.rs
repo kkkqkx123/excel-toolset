@@ -20,6 +20,7 @@ pub fn add_sheet(path: &str, params: &SecurityParams, sheet: &str) -> Result<Wri
             SheetData {
                 name: sheet.to_string(),
                 rows: Vec::new(),
+                ..Default::default()
             },
         );
         Ok(new_data)
@@ -67,13 +68,25 @@ pub fn write_cell(
     col: u16,
     value: &CellValue,
 ) -> Result<WriteResult> {
+    let cell = cell_value_to_data(value);
+    #[cfg(feature = "zip")]
+    {
+        // 保留式写入：只改目标单元格，源文件其余特性逐字节保留。
+        return crate::excel_write::patch::write_cells_preserving(
+            path,
+            params,
+            sheet,
+            &[(row, col, cell)],
+        );
+    }
+    #[cfg(not(feature = "zip"))]
     modify_file(path, params, |old_data| {
         let mut new_data = old_data.clone();
         let sd = new_data
             .get_mut(sheet)
             .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
         ensure_dimensions(sd, row as usize, col as usize);
-        sd.rows[row as usize][col as usize] = cell_value_to_data(value);
+        sd.rows[row as usize][col as usize] = cell;
         Ok(new_data)
     })
 }
@@ -87,6 +100,18 @@ pub fn write_range(
 ) -> Result<WriteResult> {
     let (r1, c1, _, _) = cell_ref::parse_range(range_spec)?;
 
+    #[cfg(feature = "zip")]
+    {
+        // 保留式写入：批量单元格改动同样只重写 sheetData。
+        let mut edits = Vec::new();
+        for (ri, row) in data.iter().enumerate() {
+            for (ci, val) in row.iter().enumerate() {
+                edits.push((r1 + ri as u32, c1 + ci as u16, cell_value_to_data(val)));
+            }
+        }
+        return crate::excel_write::patch::write_cells_preserving(path, params, sheet, &edits);
+    }
+    #[cfg(not(feature = "zip"))]
     modify_file(path, params, |old_data| {
         let mut new_data = old_data.clone();
         let sd = new_data
@@ -174,28 +199,24 @@ pub fn set_format(
     let (r_start, r_end, c_start, c_end) = cell_ref::parse_range_normalized(range_spec)?;
 
     modify_file_with_wb(path, params, |old_data, wb| {
-        *wb = Workbook::new();
-        for (name, data) in old_data.iter() {
-            let ws = wb.add_worksheet();
-            ws.set_name(name).map_err(AppError::Xlsx)?;
-
-            if name == sheet {
-                for (ri, row_data) in data.rows.iter().enumerate() {
-                    for (ci, cell) in row_data.iter().enumerate() {
-                        if ri >= r_start as usize
-                            && ri <= r_end as usize
-                            && ci >= c_start as usize
-                            && ci <= c_end as usize
-                        {
-                            let fmt = build_format(style);
-                            write_cell_with_format(ws, ri as u32, ci as u16, cell, &fmt)?;
-                        } else {
-                            write_cell_data(ws, ri as u32, ci as u16, cell)?;
-                        }
-                    }
+        let ws = wb
+            .worksheet_from_name(sheet)
+            .map_err(|_e| AppError::SheetNotFound(sheet.to_string()))?;
+        let target = old_data
+            .get(sheet)
+            .ok_or_else(|| AppError::SheetNotFound(sheet.to_string()))?;
+        for (ri, row_data) in target.rows.iter().enumerate() {
+            for (ci, cell) in row_data.iter().enumerate() {
+                if ri >= r_start as usize
+                    && ri <= r_end as usize
+                    && ci >= c_start as usize
+                    && ci <= c_end as usize
+                {
+                    let fmt = build_format(style);
+                    write_cell_with_format(ws, ri as u32, ci as u16, cell, &fmt)?;
+                } else {
+                    write_cell_data(ws, ri as u32, ci as u16, cell)?;
                 }
-            } else {
-                write_sheet_data(ws, data)?;
             }
         }
         Ok(())
@@ -211,40 +232,21 @@ pub fn merge_cells(
 ) -> Result<WriteResult> {
     let (r1, c1, r2, c2) = cell_ref::parse_range(range_spec)?;
 
-    modify_file_with_wb(path, params, |old_data, wb| {
-        *wb = Workbook::new();
-        for (name, data) in old_data.iter() {
-            let ws = wb.add_worksheet();
-            ws.set_name(name).map_err(AppError::Xlsx)?;
-
-            if name == sheet {
-                ws.merge_range(r1, c1, r2, c2, value, &Format::new())
-                    .map_err(AppError::Xlsx)?;
-            } else {
-                write_sheet_data(ws, data)?;
-            }
-        }
+    modify_file_with_wb(path, params, |_old_data, wb| {
+        let ws = wb
+            .worksheet_from_name(sheet)
+            .map_err(|_e| AppError::SheetNotFound(sheet.to_string()))?;
+        ws.merge_range(r1, c1, r2, c2, value, &Format::new())
+            .map_err(AppError::Xlsx)?;
         Ok(())
     })
 }
 
 pub fn add_chart(path: &str, params: &SecurityParams, config: &ChartConfig) -> Result<WriteResult> {
-    modify_file_with_wb(path, params, |old_data, wb| {
-        *wb = Workbook::new();
-        let sheet_names: Vec<&str> = old_data.keys().map(|s| s.as_str()).collect();
-        for name in &sheet_names {
-            let sd = &old_data[*name];
-            let ws = wb.add_worksheet();
-            ws.set_name(*name).map_err(AppError::Xlsx)?;
-            write_sheet_data(ws, sd)?;
-        }
-
-        // Insert chart after all data sheets are created
-        let sheet_idx = sheet_names
-            .iter()
-            .position(|n| *n == config.sheet)
-            .ok_or_else(|| AppError::SheetNotFound(config.sheet.clone()))?;
-        if let Ok(ws) = wb.worksheet_from_index(sheet_idx) {
+    modify_file_with_wb(path, params, |_old_data, wb| {
+        // Insert chart on the named worksheet (workbook was already rebuilt by
+        // modify_file_with_wb in the file's original sheet order).
+        if let Ok(ws) = wb.worksheet_from_name(&config.sheet) {
             let mut chart = Chart::new(map_chart_type(&config.chart_type));
 
             // Add series data
@@ -722,6 +724,7 @@ mod tests {
         let mut sd = SheetData {
             name: "Test".to_string(),
             rows: vec![vec![make_cell("a")]],
+            ..Default::default()
         };
         ensure_dimensions(&mut sd, 3, 0);
         assert!(sd.rows.len() >= 4);
@@ -732,6 +735,7 @@ mod tests {
         let mut sd = SheetData {
             name: "Test".to_string(),
             rows: vec![vec![make_cell("a")]],
+            ..Default::default()
         };
         ensure_dimensions(&mut sd, 0, 5);
         assert!(sd.rows[0].len() >= 6);
@@ -745,6 +749,7 @@ mod tests {
             SheetData {
                 name: "Sheet1".to_string(),
                 rows: vec![vec![make_cell("Header")]],
+                ..Default::default()
             },
         );
 
@@ -772,6 +777,7 @@ mod tests {
             SheetData {
                 name: "Sheet1".to_string(),
                 rows: vec![vec![make_cell("Header")], vec![make_cell("Original")]],
+                ..Default::default()
             },
         );
 
@@ -814,6 +820,7 @@ mod tests {
                     vec![make_cell("Row2")],
                     vec![make_cell("Row3")],
                 ],
+                ..Default::default()
             },
         );
 
@@ -834,6 +841,7 @@ mod tests {
             SheetData {
                 name: "Sheet1".to_string(),
                 rows: vec![vec![make_cell("Header")]],
+                ..Default::default()
             },
         );
 

@@ -3,6 +3,7 @@ use serde::Deserialize;
 
 use excel_core::excel_write;
 use excel_core::types::*;
+use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct ImageInsertReq {
@@ -48,7 +49,7 @@ pub struct ShapeInsertReq {
     pub alt_text: Option<String>,
 }
 
-pub async fn image_insert(Json(req): Json<ImageInsertReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn image_insert(Json(req): Json<ImageInsertReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: false,
         create_backup: true,
@@ -74,24 +75,24 @@ pub async fn image_insert(Json(req): Json<ImageInsertReq>) -> Json<ApiResponse<W
     };
 
     match excel_write::insert_image(&req.path, &params, &config) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
-pub async fn image_remove(Json(req): Json<ImageRemoveReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn image_remove(Json(req): Json<ImageRemoveReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: false,
         create_backup: true,
         file_path: req.path.clone(),
     };
     match excel_write::remove_image(&req.path, &params, &req.sheet, &req.anchor_cell) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
-pub async fn shape_insert(Json(req): Json<ShapeInsertReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn shape_insert(Json(req): Json<ShapeInsertReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: false,
         create_backup: true,
@@ -116,7 +117,7 @@ pub async fn shape_insert(Json(req): Json<ShapeInsertReq>) -> Json<ApiResponse<W
     };
 
     match excel_write::insert_shape(&req.path, &params, &config) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }

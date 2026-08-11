@@ -127,6 +127,7 @@ mod tests {
                 vec![make_cell(Some("2"), Int), make_cell(Some("b"), String)],
                 vec![make_cell(Some("3"), Int), make_cell(Some("c"), String)],
             ],
+            ..Default::default()
         }
     }
 
@@ -225,6 +226,7 @@ mod tests {
                 make_cell(Some("k"), String),
                 make_cell(Some("v"), String),
             ]],
+            ..Default::default()
         }];
         let result = sql_query_on_data(&data, "SELECT * FROM \"s1\"", false).unwrap();
         assert_eq!(result.row_count, 1);

@@ -124,21 +124,9 @@ pub fn register(
 }
 
 fn flatten_numbers(args: &[CellValue]) -> Vec<f64> {
-    let mut numbers = Vec::new();
-    for arg in args {
-        match arg {
-            CellValue::Number(n) => numbers.push(*n),
-            CellValue::String(s) => {
-                if let Ok(n) = s.parse::<f64>() {
-                    numbers.push(n);
-                }
-            }
-            CellValue::Bool(true) => numbers.push(1.0),
-            CellValue::Bool(false) => numbers.push(0.0),
-            _ => {}
-        }
-    }
-    numbers
+    // Delegate to the range-marker aware implementation in mod.rs so sentinel
+    // pairs inside expanded ranges are skipped, not summed.
+    super::flatten_numbers(args)
 }
 
 fn math_abs(args: &[CellValue]) -> CellValue {
@@ -164,19 +152,11 @@ fn math_average(args: &[CellValue]) -> CellValue {
 }
 
 fn math_count(args: &[CellValue]) -> CellValue {
-    let count = args
-        .iter()
-        .filter(|a| matches!(a, CellValue::Number(_) | CellValue::DateTime(_)))
-        .count();
-    CellValue::Number(count as f64)
+    CellValue::Number(super::count_values(args))
 }
 
 fn math_counta(args: &[CellValue]) -> CellValue {
-    let count = args
-        .iter()
-        .filter(|a| !matches!(a, CellValue::Empty))
-        .count();
-    CellValue::Number(count as f64)
+    CellValue::Number(super::count_non_empty(args))
 }
 
 fn math_min(args: &[CellValue]) -> CellValue {

@@ -1,11 +1,80 @@
 use std::fs;
 use std::io::{self, BufReader, Read};
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
 use sha2::{Digest, Sha256};
 
-use crate::types::{BackupInfo, SecurityParams, WorkbookHistoryEntry};
+use crate::types::{AppError, BackupInfo, Result, SecurityParams, WorkbookHistoryEntry};
 use crate::utils::file_util::{append_timestamp, copy_file, ensure_parent_dir};
+
+/// Lexically resolves `.` and `..` **without** touching the filesystem, then
+/// canonicalizes the longest existing ancestor so symlinks cannot be used to
+/// escape the sandbox root.
+///
+/// Unlike `Path::canonicalize`, this works for paths that do not exist yet
+/// (e.g. the target of `file/create`).
+pub fn resolve_path(path: &str, base: &Path) -> PathBuf {
+    let raw = Path::new(path);
+    let absolute = if raw.is_absolute() {
+        raw.to_path_buf()
+    } else {
+        base.join(raw)
+    };
+
+    // Lexical normalization.
+    let mut out = PathBuf::new();
+    for comp in absolute.components() {
+        match comp {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                out.pop();
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+
+    // Resolve symlinks on the deepest existing prefix.
+    let mut existing = out.clone();
+    let mut tail: Vec<std::ffi::OsString> = Vec::new();
+    while !existing.exists() {
+        match existing.file_name() {
+            Some(name) => {
+                tail.push(name.to_os_string());
+                if !existing.pop() {
+                    break;
+                }
+            }
+            None => break,
+        }
+    }
+    let mut resolved = existing.canonicalize().unwrap_or(existing);
+    for name in tail.into_iter().rev() {
+        resolved.push(name);
+    }
+    resolved
+}
+
+/// Rejects `..` traversal and any path that resolves outside `root`.
+///
+/// This is the guard that stops
+/// `POST /api/file/create {"path":"/etc/cron.d/pwn"}` from writing anywhere on
+/// the filesystem. Callers that legitimately want unrestricted access simply
+/// do not configure a root.
+pub fn validate_path_inside_root(path: &str, root: &Path) -> Result<()> {
+    if path.trim().is_empty() {
+        return Err(AppError::InvalidInput("path must not be empty".into()));
+    }
+    let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    let resolved = resolve_path(path, &root);
+    if !resolved.starts_with(&root) {
+        return Err(AppError::InvalidInput(format!(
+            "path '{}' resolves outside the allowed root '{}'",
+            path,
+            root.display()
+        )));
+    }
+    Ok(())
+}
 
 pub fn compute_file_hash(path: impl AsRef<Path>) -> io::Result<String> {
     let file = fs::File::open(path)?;

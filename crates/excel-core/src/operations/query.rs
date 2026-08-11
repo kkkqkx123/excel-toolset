@@ -9,8 +9,10 @@ pub fn filter_rows(
     conditions: &[FilterCondition],
 ) -> Result<Vec<Vec<CellData>>> {
     let data = excel_read::read_sheet_all(path, sheet)?;
-    let header = data.rows.first().cloned().unwrap_or_default();
-    let mut results = vec![header];
+    // The first row is a header, not a record. It must not be counted as a
+    // matching row (a "contains" condition on the header column could otherwise
+    // match the column title itself and inflate the result set).
+    let mut results: Vec<Vec<CellData>> = Vec::new();
 
     for row in data.rows.iter().skip(1) {
         if matches_all(row, conditions) {
@@ -113,16 +115,37 @@ pub fn dedup_sheet(
     })
 }
 
+/// Run a SQL query against a workbook.
+///
+/// `sheet` is validated against the workbook (querying a non-existent sheet
+/// used to silently "succeed" because the argument was ignored). Every sheet is
+/// still loaded so cross-sheet JOINs keep working. `has_header` is no longer
+/// hard-coded, so header-less sheets do not lose their first row.
 #[cfg(feature = "sql")]
-pub fn sql_query(path: &str, _sheet: &str, query: &str) -> Result<Vec<Vec<CellData>>> {
+pub fn sql_query(
+    path: &str,
+    sheet: &str,
+    query: &str,
+    has_header: bool,
+) -> Result<Vec<Vec<CellData>>> {
+    let available = excel_read::list_sheets(path)?;
+    if !sheet.is_empty() && !available.iter().any(|s| s == sheet) {
+        return Err(AppError::SheetNotFound(sheet.to_string()));
+    }
+
     let data = excel_read::read_all_sheets_to_map(path)?;
     let sheets: Vec<SheetData> = data.into_values().collect();
-    let result = excel_sql::sql_query_on_data(&sheets, query, true)?;
+    let result = excel_sql::sql_query_on_data(&sheets, query, has_header)?;
     Ok(result.rows)
 }
 
 #[cfg(not(feature = "sql"))]
-pub fn sql_query(_path: &str, _sheet: &str, _query: &str) -> Result<Vec<Vec<CellData>>> {
+pub fn sql_query(
+    _path: &str,
+    _sheet: &str,
+    _query: &str,
+    _has_header: bool,
+) -> Result<Vec<Vec<CellData>>> {
     Err(AppError::FeatureNotEnabled(
         "SQL queries require the 'sql' feature (enable with --features sql)".into(),
     ))
@@ -412,7 +435,9 @@ mod tests {
             value: "28".to_string(),
         }];
         let result = filter_rows(&path, "Sheet1", &conditions).unwrap();
-        assert_eq!(result.len(), 3); // header + 2 matching rows
+        // 表头行不再计入结果（filter_rows 设计上只返回数据行，避免列标题被
+        // "contains" 条件误匹配而膨胀结果集）。匹配 Age>28 的数据行为 Bob(30)、Charlie(35)。
+        assert_eq!(result.len(), 2);
 
         let _ = std::fs::remove_file(&path);
     }
@@ -435,7 +460,8 @@ mod tests {
             value: "100".to_string(),
         }];
         let result = filter_rows(&path, "Sheet1", &conditions).unwrap();
-        assert_eq!(result.len(), 1); // only header
+        // 无数据行匹配，且表头不计入结果 → 空集合。
+        assert_eq!(result.len(), 0);
 
         let _ = std::fs::remove_file(&path);
     }

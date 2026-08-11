@@ -3,25 +3,46 @@ use std::collections::HashMap;
 use crate::helpers::format_cell_ref;
 use excel_types::{CellDiff, DiffType, SheetData, SheetDiff};
 
+/// Compare two sheets cell-by-cell in **absolute** worksheet coordinates.
+///
+/// `SheetData::rows` is stored relative to the sheet's used-range origin
+/// (`start_row`/`start_col`). Comparing raw relative indices would both
+/// mis-label the reported cell reference (a change in `E3` reported as `C1`)
+/// and mis-align two sheets whose used-ranges start at different origins.
+/// Everything below therefore works in absolute indices and converts back to
+/// per-sheet relative indices only when fetching a cell.
 pub fn compute_cell_diffs(old_data: &SheetData, new_data: &SheetData) -> Vec<CellDiff> {
     let mut diffs = Vec::new();
 
-    let max_row = std::cmp::max(old_data.rows.len(), new_data.rows.len());
+    let old_r0 = old_data.start_row as usize;
+    let old_c0 = old_data.start_col as usize;
+    let new_r0 = new_data.start_row as usize;
+    let new_c0 = new_data.start_col as usize;
 
-    for row_idx in 0..max_row {
-        let old_row = old_data.rows.get(row_idx);
-        let new_row = new_data.rows.get(row_idx);
+    let first_row = old_r0.min(new_r0);
+    let last_row = (old_r0 + old_data.rows.len()).max(new_r0 + new_data.rows.len());
 
-        let max_col = match (old_row, new_row) {
-            (Some(or), Some(nr)) => std::cmp::max(or.len(), nr.len()),
-            (Some(or), None) => or.len(),
-            (None, Some(nr)) => nr.len(),
+    for abs_row in first_row..last_row {
+        let old_row = abs_row
+            .checked_sub(old_r0)
+            .and_then(|i| old_data.rows.get(i));
+        let new_row = abs_row
+            .checked_sub(new_r0)
+            .and_then(|i| new_data.rows.get(i));
+
+        let first_col = old_c0.min(new_c0);
+        let last_col = match (old_row, new_row) {
+            (Some(or), Some(nr)) => (old_c0 + or.len()).max(new_c0 + nr.len()),
+            (Some(or), None) => old_c0 + or.len(),
+            (None, Some(nr)) => new_c0 + nr.len(),
             (None, None) => continue,
         };
 
-        for col_idx in 0..max_col {
-            let old_cell = old_row.and_then(|r| r.get(col_idx));
-            let new_cell = new_row.and_then(|r| r.get(col_idx));
+        for abs_col in first_col..last_col {
+            let old_cell =
+                old_row.and_then(|r| abs_col.checked_sub(old_c0).and_then(|i| r.get(i)));
+            let new_cell =
+                new_row.and_then(|r| abs_col.checked_sub(new_c0).and_then(|i| r.get(i)));
 
             if old_cell.is_none() && new_cell.is_none() {
                 continue;
@@ -30,10 +51,10 @@ pub fn compute_cell_diffs(old_data: &SheetData, new_data: &SheetData) -> Vec<Cel
             let diff_type = crate::helpers::classify_diff(old_cell, new_cell);
 
             if diff_type != DiffType::NoChange {
-                let cell_ref = format_cell_ref(row_idx, col_idx);
+                let cell_ref = format_cell_ref(abs_row, abs_col);
                 diffs.push(CellDiff {
-                    row: row_idx as u32,
-                    col: col_idx as u16,
+                    row: abs_row as u32,
+                    col: abs_col as u16,
                     cell_ref,
                     diff_type,
                     old_value: old_cell.and_then(|c| c.value.clone()),
@@ -121,6 +142,7 @@ mod tests {
                     data_type: CellDataType::String,
                     formula: None,
                 }]],
+                ..Default::default()
             },
         );
         let new = old.clone();
@@ -146,6 +168,7 @@ mod tests {
         let old = SheetData {
             name: "S".into(),
             rows: vec![],
+            ..Default::default()
         };
         let new = SheetData {
             name: "S".into(),
@@ -154,6 +177,7 @@ mod tests {
                 data_type: CellDataType::String,
                 formula: None,
             }]],
+            ..Default::default()
         };
         let diffs = compute_cell_diffs(&old, &new);
         assert_eq!(diffs.len(), 1);
@@ -170,10 +194,12 @@ mod tests {
                 data_type: CellDataType::String,
                 formula: None,
             }]],
+            ..Default::default()
         };
         let new = SheetData {
             name: "S".into(),
             rows: vec![],
+            ..Default::default()
         };
         let diffs = compute_cell_diffs(&old, &new);
         assert_eq!(diffs.len(), 1);
@@ -196,11 +222,13 @@ mod tests {
                     formula: None,
                 }],
             ],
+            ..Default::default()
         };
         let diffs = compute_cell_diffs(
             &SheetData {
                 name: "S".into(),
                 rows: vec![],
+                ..Default::default()
             },
             &new,
         );
@@ -225,6 +253,7 @@ mod tests {
                     data_type: CellDataType::String,
                     formula: None,
                 }]],
+                ..Default::default()
             },
         );
 
@@ -258,6 +287,7 @@ mod tests {
             SheetData {
                 name: "S1".into(),
                 rows: vec![vec![]],
+                ..Default::default()
             },
         );
 
@@ -267,6 +297,7 @@ mod tests {
             SheetData {
                 name: "S1".into(),
                 rows: vec![vec![], vec![]],
+                ..Default::default()
             },
         );
 
@@ -303,6 +334,7 @@ mod tests {
                         },
                     ],
                 ],
+                ..Default::default()
             },
         );
 
@@ -324,6 +356,7 @@ mod tests {
                     data_type: CellDataType::String,
                     formula: None,
                 }]],
+                ..Default::default()
             },
         );
 
@@ -376,6 +409,7 @@ mod tests {
         SheetData {
             name: "S".into(),
             rows: vec![],
+            ..Default::default()
         }
     }
 
@@ -392,6 +426,7 @@ mod tests {
                     })
                     .collect(),
             ],
+            ..Default::default()
         }
     }
 }

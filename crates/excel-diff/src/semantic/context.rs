@@ -118,6 +118,7 @@ mod tests {
                     formula: None,
                 }],
             ],
+            ..Default::default()
         };
         let headers = extract_headers(&sheet);
         assert_eq!(headers, vec!["Name", "Score"]);
@@ -128,6 +129,7 @@ mod tests {
         let sheet = SheetData {
             name: "S".into(),
             rows: vec![],
+            ..Default::default()
         };
         assert!(extract_headers(&sheet).is_empty());
     }
@@ -147,6 +149,7 @@ mod tests {
                         })
                         .collect(),
                 ],
+                ..Default::default()
             }
         }
 
@@ -175,6 +178,7 @@ mod tests {
                         })
                         .collect(),
                 ],
+                ..Default::default()
             }
         }
 
@@ -201,6 +205,7 @@ mod tests {
                         })
                         .collect(),
                 ],
+                ..Default::default()
             }
         }
 

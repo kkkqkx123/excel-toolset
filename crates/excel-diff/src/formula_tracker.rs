@@ -135,13 +135,20 @@ impl FormulaTracker {
 
 pub fn extract_cell_refs(formula: &str) -> HashSet<String> {
     let mut refs = HashSet::new();
-    let formula = strip_all_sheet_prefixes(formula);
+    let stripped = strip_all_sheet_prefixes(formula);
 
-    if !formula.starts_with('=') {
+    if stripped.is_empty() {
         return refs;
     }
 
-    let formula = &formula[1..];
+    // calamine stores formulas *without* the leading '=' (e.g. "A1+B1"), while
+    // hand-written/API-supplied formulas usually include it. Normalise both
+    // shapes instead of silently returning an empty dependency set.
+    let formula = if let Some(rest) = stripped.strip_prefix('=') {
+        rest
+    } else {
+        stripped.as_str()
+    };
     let chars: Vec<char> = formula.chars().collect();
     let mut i = 0;
 
@@ -362,6 +369,15 @@ fn col_str_to_index(col_str: &str) -> Option<usize> {
     Some(index - 1)
 }
 
+
+#[cfg(test)]
+
+#[cfg(test)]
+
+#[cfg(test)]
+
+#[cfg(test)]
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -514,6 +530,7 @@ mod tests {
                     },
                 ],
             ],
+            ..Default::default()
         };
         let tracker = FormulaTracker::build_from_sheet(&sheet);
         assert!(tracker.dependencies.contains_key("A1"));
@@ -530,6 +547,7 @@ mod tests {
                 data_type: CellDataType::Float,
                 formula: None,
             }]],
+            ..Default::default()
         };
         let tracker = FormulaTracker::build_from_sheet(&sheet);
         assert!(tracker.dependencies.is_empty());

@@ -125,6 +125,7 @@ impl QuerySession {
             let data = SheetData {
                 name: name.clone(),
                 rows,
+                ..Default::default()
             };
             self.load_sheet(name, &data, false)?;
         }
@@ -209,6 +210,7 @@ mod tests {
                 vec![make_cell(Some("x"), String)],
                 vec![make_cell(Some("y"), String)],
             ],
+            ..Default::default()
         }
     }
 
@@ -219,6 +221,7 @@ mod tests {
                 vec![make_cell(Some("1"), Int)],
                 vec![make_cell(Some("2"), Int)],
             ],
+            ..Default::default()
         }
     }
 

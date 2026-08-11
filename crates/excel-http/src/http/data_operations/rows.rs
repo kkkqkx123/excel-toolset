@@ -3,6 +3,7 @@ use serde::Deserialize;
 
 use excel_core::excel_write;
 use excel_core::types::*;
+use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct RowOpReq {
@@ -32,7 +33,7 @@ pub struct DeleteRowReq {
     pub dry_run: bool,
 }
 
-pub async fn data_append_row(Json(req): Json<RowOpReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn data_append_row(Json(req): Json<RowOpReq>) -> ApiJson<WriteResult> {
     let row: Vec<Vec<CellValue>> = vec![
         req.values
             .iter()
@@ -45,12 +46,12 @@ pub async fn data_append_row(Json(req): Json<RowOpReq>) -> Json<ApiResponse<Writ
         file_path: req.path.clone(),
     };
     match excel_write::append_rows(&req.path, &params, &req.sheet, &row) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
-pub async fn data_insert_row(Json(req): Json<InsertRowReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn data_insert_row(Json(req): Json<InsertRowReq>) -> ApiJson<WriteResult> {
     let row: Vec<Vec<CellValue>> = vec![
         req.values
             .iter()
@@ -63,19 +64,19 @@ pub async fn data_insert_row(Json(req): Json<InsertRowReq>) -> Json<ApiResponse<
         file_path: req.path.clone(),
     };
     match excel_write::insert_rows(&req.path, &params, &req.sheet, req.row, &row) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
-pub async fn data_delete_row(Json(req): Json<DeleteRowReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn data_delete_row(Json(req): Json<DeleteRowReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,
         file_path: req.path.clone(),
     };
     match excel_write::delete_rows(&req.path, &params, &req.sheet, req.row, req.row) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }

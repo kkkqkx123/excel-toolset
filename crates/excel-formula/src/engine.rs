@@ -211,3 +211,21 @@ impl<P: DataProvider + 'static> FormulaEngine<P> {
             .insert(name.to_uppercase(), Arc::new(func));
     }
 }
+
+#[cfg(test)]
+mod tmp_debug_tests {
+    use super::*;
+    #[test]
+    fn debug_sum_vs_average() {
+        let mut cells = vec![vec![]; 6];
+        for (i, v) in [1.0, 2.0, 3.0, 4.0, 5.0].iter().enumerate() {
+            cells[i] = vec![CellValue::Empty; 5];
+            cells[i][2] = CellValue::Number(*v);
+        }
+        let p = InMemoryDataProvider::new().with_sheet("S", cells);
+        let mut e = FormulaEngine::new(p);
+        for f in ["=SUM(C2:C6)", "=AVERAGE(C2:C6)", "=COUNT(C2:C6)", "=MIN(C2:C6)", "=MAX(C2:C6)"] {
+            println!("{f} => {:?}", e.evaluate("S", "A1", f));
+        }
+    }
+}

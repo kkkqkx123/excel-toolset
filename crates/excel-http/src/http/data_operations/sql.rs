@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 #[cfg(feature = "sql")]
 use excel_core::operations;
 use excel_core::types::*;
+use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct SqlReq {
@@ -18,6 +19,9 @@ pub struct SqlReq {
     pub session_id: Option<String>,
     #[serde(default)]
     pub cache: bool,
+    /// Whether the first row holds column headers. Defaults to `true`.
+    #[serde(default)]
+    pub has_header: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -50,7 +54,7 @@ static GLOBAL_SESSIONS: std::sync::LazyLock<
 #[cfg(feature = "sql")]
 static SESSION_COUNTER: AtomicU64 = AtomicU64::new(1);
 
-pub async fn data_sql(Json(req): Json<SqlReq>) -> Json<ApiResponse<Vec<Vec<CellData>>>> {
+pub async fn data_sql(Json(req): Json<SqlReq>) -> ApiJson<Vec<Vec<CellData>>> {
     #[cfg(feature = "sql")]
     {
         // If session_id is provided, use session query
@@ -61,12 +65,12 @@ pub async fn data_sql(Json(req): Json<SqlReq>) -> Json<ApiResponse<Vec<Vec<CellD
             if let Some(session) = sessions.get(sid) {
                 match session.query(&req.query) {
                     Ok(result) => {
-                        return Json(ApiResponse::ok(Some(result.rows)));
+                        return ApiJson(ApiResponse::ok(Some(result.rows)));
                     }
-                    Err(e) => return Json(ApiResponse::err(e)),
+                    Err(e) => return ApiJson(ApiResponse::err(e)),
                 }
             }
-            return Json(ApiResponse::err(AppError::SheetNotFound(format!(
+            return ApiJson(ApiResponse::err(AppError::SheetNotFound(format!(
                 "Session not found: {}",
                 sid
             ))));
@@ -77,10 +81,15 @@ pub async fn data_sql(Json(req): Json<SqlReq>) -> Json<ApiResponse<Vec<Vec<CellD
             {
                 let mut cache = GLOBAL_CACHE.lock().expect("global SQL cache lock poisoned");
                 if let Some(cached) = cache.get(&key) {
-                    return Json(ApiResponse::ok(Some(cached.rows.clone())));
+                    return ApiJson(ApiResponse::ok(Some(cached.rows.clone())));
                 }
             }
-            match operations::sql_query(&req.path, &req.sheet, &req.query) {
+            match operations::sql_query(
+                &req.path,
+                &req.sheet,
+                &req.query,
+                req.has_header.unwrap_or(true),
+            ) {
                 Ok(data) => {
                     let mut cache = GLOBAL_CACHE.lock().expect("global SQL cache lock poisoned");
                     cache.put(
@@ -91,21 +100,26 @@ pub async fn data_sql(Json(req): Json<SqlReq>) -> Json<ApiResponse<Vec<Vec<CellD
                             row_count: data.len(),
                         },
                     );
-                    Json(ApiResponse::ok(Some(data)))
+                    ApiJson(ApiResponse::ok(Some(data)))
                 }
-                Err(e) => Json(ApiResponse::err(e)),
+                Err(e) => ApiJson(ApiResponse::err(e)),
             }
         } else {
-            match operations::sql_query(&req.path, &req.sheet, &req.query) {
-                Ok(data) => Json(ApiResponse::ok(Some(data))),
-                Err(e) => Json(ApiResponse::err(e)),
+            match operations::sql_query(
+                &req.path,
+                &req.sheet,
+                &req.query,
+                req.has_header.unwrap_or(true),
+            ) {
+                Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+                Err(e) => ApiJson(ApiResponse::err(e)),
             }
         }
     }
     #[cfg(not(feature = "sql"))]
     {
         let _ = req;
-        Json(ApiResponse::err(AppError::FeatureNotEnabled(
+        ApiJson(ApiResponse::err(AppError::FeatureNotEnabled(
             "SQL queries require the 'sql' feature".into(),
         )))
     }
@@ -113,23 +127,23 @@ pub async fn data_sql(Json(req): Json<SqlReq>) -> Json<ApiResponse<Vec<Vec<CellD
 
 pub async fn create_session(
     Json(req): Json<CreateSessionReq>,
-) -> Json<ApiResponse<CreateSessionResp>> {
+) -> ApiJson<CreateSessionResp> {
     #[cfg(feature = "sql")]
     {
         let session_id = format!("sess-{}", SESSION_COUNTER.fetch_add(1, Ordering::SeqCst));
         let mut qs = match excel_sql::QuerySession::new() {
             Ok(s) => s,
-            Err(e) => return Json(ApiResponse::err(e)),
+            Err(e) => return ApiJson(ApiResponse::err(e)),
         };
         if let Err(e) = qs.open_workbook(&req.path) {
-            return Json(ApiResponse::err(e));
+            return ApiJson(ApiResponse::err(e));
         }
         let tables = qs.list_tables().unwrap_or_default();
         let mut sessions = GLOBAL_SESSIONS
             .lock()
             .expect("global SQL session lock poisoned");
         sessions.insert(session_id.clone(), qs);
-        Json(ApiResponse::ok(Some(CreateSessionResp {
+        ApiJson(ApiResponse::ok(Some(CreateSessionResp {
             session_id,
             tables,
         })))
@@ -137,22 +151,22 @@ pub async fn create_session(
     #[cfg(not(feature = "sql"))]
     {
         let _ = req;
-        Json(ApiResponse::err(AppError::FeatureNotEnabled(
+        ApiJson(ApiResponse::err(AppError::FeatureNotEnabled(
             "SQL sessions require the 'sql' feature".into(),
         )))
     }
 }
 
-pub async fn close_session(Path(id): Path<String>) -> Json<ApiResponse<String>> {
+pub async fn close_session(Path(id): Path<String>) -> ApiJson<String> {
     #[cfg(feature = "sql")]
     {
         let mut sessions = GLOBAL_SESSIONS
             .lock()
             .expect("global SQL session lock poisoned");
         if sessions.remove(&id).is_some() {
-            Json(ApiResponse::ok(Some(format!("Session {} closed", id))))
+            ApiJson(ApiResponse::ok(Some(format!("Session {} closed", id))))
         } else {
-            Json(ApiResponse::err(AppError::SheetNotFound(format!(
+            ApiJson(ApiResponse::err(AppError::SheetNotFound(format!(
                 "Session not found: {}",
                 id
             ))))
@@ -161,7 +175,7 @@ pub async fn close_session(Path(id): Path<String>) -> Json<ApiResponse<String>> 
     #[cfg(not(feature = "sql"))]
     {
         let _ = id;
-        Json(ApiResponse::err(AppError::FeatureNotEnabled(
+        ApiJson(ApiResponse::err(AppError::FeatureNotEnabled(
             "SQL sessions require the 'sql' feature".into(),
         )))
     }

@@ -25,24 +25,13 @@ pub fn set_sheet_visibility(
     let old_hash = security::compute_file_hash(path)
         .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
 
-    crate::excel_write::modify_file_with_wb(path, params, |old_data, wb| {
-        *wb = rust_xlsxwriter::Workbook::new();
-
-        let sheet_names: Vec<&str> = old_data.keys().map(|s| s.as_str()).collect();
-        for name in &sheet_names {
-            let sd = &old_data[*name];
-            let ws = wb.add_worksheet();
-            ws.set_name(*name).map_err(AppError::Xlsx)?;
-            crate::excel_write::write_sheet_data(ws, sd)?;
-        }
-
-        let sheet_idx = sheet_names
-            .iter()
-            .position(|n| *n == sheet)
-            .ok_or_else(|| AppError::SheetNotFound(sheet.to_string()))?;
-
+    crate::excel_write::modify_file_with_wb(path, params, |_old_data, wb| {
+        // Do NOT rebuild the workbook here: `modify_file_with_wb` has already
+        // recreated every worksheet in the file's original order. Rebuilding
+        // from a HashMap shuffled the tabs randomly per run and made the
+        // visibility flag land on the wrong tab.
         let ws = wb
-            .worksheet_from_index(sheet_idx)
+            .worksheet_from_name(sheet)
             .map_err(|_e| AppError::SheetNotFound(sheet.to_string()))?;
 
         match visibility {

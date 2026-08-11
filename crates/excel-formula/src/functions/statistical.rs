@@ -119,7 +119,8 @@ pub fn register(
 }
 
 fn flatten_numbers(args: &[CellValue]) -> Vec<f64> {
-    args.iter().filter_map(to_number).collect()
+    // Delegate to the range-marker aware implementation in mod.rs.
+    super::flatten_numbers(args)
 }
 
 /// Extract numbers from args, handling range-marker format.

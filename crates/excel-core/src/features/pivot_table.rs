@@ -1,8 +1,14 @@
-//! Pivot table feature implementation.
+//! Pivot "table" feature implementation.
 //!
-//! rust_xlsxwriter does not natively support pivot tables.
-//! This implementation creates pivot tables by reading source data,
-//! performing in-memory aggregation, and writing results as formatted data.
+//! **This does not produce a native Excel PivotTable.** rust_xlsxwriter cannot
+//! emit `xl/pivotTables/*.xml`, so there is no pivot cache, no field list and
+//! no interactive refresh. What we do instead is read the source range,
+//! aggregate it in memory, and write the resulting **flattened summary table**
+//! into the target sheet as ordinary cells.
+//!
+//! The distinction matters: callers previously got `success: true` and assumed
+//! a real pivot part existed. Every successful result now says so explicitly in
+//! `WriteResult::message`.
 
 use std::collections::HashMap;
 
@@ -60,7 +66,10 @@ pub fn create_pivot_table(
         ..params.clone()
     };
 
-    crate::excel_write::modify_file_with_wb(path, &params_for_write, |_, wb| {
+    let rows_written = pivot_data.len();
+    let cols_written = pivot_data.iter().map(|r| r.len()).max().unwrap_or(0);
+
+    let mut result = crate::excel_write::modify_file_with_wb(path, &params_for_write, |_, wb| {
         let worksheet = wb
             .worksheet_from_name(&config.target_sheet)
             .map_err(|_e| AppError::SheetNotFound(config.target_sheet.clone()))?;
@@ -77,7 +86,18 @@ pub fn create_pivot_table(
         }
 
         Ok(())
-    })
+    })?;
+
+    // C3: do not claim we created a native PivotTable — we did not.
+    result.message = format!(
+        "Wrote a flattened aggregate summary ({} rows x {} cols) to '{}'!{}. \
+         NOTE: this is NOT a native Excel PivotTable — no pivot cache or field \
+         list is created, and the cells will not refresh when the source data \
+         changes.",
+        rows_written, cols_written, config.target_sheet, config.target_cell
+    );
+
+    Ok(result)
 }
 
 /// Apply date grouping to source data.

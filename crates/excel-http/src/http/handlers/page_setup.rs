@@ -3,6 +3,7 @@ use serde::Deserialize;
 
 use excel_core::excel_write;
 use excel_core::types::*;
+use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct PageSetupConfigureReq {
@@ -54,7 +55,7 @@ pub struct PageBreakClearReq {
 
 pub async fn page_setup_configure(
     Json(req): Json<PageSetupConfigureReq>,
-) -> Json<ApiResponse<WriteResult>> {
+) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: false,
         create_backup: true,
@@ -87,14 +88,14 @@ pub async fn page_setup_configure(
     };
 
     match excel_write::configure_page_setup(&req.path, &params, &config) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
 pub async fn page_breaks_set(
     Json(req): Json<PageBreakSetReq>,
-) -> Json<ApiResponse<WriteResult>> {
+) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: false,
         create_backup: true,
@@ -106,21 +107,21 @@ pub async fn page_breaks_set(
         vertical_breaks: req.vertical_breaks,
     };
     match excel_write::set_page_breaks(&req.path, &params, &config) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
 pub async fn page_breaks_clear(
     Json(req): Json<PageBreakClearReq>,
-) -> Json<ApiResponse<WriteResult>> {
+) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: false,
         create_backup: true,
         file_path: req.path.clone(),
     };
     match excel_write::clear_page_breaks(&req.path, &params, &req.sheet) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }

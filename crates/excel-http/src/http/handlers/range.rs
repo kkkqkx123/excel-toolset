@@ -5,6 +5,7 @@ use excel_core::excel_read;
 use excel_core::excel_write;
 use excel_core::types::*;
 use excel_core::utils::helpers;
+use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct RangeReadReq {
@@ -50,7 +51,7 @@ pub struct RangeWriteCsvReq {
     pub dry_run: bool,
 }
 
-pub async fn range_read(Json(req): Json<RangeReadReq>) -> Json<ApiResponse<ReadRangeResult>> {
+pub async fn range_read(Json(req): Json<RangeReadReq>) -> ApiJson<ReadRangeResult> {
     let mode = match req.mode.as_str() {
         "compact" => OutputMode::Compact,
         "csv" => OutputMode::Csv,
@@ -63,12 +64,12 @@ pub async fn range_read(Json(req): Json<RangeReadReq>) -> Json<ApiResponse<ReadR
         context_size: Some(3),
     };
     match excel_read::read_range_with_options(&req.path, &req.sheet, &req.range, &options) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
-pub async fn range_write(Json(req): Json<RangeWriteReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn range_write(Json(req): Json<RangeWriteReq>) -> ApiJson<WriteResult> {
     let values: Vec<Vec<CellValue>> = req
         .data
         .iter()
@@ -84,26 +85,26 @@ pub async fn range_write(Json(req): Json<RangeWriteReq>) -> Json<ApiResponse<Wri
         file_path: req.path.clone(),
     };
     match excel_write::write_range(&req.path, &params, &req.sheet, &req.range, &values) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
-pub async fn range_clear(Json(req): Json<RangeClearReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn range_clear(Json(req): Json<RangeClearReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,
         file_path: req.path.clone(),
     };
     match excel_write::clear_range(&req.path, &params, &req.sheet, &req.range) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
 pub async fn range_write_from_csv(
     Json(req): Json<RangeWriteCsvReq>,
-) -> Json<ApiResponse<WriteResult>> {
+) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,
@@ -116,7 +117,7 @@ pub async fn range_write_from_csv(
         &req.range,
         &req.csv_path,
     ) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }

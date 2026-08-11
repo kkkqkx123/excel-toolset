@@ -171,7 +171,15 @@ pub fn load_sheet_to_db(
         return Ok(());
     }
 
-    let type_rows = collect_row_types(&data.rows);
+    // Infer column types from the *data* rows only. Including the textual
+    // header row dragged every column to VARCHAR, which broke SUM()/numeric
+    // comparisons on otherwise numeric columns.
+    let type_source: &[Vec<CellData>] = if has_header && data.rows.len() > 1 {
+        &data.rows[1..]
+    } else {
+        &data.rows
+    };
+    let type_rows = collect_row_types(type_source);
     let col_types = infer_column_types(&type_rows);
 
     if has_header {
@@ -359,6 +367,7 @@ mod tests {
                     make_cell(Some("v2"), CellDataType::String),
                 ],
             ],
+            ..Default::default()
         };
         load_sheet_to_db(&conn, "sheet1", &data, true).unwrap();
         assert_eq!(table_row_count(&conn, "sheet1").unwrap(), 1);
@@ -376,6 +385,7 @@ mod tests {
                 make_cell(Some("1"), CellDataType::Int),
                 make_cell(Some("x"), CellDataType::String),
             ]],
+            ..Default::default()
         };
         load_sheet_to_db(&conn, "sheet1", &data, false).unwrap();
         assert_eq!(table_row_count(&conn, "sheet1").unwrap(), 1);
@@ -389,6 +399,7 @@ mod tests {
         let data = SheetData {
             name: "empty".to_string(),
             rows: vec![],
+            ..Default::default()
         };
         load_sheet_to_db(&conn, "empty", &data, true).unwrap();
         assert!(!table_exists(&conn, "empty").unwrap());
@@ -403,6 +414,7 @@ mod tests {
                 vec![make_cell(Some("a"), CellDataType::String)],
                 vec![make_cell(Some("b"), CellDataType::String)],
             ],
+            ..Default::default()
         };
         load_sheet_with_row_id(&conn, "s", &data, false).unwrap();
         assert_eq!(table_row_count(&conn, "s").unwrap(), 2);

@@ -5,6 +5,7 @@ use excel_core::excel_read;
 use excel_core::excel_write;
 use excel_core::security;
 use excel_core::types::*;
+use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct CreateFileReq {
@@ -28,33 +29,33 @@ pub struct FileInfoReq {
     pub path: String,
 }
 
-pub async fn file_info(Json(req): Json<FileInfoReq>) -> Json<ApiResponse<FileInfo>> {
+pub async fn file_info(Json(req): Json<FileInfoReq>) -> ApiJson<FileInfo> {
     match excel_read::read_file_info(&req.path) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
-pub async fn file_create(Json(req): Json<CreateFileReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn file_create(Json(req): Json<CreateFileReq>) -> ApiJson<WriteResult> {
     match excel_write::create_file(&req.path, &req.sheet) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
-pub async fn file_backup(Json(req): Json<BackupFileReq>) -> Json<ApiResponse<BackupInfo>> {
+pub async fn file_backup(Json(req): Json<BackupFileReq>) -> ApiJson<BackupInfo> {
     let hash = match security::compute_file_hash(&req.path) {
         Ok(h) => h,
-        Err(e) => return Json(ApiResponse::err(AppError::Io(e))),
+        Err(e) => return ApiJson(ApiResponse::err(AppError::Io(e))),
     };
     match security::create_backup(&req.path, &hash) {
         Ok(backup) => {
             if let Some(ref out) = req.output {
                 let _ = std::fs::copy(&backup.backup_path, out);
             }
-            Json(ApiResponse::ok(Some(backup)))
+            ApiJson(ApiResponse::ok(Some(backup)))
         }
-        Err(e) => Json(ApiResponse::err(AppError::Io(e))),
+        Err(e) => ApiJson(ApiResponse::err(AppError::Io(e))),
     }
 }
 
@@ -64,7 +65,7 @@ pub struct RollbackReq {
     pub backup_path: String,
 }
 
-pub async fn file_rollback(Json(req): Json<RollbackReq>) -> Json<ApiResponse<()>> {
+pub async fn file_rollback(Json(req): Json<RollbackReq>) -> ApiJson<()> {
     let backup_info = BackupInfo {
         backup_path: req.backup_path.clone(),
         timestamp: chrono::Utc::now(),
@@ -72,7 +73,7 @@ pub async fn file_rollback(Json(req): Json<RollbackReq>) -> Json<ApiResponse<()>
         file_hash: String::new(),
     };
     match security::rollback(&backup_info, &req.path) {
-        Ok(()) => Json(ApiResponse::ok(None)),
-        Err(e) => Json(ApiResponse::err(AppError::Io(e))),
+        Ok(()) => ApiJson(ApiResponse::ok(None)),
+        Err(e) => ApiJson(ApiResponse::err(AppError::Io(e))),
     }
 }

@@ -38,6 +38,7 @@ fn create_sample_sheet(name: &str, rows: Vec<Vec<Option<&str>>>) -> SheetData {
                     .collect()
             })
             .collect(),
+        ..Default::default()
     }
 }
 
@@ -70,6 +71,7 @@ fn test_integration_full_workflow_with_engine() {
                 make_cell(Some("60000.00"), CellDataType::Float),
             ],
         ],
+        ..Default::default()
     };
     engine
         .load_with_header("employees", &sheet)
@@ -179,6 +181,7 @@ fn test_integration_session_multiple_queries() {
                 make_cell(Some("1.50"), CellDataType::Float),
             ],
         ],
+        ..Default::default()
     };
 
     session
@@ -241,6 +244,7 @@ fn test_integration_filtering_with_various_operators() {
                 make_cell(Some("35"), CellDataType::Int),
             ],
         ],
+        ..Default::default()
     };
 
     let test_cases = vec![
@@ -278,6 +282,7 @@ fn test_integration_filtering_with_string_operators() {
             vec![make_cell(Some("Bob Johnson"), CellDataType::String)],
             vec![make_cell(Some("Alice Williams"), CellDataType::String)],
         ],
+        ..Default::default()
     };
 
     // Contains
@@ -342,6 +347,7 @@ fn test_integration_sorting_multi_column() {
                 make_cell(Some("65000"), CellDataType::Int),
             ],
         ],
+        ..Default::default()
     };
 
     // Sort by Dept (ASC), then by Salary (DESC)
@@ -393,6 +399,7 @@ fn test_integration_deduplication_all_columns() {
                 make_cell(Some("Bob"), CellDataType::String),
             ],
         ],
+        ..Default::default()
     };
 
     let result = excel_sql::dedup_sheet_on_data(&sheet, &[]).expect("Failed to deduplicate");
@@ -427,6 +434,7 @@ fn test_integration_deduplication_specific_columns() {
                 make_cell(Some("IT"), CellDataType::String),
             ],
         ],
+        ..Default::default()
     };
 
     // Deduplicate on ID only
@@ -497,6 +505,7 @@ fn test_integration_complex_sql_query() {
                 make_cell(Some("40"), CellDataType::Int),
             ],
         ],
+        ..Default::default()
     };
 
     engine
@@ -569,6 +578,7 @@ fn test_integration_empty_and_null_values() {
                 make_cell(Some("value4"), CellDataType::String),
             ],
         ],
+        ..Default::default()
     };
 
     engine
@@ -625,6 +635,7 @@ fn test_integration_sql_query_on_data_multiple_sheets() {
                     make_cell(Some("A1"), CellDataType::String),
                 ],
             ],
+            ..Default::default()
         },
         SheetData {
             name: "sheet_b".to_string(),
@@ -638,6 +649,7 @@ fn test_integration_sql_query_on_data_multiple_sheets() {
                     make_cell(Some("B1"), CellDataType::String),
                 ],
             ],
+            ..Default::default()
         },
     ];
 
@@ -667,6 +679,7 @@ fn test_integration_large_dataset_performance() {
     let sheet = SheetData {
         name: "large_data".to_string(),
         rows,
+        ..Default::default()
     };
 
     engine
@@ -711,6 +724,7 @@ fn test_integration_filter_multiple_conditions() {
                 make_cell(Some("70000"), CellDataType::Int),
             ],
         ],
+        ..Default::default()
     };
 
     let conditions = vec![
@@ -752,6 +766,7 @@ fn test_integration_data_type_conversion() {
                 make_cell(Some("true"), CellDataType::Bool),
             ],
         ],
+        ..Default::default()
     };
 
     engine

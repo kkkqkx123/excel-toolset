@@ -230,6 +230,9 @@ pub enum DataSub {
         session: bool,
         #[arg(long)]
         cache: bool,
+        /// Treat the first row as data instead of column headers.
+        #[arg(long)]
+        no_header: bool,
     },
 }
 

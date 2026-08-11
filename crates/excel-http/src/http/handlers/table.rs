@@ -3,6 +3,7 @@ use serde::Deserialize;
 
 use excel_core::excel_write;
 use excel_core::types::*;
+use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct TableCreateReq {
@@ -31,40 +32,40 @@ pub struct TableGetReq {
     pub name: String,
 }
 
-pub async fn table_create(Json(req): Json<TableCreateReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn table_create(Json(req): Json<TableCreateReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,
         file_path: req.path.clone(),
     };
     match excel_write::create_table(&req.path, &params, &req.config) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
-pub async fn table_remove(Json(req): Json<TableRemoveReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn table_remove(Json(req): Json<TableRemoveReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,
         file_path: req.path.clone(),
     };
     match excel_write::remove_table(&req.path, &params, &req.name) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
-pub async fn table_list(Json(req): Json<TableListReq>) -> Json<ApiResponse<Vec<TableInfo>>> {
+pub async fn table_list(Json(req): Json<TableListReq>) -> ApiJson<Vec<TableInfo>> {
     match excel_write::list_tables(&req.path) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
-pub async fn table_get(Json(req): Json<TableGetReq>) -> Json<ApiResponse<TableInfo>> {
+pub async fn table_get(Json(req): Json<TableGetReq>) -> ApiJson<TableInfo> {
     match excel_write::get_table(&req.path, &req.name) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }

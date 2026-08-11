@@ -26,14 +26,19 @@ use excel_diff::summarize;
 
 use super::args::*;
 
-pub fn execute(cli: &Cli) {
+/// Run the requested command and print its JSON result.
+///
+/// Returns `Err` when the command failed so `main` can exit with a non-zero
+/// status code. The error is still printed as JSON first, keeping the output
+/// contract unchanged for existing scripts.
+pub fn execute(cli: &Cli) -> Result<()> {
     let result = run_command(cli);
     match result {
         Ok(json) => {
             if cli.format == "text" {
                 if let Some(text) = json.get("raw_text").and_then(|v| v.as_str()) {
                     println!("{}", text);
-                    return;
+                    return Ok(());
                 }
                 eprintln!(
                     "Warning: --format text is only supported for diff commands. \
@@ -53,6 +58,7 @@ pub fn execute(cli: &Cli) {
                         .expect("JSON serialization of Value should never fail")
                 );
             }
+            Ok(())
         }
         Err(e) => {
             let err_json = serde_json::json!({
@@ -72,6 +78,7 @@ pub fn execute(cli: &Cli) {
                         .expect("JSON serialization of Value should never fail")
                 );
             }
+            Err(e)
         }
     }
 }
@@ -461,10 +468,12 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
             query,
             session,
             cache,
+            no_header,
         } => {
             // Session support is implemented in Task 5 (QuerySession enhancement).
             #[cfg(feature = "sql")]
             {
+                let has_header = !*no_header;
                 if *cache {
                     let config = excel_sql::QueryCacheConfig::default();
                     let mut query_cache = excel_sql::QueryCache::new(config);
@@ -473,7 +482,7 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                         return Ok(serde_json::to_value(cached)
                             .map_err(|e| AppError::Serialize(e.to_string()))?);
                     }
-                    let result = operations::sql_query(path, sheet, query)?;
+                    let result = operations::sql_query(path, sheet, query, has_header)?;
                     query_cache.put(
                         key,
                         excel_sql::QueryResult {
@@ -492,12 +501,12 @@ fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
                     return Ok(serde_json::to_value(result)
                         .map_err(|e| AppError::Serialize(e.to_string()))?);
                 }
-                let result = operations::sql_query(path, sheet, query)?;
+                let result = operations::sql_query(path, sheet, query, has_header)?;
                 Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
             }
             #[cfg(not(feature = "sql"))]
             {
-                let _ = (path, sheet, query, session, cache);
+                let _ = (path, sheet, query, session, cache, no_header);
                 Err(AppError::FeatureNotEnabled(
                     "SQL queries require the 'sql' feature".into(),
                 ))

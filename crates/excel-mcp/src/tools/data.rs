@@ -304,7 +304,9 @@ fn handle_sql(args: Value) -> String {
     let sheet = get_string(&args, "sheet").unwrap_or_default();
     let query = get_string(&args, "query").unwrap_or_default();
 
-    match excel_core::operations::sql_query(&path, &sheet, &query) {
+    let has_header = get_bool(&args, "has_header").unwrap_or(true);
+
+    match excel_core::operations::sql_query(&path, &sheet, &query, has_header) {
         Ok(result) => to_result_string(&result),
         Err(e) => format!("Error: {e}"),
     }

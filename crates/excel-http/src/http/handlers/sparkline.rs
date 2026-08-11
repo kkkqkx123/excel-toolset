@@ -5,6 +5,7 @@ use excel_core::excel_write;
 use excel_core::features::sparkline;
 use excel_core::types::*;
 use excel_core::utils::cell_ref;
+use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct SparklineAddReq {
@@ -36,10 +37,10 @@ pub struct SparklineRemoveReq {
     pub dry_run: bool,
 }
 
-pub async fn sparkline_add(Json(req): Json<SparklineAddReq>) -> Json<ApiResponse<WriteResult>> {
+pub async fn sparkline_add(Json(req): Json<SparklineAddReq>) -> ApiJson<WriteResult> {
     let (target_row, target_col) = match cell_ref::parse_cell_ref(&req.target_cell) {
         Ok(v) => v,
-        Err(e) => return Json(ApiResponse::err(e)),
+        Err(e) => return ApiJson(ApiResponse::err(e)),
     };
     let st = sparkline::parse_sparkline_type(&req.sparkline_type);
     let config = SparklineConfig {
@@ -56,17 +57,17 @@ pub async fn sparkline_add(Json(req): Json<SparklineAddReq>) -> Json<ApiResponse
         file_path: req.path.clone(),
     };
     match excel_write::add_sparkline(&req.path, &params, &config) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }
 
 pub async fn sparkline_remove(
     Json(req): Json<SparklineRemoveReq>,
-) -> Json<ApiResponse<WriteResult>> {
+) -> ApiJson<WriteResult> {
     let (target_row, target_col) = match cell_ref::parse_cell_ref(&req.target_cell) {
         Ok(v) => v,
-        Err(e) => return Json(ApiResponse::err(e)),
+        Err(e) => return ApiJson(ApiResponse::err(e)),
     };
     let params = SecurityParams {
         dry_run: req.dry_run,
@@ -74,7 +75,7 @@ pub async fn sparkline_remove(
         file_path: req.path.clone(),
     };
     match excel_write::remove_sparkline(&req.path, &params, &req.sheet, target_row, target_col) {
-        Ok(data) => Json(ApiResponse::ok(Some(data))),
-        Err(e) => Json(ApiResponse::err(e)),
+        Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
+        Err(e) => ApiJson(ApiResponse::err(e)),
     }
 }

@@ -9,6 +9,8 @@ mod csv;
 mod data_mut;
 mod format;
 mod operations;
+#[cfg(feature = "zip")]
+pub mod patch;
 
 pub use batch::*;
 pub use core::{ensure_dimensions, modify_file, modify_file_with_wb, write_sheet_data};
