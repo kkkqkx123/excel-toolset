@@ -1,3 +1,5 @@
+use std::fs;
+
 use rust_xlsxwriter::{Chart, Format, Table as XlsxTable, Workbook, Worksheet};
 
 use crate::excel_read::read_all_sheets_to_map;
@@ -82,7 +84,32 @@ where
     let new_hash = if params.dry_run {
         old_hash.clone()
     } else {
-        wb.save(path).map_err(AppError::Xlsx)?;
+        #[cfg(feature = "zip")]
+        {
+            // Phase 3：保存到临时文件，然后保留所有非数据部件
+            // 如果 preserve_all_parts_transfer 失败，仍使用原始保存结果
+            let tmp_path = format!("{}.rebuilt_tmp", path);
+            if let Err(e) = wb.save(&tmp_path) {
+                return Err(AppError::Xlsx(e));
+            }
+            eprintln!("DEBUG_CFG: zip feature enabled, calling preserve_all_parts_transfer");
+            let pt_result = super::patch::preserve_all_parts_transfer(path, &tmp_path);
+            eprintln!("DEBUG_CFG: preserve_all_parts_transfer result: {:?}", pt_result.as_ref().err());
+            match pt_result {
+                Ok(()) => {
+                    let _ = fs::rename(&tmp_path, path);
+                }
+                Err(e) => {
+                    // Fallback: 如果 preserve_all_parts_transfer 失败，使用原始保存
+                    let _ = fs::rename(&tmp_path, path);
+                    eprintln!("DEBUG preserve_all_parts_transfer failed for {}: {}", path, e);
+                }
+            }
+        }
+        #[cfg(not(feature = "zip"))]
+        {
+            wb.save(path).map_err(AppError::Xlsx)?;
+        }
         compute_file_hash(path).map_err(AppError::Io)?
     };
 
@@ -129,7 +156,32 @@ where
     let new_hash = if params.dry_run {
         old_hash.clone()
     } else {
-        wb.save(path).map_err(AppError::Xlsx)?;
+        #[cfg(feature = "zip")]
+        {
+            // Phase 3：保存到临时文件，然后保留所有非数据部件
+            // 如果 preserve_all_parts_transfer 失败，回退到原始保存结果
+            let tmp_path = format!("{}.rebuilt_tmp", path);
+            if let Err(e) = wb.save(&tmp_path) {
+                return Err(AppError::Xlsx(e));
+            }
+            eprintln!("DEBUG_CFG: modify_file_with_wb calling preserve_all_parts_transfer");
+            let pt_result = super::patch::preserve_all_parts_transfer(path, &tmp_path);
+            eprintln!("DEBUG_CFG: preserve_all_parts_transfer result: {:?}", pt_result.as_ref().err());
+            match pt_result {
+                Ok(()) => {
+                    let _ = fs::rename(&tmp_path, path);
+                }
+                Err(e) => {
+                    // Fallback: 如果 preserve_all_parts_transfer 失败，使用原始保存
+                    let _ = fs::rename(&tmp_path, path);
+                    eprintln!("DEBUG preserve_all_parts_transfer failed for {}: {}", path, e);
+                }
+            }
+        }
+        #[cfg(not(feature = "zip"))]
+        {
+            wb.save(path).map_err(AppError::Xlsx)?;
+        }
         compute_file_hash(path).map_err(AppError::Io)?
     };
 

@@ -23,77 +23,93 @@ pub fn set_auto_filter(
     config: &AutoFilterConfig,
     params: &SecurityParams,
 ) -> Result<WriteResult> {
-    if params.dry_run {
-        return Ok(WriteResult::dry_run_success());
+    #[cfg(feature = "zip")]
+    {
+        return crate::excel_write::patch::set_auto_filter_preserving(
+            path, params, &config.sheet, &config.range,
+        );
     }
 
-    // Parse the range to get 0-indexed coordinates
-    let (r1, c1, r2, c2) = cell_ref::parse_range(&config.range)?;
+    #[cfg(not(feature = "zip"))]
+    {
+        if params.dry_run {
+            return Ok(WriteResult::dry_run_success());
+        }
 
-    let backup_info = security::create_backup_if_needed(params)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        // Parse the range to get 0-indexed coordinates
+        let (r1, c1, r2, c2) = cell_ref::parse_range(&config.range)?;
 
-    let old_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        let backup_info = security::create_backup_if_needed(params)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
 
-    crate::excel_write::modify_file_with_wb(path, params, |old_data, wb| {
-        let ws = wb
-            .worksheet_from_name(&config.sheet)
-            .map_err(|_e| AppError::SheetNotFound(config.sheet.clone()))?;
+        let old_hash = security::compute_file_hash(path)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
 
-        ws.autofilter(r1, c1, r2, c2).map_err(AppError::Xlsx)?;
+        crate::excel_write::modify_file_with_wb(path, params, |_old_data, wb| {
+            let ws = wb
+                .worksheet_from_name(&config.sheet)
+                .map_err(|_e| AppError::SheetNotFound(config.sheet.clone()))?;
 
-        Ok(())
-    })?;
+            ws.autofilter(r1, c1, r2, c2).map_err(AppError::Xlsx)?;
 
-    let new_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+            Ok(())
+        })?;
 
-    Ok(WriteResult {
-        success: true,
-        message: format!(
-            "Set autofilter on sheet '{}' with range '{}'",
-            config.sheet, config.range
-        ),
-        backup_info,
-        old_hash,
-        new_hash,
-        diff: None,
-    })
+        let new_hash = security::compute_file_hash(path)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+
+        Ok(WriteResult {
+            success: true,
+            message: format!(
+                "Set autofilter on sheet '{}' with range '{}'",
+                config.sheet, config.range
+            ),
+            backup_info,
+            old_hash,
+            new_hash,
+            diff: None,
+        })
+    }
 }
 
 /// Remove the autofilter from a worksheet.
-///
-/// Works by rebuilding the worksheet without calling `autofilter()`.
 pub fn remove_auto_filter(path: &str, sheet: &str, params: &SecurityParams) -> Result<WriteResult> {
-    if params.dry_run {
-        return Ok(WriteResult::dry_run_success());
+    #[cfg(feature = "zip")]
+    {
+        return crate::excel_write::patch::remove_auto_filter_preserving(path, params, sheet);
     }
 
-    let backup_info = security::create_backup_if_needed(params)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+    #[cfg(not(feature = "zip"))]
+    {
+        if params.dry_run {
+            return Ok(WriteResult::dry_run_success());
+        }
 
-    let old_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        let backup_info = security::create_backup_if_needed(params)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
 
-    crate::excel_write::modify_file_with_wb(path, params, |_old_data, wb| {
-        // Rebuilding without autofilter() drops any existing filter.
-        wb.worksheet_from_name(sheet)
-            .map_err(|_e| AppError::SheetNotFound(sheet.to_string()))?;
-        Ok(())
-    })?;
+        let old_hash = security::compute_file_hash(path)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
 
-    let new_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        crate::excel_write::modify_file_with_wb(path, params, |_old_data, wb| {
+            // Rebuilding without autofilter() drops any existing filter.
+            wb.worksheet_from_name(sheet)
+                .map_err(|_e| AppError::SheetNotFound(sheet.to_string()))?;
+            Ok(())
+        })?;
 
-    Ok(WriteResult {
-        success: true,
-        message: format!("Removed autofilter from sheet '{}'", sheet),
-        backup_info,
-        old_hash,
-        new_hash,
-        diff: None,
-    })
+        let new_hash = security::compute_file_hash(path)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+
+        Ok(WriteResult {
+            success: true,
+            message: format!("Removed autofilter from sheet '{}'", sheet),
+            backup_info,
+            old_hash,
+            new_hash,
+            diff: None,
+        })
+    }
 }
 
 /// Read the current autofilter state of a worksheet.

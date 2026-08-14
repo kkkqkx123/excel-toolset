@@ -10,7 +10,7 @@
 //!
 //! 仅当 `zip` feature 启用时编译（随 `full` 默认开启）。
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::{self, File};
 use std::io::{Cursor, Read, Write};
 use std::path::Path;
@@ -22,7 +22,9 @@ use zip::{ZipArchive, ZipWriter};
 
 use crate::security::{append_history_entry, compute_file_hash, create_backup};
 use crate::types::{
-    AppError, CellData, CellDataType, Result, SecurityParams, WorkbookHistoryEntry, WriteResult,
+    AppError, CellData, CellDataType, DataValidationConfig, DataValidationType, PageSetupConfig,
+    Result, SecurityParams, SheetProtectionConfig, SheetVisibility, WorkbookHistoryEntry,
+    WriteResult,
 };
 use crate::utils::cell_ref::{index_to_col, parse_cell_ref};
 
@@ -67,51 +69,11 @@ pub fn write_cells_preserving(
     let new_xml = patch_sheet_xml(&sheet_xml, edits)?;
 
     // 重新打包：除目标 sheet 外，其余 part 逐字节复制。
-    let tmp = Path::new(path).with_extension("patch_tmp");
-    {
-        let tf = File::create(&tmp).map_err(AppError::Io)?;
-        let mut zw = ZipWriter::new(tf);
-        let mut buf = Vec::new();
-        let n = archive.len();
-        for i in 0..n {
-            let mut zf = archive
-                .by_index(i)
-                .map_err(|e| AppError::Custom(format!("读取 zip 条目失败: {}", e)))?;
-            let name = zf.name().to_string();
-            // 复用源条目的压缩方式与权限，保证产出文件结构一致。
-            let opts = zf.options();
-            if name == part {
-                zw.start_file(&name, opts)
-                    .map_err(|e| AppError::Custom(format!("写入 zip 条目失败: {}", e)))?;
-                zw.write_all(&new_xml).map_err(AppError::Io)?;
-            } else {
-                buf.clear();
-                zf.read_to_end(&mut buf).map_err(AppError::Io)?;
-                zw.start_file(&name, opts)
-                    .map_err(|e| AppError::Custom(format!("写入 zip 条目失败: {}", e)))?;
-                zw.write_all(&buf).map_err(AppError::Io)?;
-            }
-        }
-        zw.finish()
-            .map_err(|e| AppError::Custom(format!("完成 zip 写入失败: {}", e)))?;
-    }
-
-    fs::rename(&tmp, path).map_err(AppError::Io)?;
+    repackage_zip(&mut archive, path, &part, &new_xml)?;
 
     let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
 
-    // T2.30：记录写操作到审计历史（非致命，失败不影响主流程）。
-    if !params.dry_run {
-        let entry = WorkbookHistoryEntry {
-            timestamp: chrono::Utc::now(),
-            operation_type: "write_cells".to_string(),
-            target_path: path.to_string(),
-            old_hash: old_hash.clone(),
-            new_hash: new_hash.clone(),
-            result: "success".to_string(),
-        };
-        let _ = append_history_entry(path, &entry);
-    }
+    append_history(path, "write_cells", &old_hash, &new_hash, params.dry_run);
 
     Ok(WriteResult {
         success: true,
@@ -121,6 +83,1622 @@ pub fn write_cells_preserving(
         new_hash,
         diff: None,
     })
+}
+
+/// 保留式设置公式：仅改写 `sheet` 中 `(row, col)` 单元格的公式，其余 zip part 逐字节保留。
+/// `row`/`col` 均为 0-based。
+pub fn set_formula_preserving(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    row: u32,
+    col: u16,
+    formula: &str,
+) -> Result<WriteResult> {
+    let cd = CellData {
+        value: None,
+        data_type: CellDataType::String,
+        formula: Some(formula.to_string()),
+    };
+    write_cells_preserving(path, params, sheet, &[(row, col, cd)])
+}
+
+/// 保留式设置公式 + 缓存值：同时写入 `<f>` 和 `<v>`，其余 zip part 逐字节保留。
+pub fn set_formula_with_value_preserving(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    row: u32,
+    col: u16,
+    formula: &str,
+    cached_value: &str,
+    data_type: CellDataType,
+) -> Result<WriteResult> {
+    let cd = CellData {
+        value: Some(cached_value.to_string()),
+        data_type,
+        formula: Some(formula.to_string()),
+    };
+    write_cells_preserving(path, params, sheet, &[(row, col, cd)])
+}
+
+/// 保留式清空单元格范围：移除 range 内所有现存单元格的 `<f>`/`<v>`，其余 zip part 逐字节保留。
+/// `r_start/r_end` 0-based 行索引，`c_start/c_end` 0-based 列索引。
+pub fn clear_range_preserving(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    r_start: u32, r_end: u32, c_start: u16, c_end: u16,
+) -> Result<WriteResult> {
+    let old_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    let backup_info = if params.create_backup {
+        Some(create_backup(path, &old_hash).map_err(AppError::Io)?)
+    } else {
+        None
+    };
+
+    if params.dry_run {
+        return Ok(WriteResult {
+            success: true,
+            message: String::new(),
+            backup_info,
+            old_hash: old_hash.clone(),
+            new_hash: old_hash,
+            diff: None,
+        });
+    }
+
+    let file = File::open(path).map_err(AppError::Io)?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| AppError::Custom(format!("无法以 zip 打开 xlsx: {}", e)))?;
+    let part = resolve_sheet_part(&mut archive, sheet)?;
+    let sheet_xml = read_zip_entry(&mut archive, &part)?;
+
+    let (before, inner, after, self_closed) = match sheetdata_spans(&sheet_xml) {
+        Some(x) => x,
+        None => {
+            // 无 sheetData 元素：无单元格可清空。
+            return Ok(WriteResult {
+                success: true,
+                message: "empty sheet, nothing to clear".to_string(),
+                backup_info,
+                old_hash: old_hash.clone(),
+                new_hash: old_hash,
+                diff: None,
+            });
+        }
+    };
+
+    let mut model = parse_sheetdata(inner);
+    let mut modified = false;
+    model.rows.retain(|&rk, row| {
+        if rk >= r_start && rk <= r_end {
+            row.cells.retain(|&ck, _| {
+                if ck >= c_start && ck <= c_end {
+                    modified = true;
+                    false // 移除该单元格（清空效果）
+                } else {
+                    true
+                }
+            });
+        }
+        !row.cells.is_empty() // 移除空行
+    });
+
+    if !modified {
+        return Ok(WriteResult {
+            success: true,
+            message: "no cells in range to clear".to_string(),
+            backup_info,
+            old_hash: old_hash.clone(),
+            new_hash: old_hash,
+            diff: None,
+        });
+    }
+
+    let new_inner = serialize_sheet(&model);
+    let refstr = dimension_ref(&model);
+    let mut before_vec = before.to_vec();
+    replace_dimension(&mut before_vec, &refstr);
+
+    let mut new_xml = Vec::with_capacity(sheet_xml.len());
+    if self_closed {
+        new_xml.extend_from_slice(&before_vec);
+        new_xml.extend_from_slice(b"<sheetData>");
+        new_xml.extend_from_slice(new_inner.as_bytes());
+        new_xml.extend_from_slice(b"</sheetData>");
+        new_xml.extend_from_slice(after);
+    } else {
+        new_xml.extend_from_slice(&before_vec);
+        new_xml.extend_from_slice(new_inner.as_bytes());
+        new_xml.extend_from_slice(after);
+    }
+
+    repackage_zip(&mut archive, path, &part, &new_xml)?;
+    let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
+
+    append_history(path, "clear_range", &old_hash, &new_hash, params.dry_run);
+
+    Ok(WriteResult {
+        success: true,
+        message: String::new(),
+        backup_info,
+        old_hash,
+        new_hash,
+        diff: None,
+    })
+}
+
+/// 保留式清除公式缓存值：移除指定 sheet 中所有公式单元格的 `<v>` 元素，使公式下次打开时重新计算。
+pub fn clear_formula_values_preserving(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+) -> Result<WriteResult> {
+    let old_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    let backup_info = if params.create_backup {
+        Some(create_backup(path, &old_hash).map_err(AppError::Io)?)
+    } else {
+        None
+    };
+
+    if params.dry_run {
+        return Ok(WriteResult {
+            success: true,
+            message: String::new(),
+            backup_info,
+            old_hash: old_hash.clone(),
+            new_hash: old_hash,
+            diff: None,
+        });
+    }
+
+    let file = File::open(path).map_err(AppError::Io)?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| AppError::Custom(format!("无法以 zip 打开 xlsx: {}", e)))?;
+    let part = resolve_sheet_part(&mut archive, sheet)?;
+    let sheet_xml = read_zip_entry(&mut archive, &part)?;
+
+    let (before, inner, after, self_closed) = match sheetdata_spans(&sheet_xml) {
+        Some(x) => x,
+        None => {
+            return Ok(WriteResult {
+                success: true,
+                message: "empty sheet, no formulas to refresh".to_string(),
+                backup_info,
+                old_hash: old_hash.clone(),
+                new_hash: old_hash,
+                diff: None,
+            });
+        }
+    };
+
+    let mut model = parse_sheetdata(inner);
+    let mut modified = false;
+    for row in model.rows.values_mut() {
+        for cell in row.cells.values_mut() {
+            if has_formula(&cell.raw) {
+                cell.raw = strip_v_element(&cell.raw);
+                modified = true;
+            }
+        }
+    }
+
+    if !modified {
+        return Ok(WriteResult {
+            success: true,
+            message: "no formulas to refresh".to_string(),
+            backup_info,
+            old_hash: old_hash.clone(),
+            new_hash: old_hash,
+            diff: None,
+        });
+    }
+
+    let new_inner = serialize_sheet(&model);
+    let mut new_xml = Vec::with_capacity(sheet_xml.len());
+    if self_closed {
+        new_xml.extend_from_slice(before);
+        new_xml.extend_from_slice(b"<sheetData>");
+        new_xml.extend_from_slice(new_inner.as_bytes());
+        new_xml.extend_from_slice(b"</sheetData>");
+        new_xml.extend_from_slice(after);
+    } else {
+        new_xml.extend_from_slice(before);
+        new_xml.extend_from_slice(new_inner.as_bytes());
+        new_xml.extend_from_slice(after);
+    }
+
+    repackage_zip(&mut archive, path, &part, &new_xml)?;
+    let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
+
+    append_history(path, "refresh_formulas", &old_hash, &new_hash, params.dry_run);
+
+    Ok(WriteResult {
+        success: true,
+        message: String::new(),
+        backup_info,
+        old_hash,
+        new_hash,
+        diff: None,
+    })
+}
+
+/// 保留式合并单元格：在目标 sheet 中追加合并单元格范围，其余 zip part 逐字节保留。
+/// `r1/r2` 0-based 行索引，`c1/c2` 0-based 列索引。
+/// 在左上角单元格写入指定值。
+pub fn merge_cells_preserving(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    r1: u32, c1: u16, r2: u32, c2: u16,
+    value: &str,
+) -> Result<WriteResult> {
+    let range_ref = format!(
+        "{}{}:{}{}",
+        index_to_col(c1),
+        r1 + 1,
+        index_to_col(c2),
+        r2 + 1
+    );
+
+    let old_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    let backup_info = if params.create_backup {
+        Some(create_backup(path, &old_hash).map_err(AppError::Io)?)
+    } else {
+        None
+    };
+
+    if params.dry_run {
+        return Ok(WriteResult {
+            success: true,
+            message: String::new(),
+            backup_info,
+            old_hash: old_hash.clone(),
+            new_hash: old_hash,
+            diff: None,
+        });
+    }
+
+    let file = File::open(path).map_err(AppError::Io)?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| AppError::Custom(format!("无法以 zip 打开 xlsx: {}", e)))?;
+    let part = resolve_sheet_part(&mut archive, sheet)?;
+    let sheet_xml = read_zip_entry(&mut archive, &part)?;
+
+    let new_sheet_xml = patch_merge_cells_str(&sheet_xml, &range_ref)?;
+
+    repackage_zip(&mut archive, path, &part, &new_sheet_xml)?;
+
+    // If a value is provided, write it to the top-left cell
+    if !value.is_empty() {
+        let cd = CellData {
+            value: Some(value.to_string()),
+            data_type: CellDataType::String,
+            formula: None,
+        };
+        // archive is consumed by repackage_zip, so we need to reopen
+        write_cells_preserving(path, params, sheet, &[(r1, c1, cd)])?;
+    }
+
+    let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    append_history(path, "merge_cells", &old_hash, &new_hash, params.dry_run);
+
+    Ok(WriteResult {
+        success: true,
+        message: String::new(),
+        backup_info,
+        old_hash,
+        new_hash,
+        diff: None,
+    })
+}
+
+/// 字符串方式 patch mergeCells 元素。
+fn patch_merge_cells_str(xml: &[u8], new_range: &str) -> Result<Vec<u8>> {
+    let s = String::from_utf8(xml.to_vec())
+        .map_err(|e| AppError::Custom(format!("XML 不是合法 UTF-8: {}", e)))?;
+    let mut result = s;
+
+    // 检查是否已存在 <mergeCells>（闭合或自闭合）
+    if let Some(pos) = result.find("</mergeCells>") {
+        // 有开放标签 → 在闭合前插入新条目，并更新 count
+        let mc = format!("    <mergeCell ref=\"{}\"/>\n", new_range);
+        result.insert_str(pos, &mc);
+        // 更新 count 属性
+        let old_count = count_merge_cells(&result);
+        let new_count = old_count + 1;
+        // 找到 count="N" 并用新值替换
+        let old_count_str = format!("count=\"{}\"", old_count);
+        let new_count_str = format!("count=\"{}\"", new_count);
+        result = result.replacen(&old_count_str, &new_count_str, 1);
+    } else if let Some(pos) = result.find("<mergeCells/>") {
+        // 自闭合标签 → 转为开放标签
+        let replacement = format!(
+            "<mergeCells count=\"1\">\n    <mergeCell ref=\"{}\"/>\n  </mergeCells>",
+            new_range
+        );
+        result.replace_range(pos..pos + 13, &replacement);
+    } else {
+        // 不存在 mergeCells → 在 </worksheet> 前插入
+        if let Some(pos) = result.find("</worksheet>") {
+            let new_entry = format!(
+                "  <mergeCells count=\"1\">\n    <mergeCell ref=\"{}\"/>\n  </mergeCells>\n",
+                new_range
+            );
+            result.insert_str(pos, &new_entry);
+        }
+    }
+
+    Ok(result.into_bytes())
+}
+
+/// 统计当前 XML 中 `<mergeCell` 的出现次数（用于更新 count 属性）。
+fn count_merge_cells(xml: &str) -> usize {
+    xml.matches("<mergeCell ").count()
+}
+
+/// 保留式设置冻结窗格：修改 sheet XML 的 `<sheetViews>` 元素，其余 zip part 逐字节保留。
+pub fn set_freeze_panes_preserving(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    rows: u32,
+    cols: u16,
+) -> Result<WriteResult> {
+    let old_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    let backup_info = if params.create_backup {
+        Some(create_backup(path, &old_hash).map_err(AppError::Io)?)
+    } else {
+        None
+    };
+
+    if params.dry_run {
+        return Ok(WriteResult {
+            success: true,
+            message: String::new(),
+            backup_info,
+            old_hash: old_hash.clone(),
+            new_hash: old_hash,
+            diff: None,
+        });
+    }
+
+    let file = File::open(path).map_err(AppError::Io)?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| AppError::Custom(format!("无法以 zip 打开 xlsx: {}", e)))?;
+    let part = resolve_sheet_part(&mut archive, sheet)?;
+    let sheet_xml = read_zip_entry(&mut archive, &part)?;
+
+    let new_sheet_xml = patch_freeze_panes_str(&sheet_xml, rows, cols)?;
+
+    repackage_zip(&mut archive, path, &part, &new_sheet_xml)?;
+    let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    append_history(path, "set_freeze_panes", &old_hash, &new_hash, params.dry_run);
+
+    Ok(WriteResult {
+        success: true,
+        message: String::new(),
+        backup_info,
+        old_hash,
+        new_hash,
+        diff: None,
+    })
+}
+
+/// 保留式清除冻结窗格。
+pub fn clear_freeze_panes_preserving(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+) -> Result<WriteResult> {
+    set_freeze_panes_preserving(path, params, sheet, 0, 0)
+}
+
+/// 字符串方式 patch freeze panes。
+fn patch_freeze_panes_str(xml: &[u8], rows: u32, cols: u16) -> Result<Vec<u8>> {
+    let s = String::from_utf8(xml.to_vec())
+        .map_err(|e| AppError::Custom(format!("XML 不是合法 UTF-8: {}", e)))?;
+    let mut result = s;
+
+    if rows == 0 && cols == 0 {
+        // 清除冻结：移除所有 <pane .../> 元素
+        loop {
+            let start = result.find("<pane ");
+            let end = result.find("/>");
+            match (start, end) {
+                (Some(s), Some(e)) if s < e => {
+                    // 找到 pane 标签，移除它
+                    let pane_end = e + 2; // include "/>"
+                    result.replace_range(s..pane_end, "");
+                }
+                _ => break,
+            }
+        }
+        return Ok(result.into_bytes());
+    }
+
+    let top_left_cell = format!("{}{}", index_to_col(cols), rows + 1);
+    let active_pane = match (rows > 0, cols > 0) {
+        (true, true) => "bottomRight",
+        (true, false) => "bottomLeft",
+        (false, true) => "topRight",
+        (false, false) => "bottomRight",
+    };
+
+    let pane_xml = format!(
+        "<pane {}Split=\"{}\" {}Split=\"{}\" topLeftCell=\"{}\" activePane=\"{}\" state=\"frozen\"/>",
+        if cols > 0 { "x" } else { "" },
+        cols,
+        if rows > 0 { "y" } else { "" },
+        rows,
+        top_left_cell,
+        active_pane
+    );
+
+    // 如果已有 <pane> 元素，替换它
+    if let Some(start) = result.find("<pane ") {
+        if let Some(end) = result[start..].find("/>") {
+            let pane_end = start + end + 2;
+            result.replace_range(start..pane_end, &pane_xml);
+            return Ok(result.into_bytes());
+        }
+    }
+
+    // 没有 <pane>：在 <sheetView> 内插入
+    if let Some(pos) = result.find("</sheetView>") {
+        result.insert_str(pos, &format!("\n      {}", pane_xml));
+    } else if let Some(pos) = result.find("</sheetViews>") {
+        // 有 sheetViews 但无 sheetView 不太可能，但兜底
+        result.insert_str(pos, &format!(
+            "\n    <sheetView tabSelected=\"1\" workbookViewId=\"0\">\n      {}\n    </sheetView>\n",
+            pane_xml
+        ));
+    } else {
+        // 无 sheetViews → 在 </worksheet> 前插入
+        if let Some(pos) = result.find("</worksheet>") {
+            let new_xml = format!(
+                "  <sheetViews>\n    <sheetView tabSelected=\"1\" workbookViewId=\"0\">\n      {}\n    </sheetView>\n  </sheetViews>\n",
+                pane_xml
+            );
+            result.insert_str(pos, &new_xml);
+        }
+    }
+
+    Ok(result.into_bytes())
+}
+
+/// 保留式设置自动筛选。
+pub fn set_auto_filter_preserving(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    range_ref: &str,
+) -> Result<WriteResult> {
+    let old_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    let backup_info = if params.create_backup {
+        Some(create_backup(path, &old_hash).map_err(AppError::Io)?)
+    } else {
+        None
+    };
+
+    if params.dry_run {
+        return Ok(WriteResult::dry_run_success());
+    }
+
+    let file = File::open(path).map_err(AppError::Io)?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| AppError::Custom(format!("无法以 zip 打开 xlsx: {}", e)))?;
+    let part = resolve_sheet_part(&mut archive, sheet)?;
+    let sheet_xml = read_zip_entry(&mut archive, &part)?;
+
+    let new_sheet_xml = patch_auto_filter_str(&sheet_xml, Some(range_ref))?;
+    repackage_zip(&mut archive, path, &part, &new_sheet_xml)?;
+    let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    append_history(path, "set_auto_filter", &old_hash, &new_hash, params.dry_run);
+
+    Ok(WriteResult {
+        success: true,
+        message: String::new(),
+        backup_info,
+        old_hash,
+        new_hash,
+        diff: None,
+    })
+}
+
+/// 保留式移除自动筛选。
+pub fn remove_auto_filter_preserving(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+) -> Result<WriteResult> {
+    let old_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    let backup_info = if params.create_backup {
+        Some(create_backup(path, &old_hash).map_err(AppError::Io)?)
+    } else {
+        None
+    };
+
+    if params.dry_run {
+        return Ok(WriteResult::dry_run_success());
+    }
+
+    let file = File::open(path).map_err(AppError::Io)?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| AppError::Custom(format!("无法以 zip 打开 xlsx: {}", e)))?;
+    let part = resolve_sheet_part(&mut archive, sheet)?;
+    let sheet_xml = read_zip_entry(&mut archive, &part)?;
+
+    let new_sheet_xml = patch_auto_filter_str(&sheet_xml, None)?;
+    repackage_zip(&mut archive, path, &part, &new_sheet_xml)?;
+    let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    append_history(path, "remove_auto_filter", &old_hash, &new_hash, params.dry_run);
+
+    Ok(WriteResult {
+        success: true,
+        message: String::new(),
+        backup_info,
+        old_hash,
+        new_hash,
+        diff: None,
+    })
+}
+
+/// 字符串方式 patch autoFilter。
+fn patch_auto_filter_str(xml: &[u8], new_range: Option<&str>) -> Result<Vec<u8>> {
+    let s = String::from_utf8(xml.to_vec())
+        .map_err(|e| AppError::Custom(format!("XML 不是合法 UTF-8: {}", e)))?;
+    let mut result = s;
+
+    // 移除所有现有的 <autoFilter .../> 元素
+    loop {
+        let start = result.find("<autoFilter ");
+        let end = result.find("/>");
+        match (start, end) {
+            (Some(s), Some(e)) if s < e => {
+                let af_end = e + 2;
+                result.replace_range(s..af_end, "");
+            }
+            _ => break,
+        }
+    }
+
+    // 移除所有 <autoFilter>...</autoFilter> 块
+    loop {
+        let start = result.find("<autoFilter ");
+        let end = result.find("</autoFilter>");
+        match (start, end) {
+            (Some(s), Some(e)) if s < e => {
+                let af_end = e + 13;
+                result.replace_range(s..af_end, "");
+            }
+            _ => break,
+        }
+    }
+
+    // 如果提供了新范围，插入
+    if let Some(range) = new_range {
+        if let Some(pos) = result.find("</worksheet>") {
+            result.insert_str(pos, &format!("  <autoFilter ref=\"{}\"/>\n", range));
+        }
+    }
+
+    Ok(result.into_bytes())
+}
+
+/// 保留式添加数据验证。
+pub fn add_data_validation_preserving(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    config: &DataValidationConfig,
+) -> Result<WriteResult> {
+    let old_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    let backup_info = if params.create_backup {
+        Some(create_backup(path, &old_hash).map_err(AppError::Io)?)
+    } else {
+        None
+    };
+
+    if params.dry_run {
+        return Ok(WriteResult::dry_run_success());
+    }
+
+    let file = File::open(path).map_err(AppError::Io)?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| AppError::Custom(format!("无法以 zip 打开 xlsx: {}", e)))?;
+    let part = resolve_sheet_part(&mut archive, sheet)?;
+    let sheet_xml = read_zip_entry(&mut archive, &part)?;
+
+    let dv_xml = build_data_validation_xml_str(config);
+    let new_sheet_xml = patch_data_validation_str(&sheet_xml, &dv_xml)?;
+
+    repackage_zip(&mut archive, path, &part, &new_sheet_xml)?;
+    let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    append_history(path, "add_data_validation", &old_hash, &new_hash, params.dry_run);
+
+    Ok(WriteResult {
+        success: true,
+        message: String::new(),
+        backup_info,
+        old_hash,
+        new_hash,
+        diff: None,
+    })
+}
+
+/// 构建 <dataValidation> XML 元素字符串。
+fn build_data_validation_xml_str(config: &DataValidationConfig) -> String {
+    let type_attr = match config.validation_type {
+        DataValidationType::Whole => "whole",
+        DataValidationType::Decimal => "decimal",
+        DataValidationType::List => "list",
+        DataValidationType::Date => "date",
+        DataValidationType::Time => "time",
+        DataValidationType::TextLength => "textLength",
+        DataValidationType::Custom => "custom",
+    };
+
+    let mut dv = format!(
+        "<dataValidation type=\"{}\" allowBlank=\"{}\" sqref=\"{}\"",
+        type_attr,
+        if config.allow_blank { "1" } else { "0" },
+        config.range
+    );
+
+    if !config.show_dropdown {
+        dv.push_str(" showDropDown=\"1\"");
+    }
+
+    let mut inner = String::new();
+    if let (DataValidationType::List, Some(values)) = (&config.validation_type, &config.list_values) {
+        if !values.is_empty() {
+            let quoted: Vec<String> = values.iter()
+                .map(|v| format!("\"{}\"", v))
+                .collect();
+            inner.push_str(&format!("<formula1>{}</formula1>", quoted.join(",")));
+        }
+    } else if let Some(f1) = &config.formula1 {
+        inner.push_str(&format!("<formula1>{}</formula1>", f1));
+    }
+    if let Some(f2) = &config.formula2 {
+        inner.push_str(&format!("<formula2>{}</formula2>", f2));
+    }
+
+    if inner.is_empty() {
+        format!("{}/>", dv)
+    } else {
+        format!("{}>{}</dataValidation>", dv, inner)
+    }
+}
+
+/// 字符串方式 patch dataValidations。
+fn patch_data_validation_str(xml: &[u8], new_dv: &str) -> Result<Vec<u8>> {
+    let s = String::from_utf8(xml.to_vec())
+        .map_err(|e| AppError::Custom(format!("XML 不是合法 UTF-8: {}", e)))?;
+    let mut result = s;
+
+    if let Some(pos) = result.find("</dataValidations>") {
+        // 有现有 <dataValidations>，在闭合前插入新 DV
+        result.insert_str(pos, &format!("\n    {}", new_dv));
+        // 更新 count
+        let old_count = result.matches("<dataValidation ").count();
+        let old_count_str = format!("count=\"{}\"", old_count - 1);
+        let new_count_str = format!("count=\"{}\"", old_count);
+        result = result.replacen(&old_count_str, &new_count_str, 1);
+    } else if let Some(pos) = result.find("<dataValidations/>") {
+        // 自闭合 → 转为开放
+        let replacement = format!(
+            "<dataValidations count=\"1\">\n    {}\n  </dataValidations>",
+            new_dv
+        );
+        result.replace_range(pos..pos + 18, &replacement);
+    } else {
+        // 不存在 → 在 </worksheet> 前插入
+        if let Some(pos) = result.find("</worksheet>") {
+            let new_entry = format!(
+                "  <dataValidations count=\"1\">\n    {}\n  </dataValidations>\n",
+                new_dv
+            );
+            result.insert_str(pos, &new_entry);
+        }
+    }
+
+    Ok(result.into_bytes())
+}
+
+/// 保留式设置工作表保护。
+pub fn protect_sheet_preserving(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+    config: &SheetProtectionConfig,
+) -> Result<WriteResult> {
+    let old_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    let backup_info = if params.create_backup {
+        Some(create_backup(path, &old_hash).map_err(AppError::Io)?)
+    } else {
+        None
+    };
+
+    if params.dry_run {
+        return Ok(WriteResult::dry_run_success());
+    }
+
+    let file = File::open(path).map_err(AppError::Io)?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| AppError::Custom(format!("无法以 zip 打开 xlsx: {}", e)))?;
+    let part = resolve_sheet_part(&mut archive, sheet)?;
+    let sheet_xml = read_zip_entry(&mut archive, &part)?;
+
+    let sp_xml = build_sheet_protection_xml_str(config);
+    let new_sheet_xml = patch_sheet_protection_str(&sheet_xml, Some(&sp_xml))?;
+
+    repackage_zip(&mut archive, path, &part, &new_sheet_xml)?;
+    let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    append_history(path, "protect_sheet", &old_hash, &new_hash, params.dry_run);
+
+    Ok(WriteResult {
+        success: true,
+        message: String::new(),
+        backup_info,
+        old_hash,
+        new_hash,
+        diff: None,
+    })
+}
+
+/// 保留式移除工作表保护。
+pub fn unprotect_sheet_preserving(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+) -> Result<WriteResult> {
+    let old_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    let backup_info = if params.create_backup {
+        Some(create_backup(path, &old_hash).map_err(AppError::Io)?)
+    } else {
+        None
+    };
+
+    if params.dry_run {
+        return Ok(WriteResult::dry_run_success());
+    }
+
+    let file = File::open(path).map_err(AppError::Io)?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| AppError::Custom(format!("无法以 zip 打开 xlsx: {}", e)))?;
+    let part = resolve_sheet_part(&mut archive, sheet)?;
+    let sheet_xml = read_zip_entry(&mut archive, &part)?;
+
+    let new_sheet_xml = patch_sheet_protection_str(&sheet_xml, None)?;
+    repackage_zip(&mut archive, path, &part, &new_sheet_xml)?;
+    let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    append_history(path, "unprotect_sheet", &old_hash, &new_hash, params.dry_run);
+
+    Ok(WriteResult {
+        success: true,
+        message: String::new(),
+        backup_info,
+        old_hash,
+        new_hash,
+        diff: None,
+    })
+}
+
+/// 构建 <sheetProtection> XML 元素字符串。
+fn build_sheet_protection_xml_str(config: &SheetProtectionConfig) -> String {
+    let opts = &config.options;
+    format!(
+        "<sheetProtection password=\"{}\" selectLockedCells=\"{}\" selectUnlockedCells=\"{}\" \
+         formatCells=\"{}\" formatColumns=\"{}\" formatRows=\"{}\" \
+         insertColumns=\"{}\" insertRows=\"{}\" insertHyperlinks=\"{}\" \
+         deleteColumns=\"{}\" deleteRows=\"{}\" \
+         sort=\"{}\" autoFilter=\"{}\" pivotTables=\"{}\" \
+         editObjects=\"{}\" editScenarios=\"{}\"/>",
+        config.password.as_deref().unwrap_or(""),
+        bool_to_01(opts.select_locked_cells), bool_to_01(opts.select_unlocked_cells),
+        bool_to_01(opts.format_cells), bool_to_01(opts.format_columns), bool_to_01(opts.format_rows),
+        bool_to_01(opts.insert_columns), bool_to_01(opts.insert_rows), bool_to_01(opts.insert_links),
+        bool_to_01(opts.delete_columns), bool_to_01(opts.delete_rows),
+        bool_to_01(opts.sort), bool_to_01(opts.auto_filter), bool_to_01(opts.pivot_tables),
+        bool_to_01(opts.edit_objects), bool_to_01(opts.edit_scenarios),
+    )
+}
+
+fn bool_to_01(b: bool) -> &'static str {
+    if b { "1" } else { "0" }
+}
+
+/// 字符串方式 patch sheetProtection。
+fn patch_sheet_protection_str(xml: &[u8], new_sp: Option<&str>) -> Result<Vec<u8>> {
+    let s = String::from_utf8(xml.to_vec())
+        .map_err(|e| AppError::Custom(format!("XML 不是合法 UTF-8: {}", e)))?;
+    let mut result = s;
+
+    // 移除所有现有 <sheetProtection .../> 元素
+    loop {
+        let start = result.find("<sheetProtection ");
+        let end = result.find("/>");
+        match (start, end) {
+            (Some(s), Some(e)) if s < e => {
+                let sp_end = e + 2;
+                result.replace_range(s..sp_end, "");
+            }
+            _ => break,
+        }
+    }
+
+    // 移除所有 <sheetProtection>...</sheetProtection> 块
+    loop {
+        let start = result.find("<sheetProtection ");
+        let end = result.find("</sheetProtection>");
+        match (start, end) {
+            (Some(s), Some(e)) if s < e => {
+                let sp_end = e + 18;
+                result.replace_range(s..sp_end, "");
+            }
+            _ => break,
+        }
+    }
+
+    // 如果提供了新保护，在 </worksheet> 前插入
+    if let Some(sp) = new_sp {
+        if let Some(pos) = result.find("</worksheet>") {
+            result.insert_str(pos, &format!("  {}\n", sp));
+        }
+    }
+
+    Ok(result.into_bytes())
+}
+
+/// 保留式设置页面设置 — 暂未实现，留待 Phase 3。
+pub fn configure_page_setup_preserving(
+    _path: &str,
+    _params: &SecurityParams,
+    _sheet: &str,
+    _config: &PageSetupConfig,
+) -> Result<WriteResult> {
+    Err(AppError::Custom(
+        "configure_page_setup_preserving not implemented yet - use full transfer fallback".into()
+    ))
+}
+
+/// 保留式设置工作表可见性：修改 workbook.xml 中对应 sheet 的 `state` 属性。
+pub fn set_sheet_visibility_preserving(
+    path: &str,
+    params: &SecurityParams,
+    sheet_name: &str,
+    visibility: &SheetVisibility,
+) -> Result<WriteResult> {
+    let old_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    let backup_info = if params.create_backup {
+        Some(create_backup(path, &old_hash).map_err(AppError::Io)?)
+    } else {
+        None
+    };
+
+    if params.dry_run {
+        return Ok(WriteResult::dry_run_success());
+    }
+
+    let file = File::open(path).map_err(AppError::Io)?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| AppError::Custom(format!("无法以 zip 打开 xlsx: {}", e)))?;
+
+    let wb_part = "xl/workbook.xml";
+    let wb_xml = read_zip_entry(&mut archive, wb_part)?;
+
+    let state_attr = match visibility {
+        SheetVisibility::Visible => None,
+        SheetVisibility::Hidden => Some("hidden"),
+        SheetVisibility::VeryHidden => Some("veryHidden"),
+    };
+
+    let new_wb_xml = patch_sheet_visibility_str(&wb_xml, sheet_name, state_attr)?;
+
+    repackage_zip(&mut archive, path, wb_part, &new_wb_xml)?;
+    let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    append_history(path, "set_sheet_visibility", &old_hash, &new_hash, params.dry_run);
+
+    Ok(WriteResult {
+        success: true,
+        message: String::new(),
+        backup_info,
+        old_hash,
+        new_hash,
+        diff: None,
+    })
+}
+
+/// 字符串方式 patch sheet visibility。
+fn patch_sheet_visibility_str(wb_xml: &[u8], sheet_name: &str, state: Option<&str>) -> Result<Vec<u8>> {
+    let s = String::from_utf8(wb_xml.to_vec())
+        .map_err(|e| AppError::Custom(format!("XML 不是合法 UTF-8: {}", e)))?;
+    let mut result = s;
+
+    // 找到目标 sheet 的 <sheet> 标签并修改 state 属性
+    let marker = format!("name=\"{}\"", sheet_name);
+    if let Some(name_pos) = result.find(&marker) {
+        // 往回找 <sheet
+        let prefix = &result[..name_pos];
+        let tag_start = prefix.rfind("<sheet").ok_or_else(|| {
+            AppError::Custom(format!("找不到 sheet 标签: {}", sheet_name))
+        })?;
+
+        // 从 tag_start 找到标签结束（> 或 />）
+        let tag_end = result[tag_start..].find('>').ok_or_else(|| {
+            AppError::Custom("无法找到 sheet 标签结束".to_string())
+        })? + tag_start;
+
+        let tag = &result[tag_start..=tag_end];
+
+        // 构建新标签
+        let mut new_tag = format!("<sheet name=\"{}\"", sheet_name);
+
+        // 提取 sheetId 和 r:id
+        if let Some(sid_start) = tag.find("sheetId=\"") {
+            let sid_rest = &tag[sid_start + 9..];
+            if let Some(sid_end) = sid_rest.find('"') {
+                new_tag.push_str(&format!(" sheetId=\"{}\"", &sid_rest[..sid_end]));
+            }
+        }
+        if let Some(rid_start) = tag.find("r:id=\"") {
+            let rid_rest = &tag[rid_start + 6..];
+            if let Some(rid_end) = rid_rest.find('"') {
+                new_tag.push_str(&format!(" r:id=\"{}\"", &rid_rest[..rid_end]));
+            }
+        }
+
+        // 添加 state 属性
+        if let Some(s) = state {
+            new_tag.push_str(&format!(" state=\"{}\"", s));
+        }
+
+        new_tag.push(if tag.ends_with("/>") { '/' } else { ' ' });
+        new_tag.push('>');
+
+        result.replace_range(tag_start..=tag_end, &new_tag);
+        Ok(result.into_bytes())
+    } else {
+        Err(AppError::SheetNotFound(sheet_name.into()))
+    }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// R2.2 — add / delete / rename sheet preserving
+// ───────────────────────────────────────────────────────────────────────────
+
+/// 保留式添加工作表：修改 workbook.xml、[Content_Types].xml、workbook.xml.rels，
+/// 并写入一个空的 sheet XML，其余 zip part 逐字节保留。
+pub fn add_sheet_preserving(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+) -> Result<WriteResult> {
+    let old_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    let backup_info = if params.create_backup {
+        Some(create_backup(path, &old_hash).map_err(AppError::Io)?)
+    } else {
+        None
+    };
+
+    if params.dry_run {
+        return Ok(WriteResult::dry_run_success());
+    }
+
+    let file = File::open(path).map_err(AppError::Io)?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| AppError::Custom(format!("无法以 zip 打开 xlsx: {}", e)))?;
+
+    // 读取现有文件
+    let wb_xml = read_zip_entry(&mut archive, "xl/workbook.xml")?;
+    let ct_xml = read_zip_entry(&mut archive, "[Content_Types].xml")?;
+    let rels_xml = read_zip_entry(&mut archive, "xl/_rels/workbook.xml.rels")?;
+
+    // 检查 sheet 是否已存在
+    let wb_str = String::from_utf8_lossy(&wb_xml);
+    if wb_str.contains(&format!("name=\"{}\"", sheet)) {
+        return Err(AppError::SheetAlreadyExists(sheet.into()));
+    }
+
+    // 确定下一个 sheet 编号、rId、sheetId
+    let next_sheet_num = next_sheet_number(&wb_str);
+    let next_rid = next_rid(&wb_str);
+    let next_sheet_id = next_sheet_id(&wb_str);
+
+    let sheet_part = format!("xl/worksheets/sheet{}.xml", next_sheet_num);
+    let sheet_part_name = format!("/xl/worksheets/sheet{}.xml", next_sheet_num);
+
+    // 1. 修改 workbook.xml — 追加 <sheet>
+    let new_wb = patch_add_sheet_str(&wb_xml, sheet, &next_rid, next_sheet_id)?;
+
+    // 2. 修改 [Content_Types].xml — 追加 Override
+    let new_ct = patch_add_content_type_str(&ct_xml, &sheet_part_name)?;
+
+    // 3. 修改 workbook.xml.rels — 追加 Relationship
+    let new_rels = patch_add_sheet_rel_str(&rels_xml, &next_rid, &sheet_part)?;
+
+    // 4. 创建空的 sheet XML
+    let empty_sheet = b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>
+<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">
+  <sheetData/>
+</worksheet>
+";
+
+    // 构建变更映射
+    let mut changes = HashMap::new();
+    changes.insert("xl/workbook.xml".to_string(), new_wb);
+    changes.insert("[Content_Types].xml".to_string(), new_ct);
+    changes.insert("xl/_rels/workbook.xml.rels".to_string(), new_rels);
+    changes.insert(sheet_part, empty_sheet.to_vec());
+
+    repackage_zip_multi(&mut archive, path, &changes, &[])?;
+
+    let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    append_history(path, "add_sheet", &old_hash, &new_hash, params.dry_run);
+
+    Ok(WriteResult {
+        success: true,
+        message: format!("Added sheet '{}'", sheet),
+        backup_info,
+        old_hash,
+        new_hash,
+        diff: None,
+    })
+}
+
+/// 保留式删除工作表：从 workbook.xml、[Content_Types].xml、workbook.xml.rels 中移除
+/// 对应条目，并跳过该 sheet 的 XML 条目，其余 zip part 逐字节保留。
+pub fn delete_sheet_preserving(
+    path: &str,
+    params: &SecurityParams,
+    sheet: &str,
+) -> Result<WriteResult> {
+    let old_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    let backup_info = if params.create_backup {
+        Some(create_backup(path, &old_hash).map_err(AppError::Io)?)
+    } else {
+        None
+    };
+
+    if params.dry_run {
+        return Ok(WriteResult::dry_run_success());
+    }
+
+    let file = File::open(path).map_err(AppError::Io)?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| AppError::Custom(format!("无法以 zip 打开 xlsx: {}", e)))?;
+
+    let wb_xml = read_zip_entry(&mut archive, "xl/workbook.xml")?;
+    let ct_xml = read_zip_entry(&mut archive, "[Content_Types].xml")?;
+    let rels_xml = read_zip_entry(&mut archive, "xl/_rels/workbook.xml.rels")?;
+
+    // 检查 sheet 是否存在并获取其 rid
+    let wb_str = String::from_utf8_lossy(&wb_xml);
+    if !wb_str.contains(&format!("name=\"{}\"", sheet)) {
+        return Err(AppError::SheetNotFound(sheet.into()));
+    }
+
+    // 提取 sheet 的 rid
+    let rid = extract_sheet_rid_str(&wb_xml, sheet)?;
+
+    // 检查删除后是否还有 sheet
+    let sheet_count = wb_str.matches("<sheet ").count();
+    if sheet_count <= 1 {
+        return Err(AppError::Custom("Cannot delete all sheets from a workbook".to_string()));
+    }
+
+    // 通过 rid 找到 sheet 的 part 路径
+    let sheet_part = find_rel_target_str(&rels_xml, &rid)?;
+    let part = if sheet_part.starts_with("xl/") {
+        sheet_part.clone()
+    } else if sheet_part.starts_with('/') {
+        sheet_part.trim_start_matches('/').to_string()
+    } else {
+        format!("xl/{}", sheet_part)
+    };
+
+    // 1. 修改 workbook.xml — 移除 <sheet>
+    let new_wb = patch_remove_sheet_str(&wb_xml, sheet)?;
+
+    // 2. 修改 [Content_Types].xml — 移除对应 Override
+    let new_ct = patch_remove_content_type_str(&ct_xml, &part)?;
+
+    // 3. 修改 workbook.xml.rels — 移除对应 Relationship
+    let new_rels = patch_remove_rel_str(&rels_xml, &rid)?;
+
+    let mut changes = HashMap::new();
+    changes.insert("xl/workbook.xml".to_string(), new_wb);
+    changes.insert("[Content_Types].xml".to_string(), new_ct);
+    changes.insert("xl/_rels/workbook.xml.rels".to_string(), new_rels);
+
+    // 从 zip 中跳过该 sheet 的 XML 条目
+    let skip_parts = vec![part];
+
+    repackage_zip_multi(&mut archive, path, &changes, &skip_parts)?;
+
+    let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    append_history(path, "delete_sheet", &old_hash, &new_hash, params.dry_run);
+
+    Ok(WriteResult {
+        success: true,
+        message: format!("Deleted sheet '{}'", sheet),
+        backup_info,
+        old_hash,
+        new_hash,
+        diff: None,
+    })
+}
+
+/// 保留式重命名工作表：修改 workbook.xml 中对应 sheet 的 name 属性，
+/// 其余 zip part 逐字节保留。
+pub fn rename_sheet_preserving(
+    path: &str,
+    params: &SecurityParams,
+    old_name: &str,
+    new_name: &str,
+) -> Result<WriteResult> {
+    let old_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    let backup_info = if params.create_backup {
+        Some(create_backup(path, &old_hash).map_err(AppError::Io)?)
+    } else {
+        None
+    };
+
+    if params.dry_run {
+        return Ok(WriteResult::dry_run_success());
+    }
+
+    let file = File::open(path).map_err(AppError::Io)?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| AppError::Custom(format!("无法以 zip 打开 xlsx: {}", e)))?;
+
+    let wb_xml = read_zip_entry(&mut archive, "xl/workbook.xml")?;
+
+    let wb_str = String::from_utf8_lossy(&wb_xml);
+    if !wb_str.contains(&format!("name=\"{}\"", old_name)) {
+        return Err(AppError::SheetNotFound(old_name.into()));
+    }
+    if wb_str.contains(&format!("name=\"{}\"", new_name)) {
+        return Err(AppError::SheetAlreadyExists(new_name.into()));
+    }
+
+    let new_wb = patch_rename_sheet_str(&wb_xml, old_name, new_name)?;
+
+    let mut changes = HashMap::new();
+    changes.insert("xl/workbook.xml".to_string(), new_wb);
+
+    repackage_zip_multi(&mut archive, path, &changes, &[])?;
+
+    let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
+    append_history(path, "rename_sheet", &old_hash, &new_hash, params.dry_run);
+
+    Ok(WriteResult {
+        success: true,
+        message: format!("Renamed sheet '{}' to '{}'", old_name, new_name),
+        backup_info,
+        old_hash,
+        new_hash,
+        diff: None,
+    })
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// R2.2 内部辅助函数
+// ───────────────────────────────────────────────────────────────────────────
+
+/// 从 workbook.xml 字符串中提取 sheet 的 rid。
+fn extract_sheet_rid_str(wb: &[u8], sheet: &str) -> Result<String> {
+    let s = String::from_utf8_lossy(wb);
+    let marker = format!("name=\"{}\"", sheet);
+    if let Some(name_pos) = s.find(&marker) {
+        let prefix = &s[..name_pos];
+        let tag_start = prefix.rfind("<sheet").ok_or_else(|| {
+            AppError::Custom(format!("找不到 sheet 标签: {}", sheet))
+        })?;
+        let tag = &s[tag_start..];
+        if let Some(rid_start) = tag.find("r:id=\"") {
+            let rest = &tag[rid_start + 6..];
+            if let Some(rid_end) = rest.find('"') {
+                return Ok(rest[..rid_end].to_string());
+            }
+        }
+        Err(AppError::Custom(format!("找不到 sheet 的 r:id: {}", sheet)))
+    } else {
+        Err(AppError::SheetNotFound(sheet.into()))
+    }
+}
+
+/// 从 rels XML 字符串中提取 rid 对应的 Target。
+fn find_rel_target_str(rels: &[u8], rid: &str) -> Result<String> {
+    let s = String::from_utf8_lossy(rels);
+    let marker = format!("Id=\"{}\"", rid);
+    if let Some(id_pos) = s.find(&marker) {
+        let prefix = &s[..id_pos];
+        let tag_start = prefix.rfind("<Relationship").ok_or_else(|| {
+            AppError::Custom(format!("找不到 Relationship 标签: {}", rid))
+        })?;
+        let tag = &s[tag_start..];
+        if let Some(t_start) = tag.find("Target=\"") {
+            let rest = &tag[t_start + 8..];
+            if let Some(t_end) = rest.find('"') {
+                let target = rest[..t_end].to_string();
+                // 归一化
+                let trimmed = target
+                    .strip_prefix('/')
+                    .or_else(|| target.strip_prefix("xl/"))
+                    .unwrap_or(&target);
+                let part = if trimmed.starts_with("xl/") {
+                    trimmed.to_string()
+                } else {
+                    format!("xl/{}", trimmed)
+                };
+                return Ok(part);
+            }
+        }
+        Err(AppError::Custom(format!("找不到 rid {} 的 Target", rid)))
+    } else {
+        Err(AppError::Custom(format!("找不到 rid: {}", rid)))
+    }
+}
+
+/// 确定下一个 sheet 编号（从现有 zip 条目中找最大值 +1）。
+fn next_sheet_number(wb_xml: &str) -> u32 {
+    let mut max_n = 0u32;
+    // 查找所有 sheetId="N" 模式
+    let mut pos = 0;
+    while let Some(start) = wb_xml[pos..].find("sheetId=\"") {
+        let rest = &wb_xml[pos + start + 9..];
+        if let Some(end) = rest.find('"') {
+            if let Ok(n) = rest[..end].parse::<u32>() {
+                if n > max_n { max_n = n; }
+            }
+        }
+        pos += start + 1;
+    }
+    max_n + 1
+}
+
+/// 确定下一个 rId（从 workbook.xml 中找 rIdN 的最大值 +1）。
+fn next_rid(wb_xml: &str) -> String {
+    let mut max_n = 0u32;
+    let mut pos = 0;
+    while let Some(start) = wb_xml[pos..].find("r:id=\"rId") {
+        let rest = &wb_xml[pos + start + 9..];
+        if let Some(end) = rest.find('"') {
+            if let Ok(n) = rest[..end].parse::<u32>() {
+                if n > max_n { max_n = n; }
+            }
+        }
+        pos += start + 1;
+    }
+    format!("rId{}", max_n + 1)
+}
+
+/// 确定下一个 sheetId。
+fn next_sheet_id(wb_xml: &str) -> u32 {
+    next_sheet_number(wb_xml)
+}
+
+/// 字符串方式：在 workbook.xml 中追加 <sheet>。
+fn patch_add_sheet_str(wb: &[u8], sheet: &str, rid: &str, sheet_id: u32) -> Result<Vec<u8>> {
+    let s = String::from_utf8(wb.to_vec())
+        .map_err(|e| AppError::Custom(format!("XML 不是合法 UTF-8: {}", e)))?;
+    let mut result = s;
+
+    // 在 </sheets> 前插入
+    if let Some(pos) = result.find("</sheets>") {
+        let new_sheet = format!("\n    <sheet name=\"{}\" sheetId=\"{}\" r:id=\"{}\"/>", sheet, sheet_id, rid);
+        result.insert_str(pos, &new_sheet);
+        Ok(result.into_bytes())
+    } else {
+        Err(AppError::Custom("workbook.xml 中找不到 </sheets>".to_string()))
+    }
+}
+
+/// 字符串方式：从 workbook.xml 中移除 <sheet>。
+fn patch_remove_sheet_str(wb: &[u8], sheet: &str) -> Result<Vec<u8>> {
+    let s = String::from_utf8(wb.to_vec())
+        .map_err(|e| AppError::Custom(format!("XML 不是合法 UTF-8: {}", e)))?;
+    let mut result = s;
+
+    let marker = format!("name=\"{}\"", sheet);
+    if let Some(name_pos) = result.find(&marker) {
+        let prefix = &result[..name_pos];
+        let tag_start = prefix.rfind("<sheet").ok_or_else(|| {
+            AppError::Custom(format!("找不到 sheet 标签: {}", sheet))
+        })?;
+        // 找到标签结束：> 或 />
+        let rest = &result[tag_start..];
+        let tag_end = rest.find('>').ok_or_else(|| {
+            AppError::Custom("找不到 sheet 标签结束".to_string())
+        })? + tag_start + 1;
+        result.replace_range(tag_start..tag_end, "");
+        Ok(result.into_bytes())
+    } else {
+        Err(AppError::SheetNotFound(sheet.into()))
+    }
+}
+
+/// 字符串方式：在 workbook.xml 中重命名 sheet。
+fn patch_rename_sheet_str(wb: &[u8], old_name: &str, new_name: &str) -> Result<Vec<u8>> {
+    let s = String::from_utf8(wb.to_vec())
+        .map_err(|e| AppError::Custom(format!("XML 不是合法 UTF-8: {}", e)))?;
+    let mut result = s;
+
+    let old_marker = format!("name=\"{}\"", old_name);
+    let new_marker = format!("name=\"{}\"", new_name);
+    result = result.replacen(&old_marker, &new_marker, 1);
+
+    Ok(result.into_bytes())
+}
+
+/// 字符串方式：在 [Content_Types].xml 中追加 Override。
+fn patch_add_content_type_str(ct: &[u8], part_name: &str) -> Result<Vec<u8>> {
+    let s = String::from_utf8(ct.to_vec())
+        .map_err(|e| AppError::Custom(format!("XML 不是合法 UTF-8: {}", e)))?;
+    let mut result = s;
+
+    let content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml";
+    let new_override = format!(
+        "\n  <Override PartName=\"{}\" ContentType=\"{}\"/>",
+        part_name, content_type
+    );
+
+    if let Some(pos) = result.find("</Types>") {
+        result.insert_str(pos, &new_override);
+        Ok(result.into_bytes())
+    } else {
+        Err(AppError::Custom("[Content_Types].xml 中找不到 </Types>".to_string()))
+    }
+}
+
+/// 字符串方式：从 [Content_Types].xml 中移除 Override。
+fn patch_remove_content_type_str(ct: &[u8], part: &str) -> Result<Vec<u8>> {
+    let s = String::from_utf8(ct.to_vec())
+        .map_err(|e| AppError::Custom(format!("XML 不是合法 UTF-8: {}", e)))?;
+    let mut result = s;
+
+    // part 可能是 "xl/worksheets/sheet2.xml"，需要匹配 "/xl/worksheets/sheet2.xml"
+    let rel_part = if part.starts_with("xl/") {
+        format!("/{}", part)
+    } else {
+        part.to_string()
+    };
+
+    let marker = format!("PartName=\"{}\"", rel_part);
+    if let Some(pn_pos) = result.find(&marker) {
+        let prefix = &result[..pn_pos];
+        let tag_start = prefix.rfind("<Override").ok_or_else(|| {
+            AppError::Custom(format!("找不到 Override 标签: {}", part))
+        })?;
+        let rest = &result[tag_start..];
+        let tag_end = rest.find("/>").ok_or_else(|| {
+            AppError::Custom("找不到 Override 标签结束".to_string())
+        })? + tag_start + 2;
+        result.replace_range(tag_start..tag_end, "");
+        Ok(result.into_bytes())
+    } else {
+        // 找不到也 OK，继续
+        Ok(ct.to_vec())
+    }
+}
+
+/// 字符串方式：在 workbook.xml.rels 中追加 Relationship。
+fn patch_add_sheet_rel_str(rels: &[u8], rid: &str, target: &str) -> Result<Vec<u8>> {
+    let s = String::from_utf8(rels.to_vec())
+        .map_err(|e| AppError::Custom(format!("XML 不是合法 UTF-8: {}", e)))?;
+    let mut result = s;
+
+    // target 可以是 "xl/worksheets/sheet3.xml"，但 rels 中通常用相对路径 "worksheets/sheet3.xml"
+    let rel_target = target.strip_prefix("xl/").unwrap_or(target);
+    let rel_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet";
+    let new_rel = format!(
+        "\n  <Relationship Id=\"{}\" Type=\"{}\" Target=\"{}\"/>",
+        rid, rel_type, rel_target
+    );
+
+    if let Some(pos) = result.find("</Relationships>") {
+        result.insert_str(pos, &new_rel);
+        Ok(result.into_bytes())
+    } else {
+        Err(AppError::Custom("rels 中找不到 </Relationships>".to_string()))
+    }
+}
+
+/// 字符串方式：从 rels 中移除 Relationship。
+fn patch_remove_rel_str(rels: &[u8], rid: &str) -> Result<Vec<u8>> {
+    let s = String::from_utf8(rels.to_vec())
+        .map_err(|e| AppError::Custom(format!("XML 不是合法 UTF-8: {}", e)))?;
+    let mut result = s;
+
+    let marker = format!("Id=\"{}\"", rid);
+    if let Some(id_pos) = result.find(&marker) {
+        let prefix = &result[..id_pos];
+        let tag_start = prefix.rfind("<Relationship").ok_or_else(|| {
+            AppError::Custom(format!("找不到 Relationship 标签: {}", rid))
+        })?;
+        let rest = &result[tag_start..];
+        let tag_end = rest.find("/>").ok_or_else(|| {
+            AppError::Custom("找不到 Relationship 标签结束".to_string())
+        })? + tag_start + 2;
+        result.replace_range(tag_start..tag_end, "");
+        Ok(result.into_bytes())
+    } else {
+        Err(AppError::Custom(format!("找不到 rid: {}", rid)))
+    }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// 内部辅助
+// ───────────────────────────────────────────────────────────────────────────
+
+/// 把 zip 中除 `part` 外的所有条目逐字节复制，并用 `new_xml` 替换 `part` 的内容。
+fn repackage_zip(
+    archive: &mut ZipArchive<File>,
+    path: &str,
+    part: &str,
+    new_xml: &[u8],
+) -> Result<()> {
+    let tmp = Path::new(path).with_extension("patch_tmp");
+    let tf = File::create(&tmp).map_err(AppError::Io)?;
+    let mut zw = ZipWriter::new(tf);
+    let mut buf = Vec::new();
+    let n = archive.len();
+    for i in 0..n {
+        let mut zf = archive
+            .by_index(i)
+            .map_err(|e| AppError::Custom(format!("读取 zip 条目失败: {}", e)))?;
+        let name = zf.name().to_string();
+        let opts = zf.options();
+        if name == part {
+            zw.start_file(&name, opts)
+                .map_err(|e| AppError::Custom(format!("写入 zip 条目失败: {}", e)))?;
+            zw.write_all(new_xml).map_err(AppError::Io)?;
+        } else {
+            buf.clear();
+            zf.read_to_end(&mut buf).map_err(AppError::Io)?;
+            zw.start_file(&name, opts)
+                .map_err(|e| AppError::Custom(format!("写入 zip 条目失败: {}", e)))?;
+            zw.write_all(&buf).map_err(AppError::Io)?;
+        }
+    }
+    zw.finish()
+        .map_err(|e| AppError::Custom(format!("完成 zip 写入失败: {}", e)))?;
+    fs::rename(&tmp, path).map_err(AppError::Io)?;
+    Ok(())
+}
+
+/// 多条目版本的 repackage：支持同时修改/新增多个 part，并跳过指定条目。
+///
+/// - `changes`: 需要修改或新增的条目名 → 新内容
+/// - `skip_parts`: 需要跳过的条目名（不写入新 zip）
+fn repackage_zip_multi(
+    archive: &mut ZipArchive<File>,
+    path: &str,
+    changes: &HashMap<String, Vec<u8>>,
+    skip_parts: &[String],
+) -> Result<()> {
+    let tmp = Path::new(path).with_extension("patch_tmp");
+    let tf = File::create(&tmp).map_err(AppError::Io)?;
+    let mut zw = ZipWriter::new(tf);
+    #[cfg(feature = "flate2")]
+    let default_opt = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+    #[cfg(not(feature = "flate2"))]
+    let default_opt = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Stored);
+    let mut buf = Vec::new();
+    let n = archive.len();
+
+    // 预先记录所有需要新增的条目（不在原 zip 中）
+    let mut added = std::collections::HashSet::new();
+
+    for i in 0..n {
+        let mut zf = archive
+            .by_index(i)
+            .map_err(|e| AppError::Custom(format!("读取 zip 条目失败: {}", e)))?;
+        let name = zf.name().to_string();
+        let opts = zf.options();
+
+        // 检查是否在跳过列表中
+        if skip_parts.iter().any(|sp| *sp == name) {
+            continue;
+        }
+
+        // 检查是否有变更
+        if let Some(new_content) = changes.get(&name) {
+            zw.start_file(&name, opts)
+                .map_err(|e| AppError::Custom(format!("写入 zip 条目失败: {}", e)))?;
+            zw.write_all(new_content).map_err(AppError::Io)?;
+            added.insert(name);
+        } else {
+            buf.clear();
+            zf.read_to_end(&mut buf).map_err(AppError::Io)?;
+            zw.start_file(&name, opts)
+                .map_err(|e| AppError::Custom(format!("写入 zip 条目失败: {}", e)))?;
+            zw.write_all(&buf).map_err(AppError::Io)?;
+        }
+    }
+
+    // 写入新增的条目（不在原 zip 中的）
+    for (name, content) in changes {
+        if !added.contains(name) {
+            // 使用默认 options
+            zw.start_file(name, default_opt)
+                .map_err(|e| AppError::Custom(format!("写入新增 zip 条目失败: {}", e)))?;
+            zw.write_all(content).map_err(AppError::Io)?;
+        }
+    }
+
+    zw.finish()
+        .map_err(|e| AppError::Custom(format!("完成 zip 写入失败: {}", e)))?;
+    fs::rename(&tmp, path).map_err(AppError::Io)?;
+    Ok(())
+}
+
+/// 记录写操作到审计历史（非致命）。
+fn append_history(path: &str, op: &str, old_hash: &str, new_hash: &str, dry_run: bool) {
+    if dry_run {
+        return;
+    }
+    let entry = WorkbookHistoryEntry {
+        timestamp: chrono::Utc::now(),
+        operation_type: op.to_string(),
+        target_path: path.to_string(),
+        old_hash: old_hash.to_string(),
+        new_hash: new_hash.to_string(),
+        result: "success".to_string(),
+    };
+    let _ = append_history_entry(path, &entry);
+}
+
+/// 判断单元格原始字节中是否包含 `<f`（公式标记）。
+fn has_formula(raw: &[u8]) -> bool {
+    raw.windows(3).any(|w| w == b"<f>") || raw.windows(4).any(|w| w == b"<f ")
+}
+
+/// 从单元格原始字节中移除 `<v>...</v>` 元素。
+fn strip_v_element(raw: &[u8]) -> Vec<u8> {
+    // 查找 <v 或 <v> 起始位置
+    let mut result = Vec::with_capacity(raw.len());
+    let mut i = 0;
+    while i < raw.len() {
+        if (raw[i..].starts_with(b"<v>") || raw[i..].starts_with(b"<v ")) && i > 0 {
+            // 向前确认这不是 <f> 或其它标签的一部分
+            let prev = raw[i - 1];
+            if prev == b'>' || prev == b'/' || prev == b'"' || prev == b'\'' {
+                // 跳过 <v...> 标签
+                i += 2; // skip "<v"
+                while i < raw.len() && raw[i] != b'>' {
+                    i += 1;
+                }
+                i += 1; // skip '>'
+                // 跳过内容直到 </v>
+                while i + 4 < raw.len() && !raw[i..].starts_with(b"</v>") {
+                    i += 1;
+                }
+                // 跳过 </v> 或 </v...>
+                if i + 4 <= raw.len() && raw[i..].starts_with(b"</v>") {
+                    i += 4;
+                } else {
+                    // 异常情况：不匹配，让后续字符正常通过
+                    // 这会回退太多，改用更保守的策略
+                    break;
+                }
+                continue;
+            }
+        }
+        result.push(raw[i]);
+        i += 1;
+    }
+    // 如果上述循环因异常 break 退出，退回到安全路径：直接返回原始字节
+    if i < raw.len() {
+        return raw.to_vec();
+    }
+    result
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -631,6 +2209,437 @@ fn extract_col(raw: &[u8]) -> u16 {
         .and_then(|r| parse_cell_ref(&r).ok())
         .map(|(_, col)| col)
         .unwrap_or(0)
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Phase 3 — 通用 fallback：preserve_all_parts_transfer
+// ───────────────────────────────────────────────────────────────────────────
+
+/// 非数据 zip 部件的前缀模式。
+/// 以这些模式开头的 zip 条目从源 zip 拷贝到重建后的 zip。
+const NON_DATA_PREFIXES: &[&str] = &[
+    "xl/styles.xml",
+    "xl/worksheets/_rels/",
+    "xl/charts/",
+    "xl/drawings/",
+    "xl/comments",
+    "xl/media/",
+    "xl/theme/",
+    "xl/vbaProject",
+    "xl/calcChain",
+    "xl/pivotTables/",
+    "xl/pivotCache/",
+    "xl/tables/",
+    "xl/activeX/",
+    "xl/richData/",
+    "xl/printerSettings/",
+    "xl/connectors/",
+    "xl/chartsheets/",
+    "xl/dialogsheet",
+    "xl/ctrlProps/",
+    "xl/queryTable/",
+    "xl/peopleList/",
+    "xl/attachments/",
+    "xl/notes",
+    "xl/metadata",
+    "xl/volatileDependencies",
+    "xl/dbPr",
+];
+
+/// 判断 zip 条目是否为非数据部件（需要从源 zip 保留）。
+fn is_non_data_part(name: &str) -> bool {
+    NON_DATA_PREFIXES.iter().any(|p| name.starts_with(p))
+}
+
+/// 从源 zip 读取所有条目到 HashMap。
+fn read_zip_map(path: &str) -> Result<HashMap<String, Vec<u8>>> {
+    use std::io::Read;
+    let file = File::open(path).map_err(AppError::Io)?;
+    let mut archive = ZipArchive::new(file)
+        .map_err(|e| AppError::Custom(format!("无法以 zip 打开: {}", e)))?;
+    let mut map = HashMap::new();
+    for i in 0..archive.len() {
+        let mut zf = archive
+            .by_index(i)
+            .map_err(|e| AppError::Custom(format!("读取 zip 条目失败: {}", e)))?;
+        let name = zf.name().to_string();
+        let mut buf = Vec::new();
+        zf.read_to_end(&mut buf).map_err(AppError::Io)?;
+        map.insert(name, buf);
+    }
+    Ok(map)
+}
+
+/// 写入 zip 条目到文件。
+fn write_zip_map(path: &str, entries: &HashMap<String, Vec<u8>>) -> Result<()> {
+    use std::io::Write;
+    let tmp = Path::new(path).with_extension("transfer_tmp");
+    let file = File::create(&tmp).map_err(AppError::Io)?;
+    let mut zw = ZipWriter::new(file);
+    #[cfg(feature = "flate2")]
+    let opt = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+    #[cfg(not(feature = "flate2"))]
+    let opt = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Stored);
+    // 保持原始顺序：先输出源的顺序，但以排好序的 key 列表遍历
+    for (name, content) in entries {
+        zw.start_file(name, opt)
+            .map_err(|e| AppError::Custom(format!("写入 zip 条目失败: {}", e)))?;
+        zw.write_all(content).map_err(AppError::Io)?;
+    }
+    zw.finish()
+        .map_err(|e| AppError::Custom(format!("完成 zip 写入失败: {}", e)))?;
+    fs::rename(&tmp, path).map_err(AppError::Io)?;
+    Ok(())
+}
+
+/// 从 workbook.xml 解析 sheet 名称到 part 路径的映射。
+fn parse_sheet_name_to_part(wb_xml: &[u8], rels_xml: &[u8]) -> HashMap<String, String> {
+    let wb_str = String::from_utf8_lossy(wb_xml);
+    let mut result = HashMap::new();
+
+    // 解析所有 <sheet name="..." r:id="...">
+    let mut pos = 0;
+    while let Some(sheet_start) = wb_str[pos..].find("<sheet ") {
+        let tag = &wb_str[pos + sheet_start..];
+        let tag_end = tag.find('>').unwrap_or(tag.len());
+        let tag_content = &tag[..tag_end];
+
+        // 提取 name 和 r:id
+        let name = extract_attr_str(tag_content, "name");
+        let rid = extract_attr_str(tag_content, "r:id");
+
+        if let (Some(name), Some(rid)) = (name, rid) {
+            // 从 rels 中找到 rid 对应的 Target
+            if let Some(target) = find_rel_target_str(rels_xml, &rid).ok() {
+                result.insert(name, target);
+            }
+        }
+        pos += sheet_start + 1;
+    }
+    result
+}
+
+/// 从字符串中提取属性值。
+fn extract_attr_str(s: &str, key: &str) -> Option<String> {
+    let marker = format!("{}=\"", key);
+    if let Some(start) = s.find(&marker) {
+        let val_start = start + marker.len();
+        if let Some(end) = s[val_start..].find('"') {
+            return Some(s[val_start..val_start + end].to_string());
+        }
+    }
+    None
+}
+
+/// 提取 worksheet XML 中除了 <sheetData> 之外的所有顶层元素。
+/// 返回 (元素名, 完整 XML 片段) 列表。
+fn extract_non_data_elements(xml: &[u8]) -> Vec<(String, String)> {
+    let s = String::from_utf8_lossy(xml);
+    let mut elements = Vec::new();
+
+    // 找到 <worksheet 和 </worksheet> 之间的内容
+    let root_start = s.find("<worksheet").unwrap_or(0);
+    let root_end = s.find("</worksheet>").unwrap_or(s.len());
+
+    let body = &s[root_start..root_end];
+
+    // 按顶层标签分割
+    let mut depth = 0;
+    let mut current_tag = String::new();
+    let mut current_content = String::new();
+    let mut in_tag = false;
+
+    for ch in body.chars() {
+        current_content.push(ch);
+        if ch == '<' {
+            depth += 1;
+            in_tag = true;
+            current_tag.clear();
+        } else if ch == '>' {
+            depth -= 0; // depth already incremented at '<'
+            in_tag = false;
+            // 提取标签名
+            if !current_tag.is_empty() && current_tag.as_bytes()[0] != b'/' {
+                // 提取标签名（不含属性和命名空间）
+                let tag_name = current_tag
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("")
+                    .to_string();
+                if !tag_name.is_empty() && !tag_name.starts_with('?') && tag_name != "sheetData" {
+                    elements.push((tag_name, current_content.clone()));
+                }
+            }
+            if current_tag == "/sheetData" || current_tag.starts_with("/sheetData ") {
+                // 结束标签，不记录
+            }
+        } else if in_tag {
+            current_tag.push(ch);
+        } else if ch == '<' {
+            // 开始新标签
+            current_content.clear();
+            current_content.push(ch);
+            current_tag.clear();
+            in_tag = true;
+        }
+    }
+
+    elements
+}
+
+/// 检查 rebuilt XML 中是否已包含指定元素名。
+fn has_element(xml: &str, tag_name: &str) -> bool {
+    // 寻找开放标签（不含 </）
+    let open = format!("<{} ", tag_name);
+    let open2 = format!("<{}>", tag_name);
+    let open3 = format!("<{}/>", tag_name);
+    xml.contains(&open) || xml.contains(&open2) || xml.contains(&open3)
+}
+
+/// 合并 worksheet 中的非数据元素：从源 XML 中提取非数据元素，
+/// 插入到重建后的 XML 的 </sheetData> 之后。
+fn merge_worksheet_xml(source_xml: &[u8], rebuilt_xml: &[u8]) -> Vec<u8> {
+    let rebuilt_str = String::from_utf8_lossy(rebuilt_xml);
+    let source_str = String::from_utf8_lossy(source_xml);
+
+    // 1. 提取源 XML 中 <sheetData> 之后、</worksheet> 之前的内容
+    let source_after_sd = if let Some(sd_end) = source_str.find("</sheetData>") {
+        let after = &source_str[sd_end + 12..];
+        if let Some(ws_end) = after.rfind("</worksheet>") {
+            &after[..ws_end]
+        } else {
+            ""
+        }
+    } else {
+        ""
+    };
+
+    // 2. 解析源 XML 中非数据元素的标签名
+    let source_elements = extract_non_data_elements(source_xml);
+
+    // 3. 在重建后的 XML 中找到 </sheetData> 之后的位置
+    let sd_end_pos = rebuilt_str.find("</sheetData>");
+
+    match sd_end_pos {
+        Some(pos) => {
+            let insert_pos = pos + 12; // after </sheetData>
+            let after_sd = &rebuilt_str[insert_pos..];
+
+            // 找到 </worksheet> 的位置
+            let ws_end_pos = after_sd.find("</worksheet>").unwrap_or(after_sd.len());
+            let existing_after = &after_sd[..ws_end_pos];
+
+            // 收集需要插入的 XML 片段
+            let mut to_insert = String::new();
+
+            for (tag_name, xml_fragment) in &source_elements {
+                // 跳过 <sheetData>, <sheetViews>, <pageMargins>, <pageSetup>
+                // sheetViews/pageMargins/pageSetup 由 rust_xlsxwriter 生成，保留重建版本
+                if tag_name == "sheetData" || tag_name == "sheetViews"
+                    || tag_name == "pageMargins" || tag_name == "pageSetup"
+                {
+                    continue;
+                }
+                // 检查是否已存在于重建版本中
+                if !has_element(existing_after, tag_name) {
+                    to_insert.push_str(xml_fragment);
+                    to_insert.push('\n');
+                }
+            }
+
+            if to_insert.is_empty() {
+                // 无需修改
+                rebuilt_xml.to_vec()
+            } else {
+                let mut result = rebuilt_str[..insert_pos].to_string();
+                result.push('\n');
+                result.push_str(&to_insert);
+                result.push_str(after_sd);
+                result.into_bytes()
+            }
+        }
+        None => {
+            // 重建 XML 中没有 <sheetData>，无法合并
+            rebuilt_xml.to_vec()
+        }
+    }
+}
+
+/// 全量重建时保留所有非数据 zip 部件。
+///
+/// 流程：
+/// 1. 打开源 zip 和重建后的新 zip
+/// 2. 从源 zip 拷贝非数据部件到新 zip（覆盖新 zip 的同名部件）：
+///    - styles.xml、charts/*.xml、drawings/*.xml、comments*.xml、media/* 等
+/// 3. 从源 zip 拷贝 worksheet XML 中的非数据元素到新 zip 的 worksheet XML：
+///    - <mergeCells>、<dataValidations>、<conditionalFormatting>、<autoFilter> 等
+/// 4. 更新新 zip 的 [Content_Types].xml
+/// 5. 保存新 zip
+///
+/// # Arguments
+/// * `src_path` - 原始 xlsx 文件路径（修改前）
+/// * `rebuilt_path` - rust_xlsxwriter 重建后的 xlsx 文件路径（已丢失非数据部件）
+///                    此文件会被原地修改
+pub fn preserve_all_parts_transfer(src_path: &str, rebuilt_path: &str) -> Result<()> {
+    // 1. 读取源 zip 和重建后的 zip
+    let src_entries = read_zip_map(src_path)?;
+    let rebuilt_entries = read_zip_map(rebuilt_path)?;
+
+    // 构建输出条目
+    let mut output = HashMap::new();
+
+    // 2. 收集重建 zip 中的数据部件名称
+    let mut data_part_names: Vec<String> = Vec::new();
+
+    // 3. 处理重建后的条目
+    for (name, content) in &rebuilt_entries {
+        // 对于 worksheet XML，合并非数据元素
+        if name.starts_with("xl/worksheets/sheet") && name.ends_with(".xml") {
+            // 找到对应的源 worksheet XML
+            let merged = if let Some(src_content) = src_entries.get(name) {
+                merge_worksheet_xml(src_content, content)
+            } else {
+                content.clone()
+            };
+            output.insert(name.clone(), merged);
+            data_part_names.push(name.clone());
+        } else {
+            output.insert(name.clone(), content.clone());
+            data_part_names.push(name.clone());
+        }
+    }
+
+    // 4. 从源 zip 拷贝非数据部件（不在重建 zip 中的）
+    let mut added_content_types: Vec<String> = Vec::new();
+    for (name, content) in &src_entries {
+        if is_non_data_part(name) && !output.contains_key(name) {
+            output.insert(name.clone(), content.clone());
+            // 记录需要添加到 Content_Types 的部件
+            // 计算 PartName（格式为 /xl/...）
+            let part_name = if name.starts_with("xl/") {
+                format!("/{}", name)
+            } else {
+                format!("/xl/{}", name)
+            };
+            added_content_types.push(part_name);
+        }
+    }
+
+    // 5. 对于 styles.xml，始终使用源版本（保留自定义样式）
+    if let Some(src_styles) = src_entries.get("xl/styles.xml") {
+        output.insert("xl/styles.xml".to_string(), src_styles.clone());
+    }
+
+    // 6. 更新 [Content_Types].xml：添加新增的非数据部件
+    if !added_content_types.is_empty() {
+        if let Some(ct_content) = output.get("[Content_Types].xml") {
+            let mut ct_str = String::from_utf8_lossy(ct_content).to_string();
+            let mut modified = false;
+            for part_name in &added_content_types {
+                // 检查是否已存在
+                if !ct_str.contains(&format!("PartName=\"{}\"", part_name)) {
+                    // 确定 ContentType
+                    let content_type = guess_content_type(part_name);
+                    let override_xml = format!(
+                        "  <Override PartName=\"{}\" ContentType=\"{}\"/>\n",
+                        part_name, content_type
+                    );
+                    if let Some(pos) = ct_str.rfind("</Types>") {
+                        ct_str.insert_str(pos, &override_xml);
+                        modified = true;
+                    }
+                }
+            }
+            if modified {
+                output.insert("[Content_Types].xml".to_string(), ct_str.into_bytes());
+            }
+        }
+    }
+
+    // 7. 写入输出 zip
+    write_zip_map(rebuilt_path, &output)?;
+
+    Ok(())
+}
+
+/// 根据部件路径猜测 ContentType。
+fn guess_content_type(part_name: &str) -> &'static str {
+    if part_name.ends_with(".xml") {
+        if part_name.contains("/charts/") {
+            "application/vnd.openxmlformats-officedocument.drawingml.chart+xml"
+        } else if part_name.contains("/drawings/") {
+            "application/vnd.openxmlformats-officedocument.drawing+xml"
+        } else if part_name.contains("/comments") {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml"
+        } else if part_name.contains("/styles.xml") {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"
+        } else if part_name.contains("/theme/") {
+            "application/vnd.openxmlformats-officedocument.theme+xml"
+        } else if part_name.contains("/calcChain") {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml"
+        } else if part_name.contains("/pivotTables/") {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml"
+        } else if part_name.contains("/pivotCache/") {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml"
+        } else if part_name.contains("/tables/") {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml"
+        } else if part_name.contains("/activeX/") {
+            "application/vnd.ms-office.activeX+xml"
+        } else if part_name.contains("/ctrlProps/") {
+            "application/vnd.ms-office.controlProperties+xml"
+        } else if part_name.contains("/queryTable/") {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml"
+        } else if part_name.contains("/metadata") {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml"
+        } else if part_name.contains("/volatileDependencies") {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.volatileDependencies+xml"
+        } else if part_name.contains("/peopleList") {
+            "application/vnd.ms-office.peopleList+xml"
+        } else if part_name.contains("/attachments") {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetAttachments+xml"
+        } else if part_name.contains("/notes") {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.notes+xml"
+        } else if part_name.contains("/dbPr") {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.databaseProperties+xml"
+        } else if part_name.contains("/chartsheets/") {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml"
+        } else if part_name.contains("/dialogsheet") {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.dialogsheet+xml"
+        } else if part_name.contains("/connections") {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml"
+        } else if part_name.contains("/externalLinks") {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.externalLink+xml"
+        } else {
+            "application/xml"
+        }
+    } else if part_name.ends_with(".bin") {
+        if part_name.contains("vbaProject") {
+            "application/vnd.ms-office.vbaProject"
+        } else if part_name.contains("printerSettings") {
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.printerSettings"
+        } else {
+            "application/octet-stream"
+        }
+    } else if part_name.contains("/media/") {
+        // 根据扩展名判断
+        if part_name.ends_with(".png") {
+            "image/png"
+        } else if part_name.ends_with(".jpg") || part_name.ends_with(".jpeg") {
+            "image/jpeg"
+        } else if part_name.ends_with(".gif") {
+            "image/gif"
+        } else if part_name.ends_with(".svg") {
+            "image/svg+xml"
+        } else if part_name.ends_with(".bmp") {
+            "image/bmp"
+        } else {
+            "application/octet-stream"
+        }
+    } else {
+        "application/octet-stream"
+    }
 }
 
 #[cfg(test)]

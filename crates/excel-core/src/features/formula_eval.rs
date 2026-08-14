@@ -170,8 +170,6 @@ pub fn set_formula_with_eval(
     evaluate: bool,
     params: &SecurityParams,
 ) -> Result<WriteResult> {
-    use crate::excel_write::{ensure_dimensions, modify_file};
-
     let formula_clean = formula.strip_prefix('=').unwrap_or(formula);
 
     // Pre-evaluate the formula if requested. A failure here used to be swallowed
@@ -191,46 +189,73 @@ pub fn set_formula_with_eval(
         None
     };
 
-    let result = modify_file(path, params, |old_data| {
-        let mut new_data = old_data.clone();
-        let sd = new_data
-            .get_mut(sheet)
-            .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
+    let (row, col) = cell_ref::parse_cell_ref(cell)?;
 
-        let (row, col) = cell_ref::parse_cell_ref(cell)?;
-        ensure_dimensions(sd, row as usize, col as usize);
+    let result = {
+        #[cfg(feature = "zip")]
+        {
+            match &eval_result {
+                Some(CellValue::Number(n)) => crate::excel_write::patch::set_formula_with_value_preserving(
+                    path, params, sheet, row, col, formula_clean, &format!("{}", n), CellDataType::Float,
+                ),
+                Some(CellValue::String(s)) => crate::excel_write::patch::set_formula_with_value_preserving(
+                    path, params, sheet, row, col, formula_clean, s, CellDataType::String,
+                ),
+                Some(CellValue::Bool(b)) => crate::excel_write::patch::set_formula_with_value_preserving(
+                    path, params, sheet, row, col, formula_clean,
+                    if *b { "TRUE" } else { "FALSE" }, CellDataType::Bool,
+                ),
+                Some(CellValue::Error(e)) => crate::excel_write::patch::set_formula_with_value_preserving(
+                    path, params, sheet, row, col, formula_clean, e, CellDataType::Error,
+                ),
+                _ => crate::excel_write::patch::set_formula_preserving(
+                    path, params, sheet, row, col, formula_clean,
+                ),
+            }
+        }
 
-        let cell_data = match &eval_result {
-            Some(CellValue::Number(n)) => CellData {
-                value: Some(format!("{}", n)),
-                data_type: CellDataType::Float,
-                formula: Some(formula_clean.to_string()),
-            },
-            Some(CellValue::String(s)) => CellData {
-                value: Some(s.clone()),
-                data_type: CellDataType::String,
-                formula: Some(formula_clean.to_string()),
-            },
-            Some(CellValue::Bool(b)) => CellData {
-                value: Some(if *b { "TRUE".into() } else { "FALSE".into() }),
-                data_type: CellDataType::Bool,
-                formula: Some(formula_clean.to_string()),
-            },
-            Some(CellValue::Error(e)) => CellData {
-                value: Some(e.clone()),
-                data_type: CellDataType::Error,
-                formula: Some(formula_clean.to_string()),
-            },
-            _ => CellData {
-                value: None,
-                data_type: CellDataType::String,
-                formula: Some(formula_clean.to_string()),
-            },
-        };
+        #[cfg(not(feature = "zip"))]
+        modify_file(path, params, |old_data| {
+            use crate::excel_write::ensure_dimensions;
+            let mut new_data = old_data.clone();
+            let sd = new_data
+                .get_mut(sheet)
+                .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
 
-        sd.rows[row as usize][col as usize] = cell_data;
-        Ok(new_data)
-    })?;
+            ensure_dimensions(sd, row as usize, col as usize);
+
+            let cell_data = match &eval_result {
+                Some(CellValue::Number(n)) => CellData {
+                    value: Some(format!("{}", n)),
+                    data_type: CellDataType::Float,
+                    formula: Some(formula_clean.to_string()),
+                },
+                Some(CellValue::String(s)) => CellData {
+                    value: Some(s.clone()),
+                    data_type: CellDataType::String,
+                    formula: Some(formula_clean.to_string()),
+                },
+                Some(CellValue::Bool(b)) => CellData {
+                    value: Some(if *b { "TRUE".into() } else { "FALSE".into() }),
+                    data_type: CellDataType::Bool,
+                    formula: Some(formula_clean.to_string()),
+                },
+                Some(CellValue::Error(e)) => CellData {
+                    value: Some(e.clone()),
+                    data_type: CellDataType::Error,
+                    formula: Some(formula_clean.to_string()),
+                },
+                _ => CellData {
+                    value: None,
+                    data_type: CellDataType::String,
+                    formula: Some(formula_clean.to_string()),
+                },
+            };
+
+            sd.rows[row as usize][col as usize] = cell_data;
+            Ok(new_data)
+        })
+    };
 
     let msg = match (&eval_result, &eval_error) {
         (Some(v), _) => format!(
@@ -250,7 +275,7 @@ pub fn set_formula_with_eval(
 
     Ok(WriteResult {
         message: msg,
-        ..result
+        ..result?
     })
 }
 

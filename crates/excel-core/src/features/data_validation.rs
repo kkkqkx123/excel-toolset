@@ -13,36 +13,44 @@ pub fn add_data_validation(
     params: &SecurityParams,
     sheet: &str,
 ) -> Result<WriteResult> {
-    if params.dry_run {
-        return Ok(WriteResult::dry_run_success());
+    #[cfg(feature = "zip")]
+    {
+        return crate::excel_write::patch::add_data_validation_preserving(path, params, sheet, config);
     }
 
-    security::create_backup_if_needed(params)?;
-
-    let dv = build_data_validation(config)?;
-
-    // Support multi-region sqref: split by space and apply to each range
-    let ranges: Vec<&str> = config.range.split_whitespace().collect();
-    if ranges.is_empty() {
-        return Err(AppError::InvalidInput(
-            "Empty range for data validation".to_string(),
-        ));
-    }
-
-    crate::excel_write::modify_file_with_wb(path, params, |_, wb| {
-        let worksheet = wb
-            .worksheet_from_name(sheet)
-            .map_err(|_e| AppError::SheetNotFound(sheet.to_string()))?;
-
-        for range_str in &ranges {
-            let (r1, c1, r2, c2) = crate::utils::cell_ref::parse_range(range_str)?;
-            worksheet
-                .add_data_validation(r1, c1, r2, c2, &dv)
-                .map_err(AppError::Xlsx)?;
+    #[cfg(not(feature = "zip"))]
+    {
+        if params.dry_run {
+            return Ok(WriteResult::dry_run_success());
         }
 
-        Ok(())
-    })
+        security::create_backup_if_needed(params)?;
+
+        let dv = build_data_validation(config)?;
+
+        // Support multi-region sqref: split by space and apply to each range
+        let ranges: Vec<&str> = config.range.split_whitespace().collect();
+        if ranges.is_empty() {
+            return Err(AppError::InvalidInput(
+                "Empty range for data validation".to_string(),
+            ));
+        }
+
+        crate::excel_write::modify_file_with_wb(path, params, |_, wb| {
+            let worksheet = wb
+                .worksheet_from_name(sheet)
+                .map_err(|_e| AppError::SheetNotFound(sheet.to_string()))?;
+
+            for range_str in &ranges {
+                let (r1, c1, r2, c2) = crate::utils::cell_ref::parse_range(range_str)?;
+                worksheet
+                    .add_data_validation(r1, c1, r2, c2, &dv)
+                    .map_err(AppError::Xlsx)?;
+            }
+
+            Ok(())
+        })
+    }
 }
 
 /// Build a rust_xlsxwriter DataValidation from our config.

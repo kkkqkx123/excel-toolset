@@ -20,105 +20,124 @@ pub fn protect_sheet(
     config: &SheetProtectionConfig,
     params: &SecurityParams,
 ) -> Result<WriteResult> {
-    if params.dry_run {
-        return Ok(WriteResult::dry_run_success());
+    #[cfg(feature = "zip")]
+    {
+        return crate::excel_write::patch::protect_sheet_preserving(path, params, &config.sheet, config);
     }
 
-    let backup_info = security::create_backup_if_needed(params)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
-
-    let old_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
-
-    crate::excel_write::modify_file_with_wb(path, params, |old_data, wb| {
-        let ws = wb
-            .worksheet_from_name(&config.sheet)
-            .map_err(|_e| AppError::SheetNotFound(config.sheet.clone()))?;
-
-        let protection_options = rust_xlsxwriter::ProtectionOptions {
-            select_locked_cells: config.options.select_locked_cells,
-            select_unlocked_cells: config.options.select_unlocked_cells,
-            format_cells: config.options.format_cells,
-            format_columns: config.options.format_columns,
-            format_rows: config.options.format_rows,
-            insert_rows: config.options.insert_rows,
-            insert_columns: config.options.insert_columns,
-            insert_links: config.options.insert_links,
-            delete_rows: config.options.delete_rows,
-            delete_columns: config.options.delete_columns,
-            sort: config.options.sort,
-            use_autofilter: config.options.auto_filter,
-            use_pivot_tables: config.options.pivot_tables,
-            edit_scenarios: config.options.edit_scenarios,
-            edit_objects: config.options.edit_objects,
-            contents: config.options.contents,
-        };
-
-        match &config.password {
-            Some(pwd) if !pwd.is_empty() => {
-                ws.protect_with_password(pwd);
-            }
-            _ => {
-                ws.protect();
-            }
+    #[cfg(not(feature = "zip"))]
+    {
+        if params.dry_run {
+            return Ok(WriteResult::dry_run_success());
         }
 
-        ws.protect_with_options(&protection_options);
+        let backup_info = security::create_backup_if_needed(params)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
 
-        Ok(())
-    })?;
+        let old_hash = security::compute_file_hash(path)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
 
-    let new_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        let _ = security::create_backup_if_needed(params)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
 
-    Ok(WriteResult {
-        success: true,
-        message: format!(
-            "Protected sheet '{}'{}",
-            config.sheet,
-            if config.password.is_some() {
-                " with password"
-            } else {
-                ""
+        crate::excel_write::modify_file_with_wb(path, params, |_old_data, wb| {
+            let ws = wb
+                .worksheet_from_name(&config.sheet)
+                .map_err(|_e| AppError::SheetNotFound(config.sheet.clone()))?;
+
+            let protection_options = rust_xlsxwriter::ProtectionOptions {
+                select_locked_cells: config.options.select_locked_cells,
+                select_unlocked_cells: config.options.select_unlocked_cells,
+                format_cells: config.options.format_cells,
+                format_columns: config.options.format_columns,
+                format_rows: config.options.format_rows,
+                insert_rows: config.options.insert_rows,
+                insert_columns: config.options.insert_columns,
+                insert_links: config.options.insert_links,
+                delete_rows: config.options.delete_rows,
+                delete_columns: config.options.delete_columns,
+                sort: config.options.sort,
+                use_autofilter: config.options.auto_filter,
+                use_pivot_tables: config.options.pivot_tables,
+                edit_scenarios: config.options.edit_scenarios,
+                edit_objects: config.options.edit_objects,
+                contents: config.options.contents,
+            };
+
+            match &config.password {
+                Some(pwd) if !pwd.is_empty() => {
+                    ws.protect_with_password(pwd);
+                }
+                _ => {
+                    ws.protect();
+                }
             }
-        ),
-        backup_info,
-        old_hash,
-        new_hash,
-        diff: None,
-    })
+
+            ws.protect_with_options(&protection_options);
+
+            Ok(())
+        })?;
+
+        let new_hash = security::compute_file_hash(path)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+
+        Ok(WriteResult {
+            success: true,
+            message: format!(
+                "Protected sheet '{}'{}",
+                config.sheet,
+                if config.password.is_some() {
+                    " with password"
+                } else {
+                    ""
+                }
+            ),
+            backup_info,
+            old_hash,
+            new_hash,
+            diff: None,
+        })
+    }
 }
 
 /// Remove protection from a worksheet.
 pub fn unprotect_sheet(path: &str, sheet: &str, params: &SecurityParams) -> Result<WriteResult> {
-    if params.dry_run {
-        return Ok(WriteResult::dry_run_success());
+    #[cfg(feature = "zip")]
+    {
+        return crate::excel_write::patch::unprotect_sheet_preserving(path, params, sheet);
     }
 
-    let backup_info = security::create_backup_if_needed(params)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+    #[cfg(not(feature = "zip"))]
+    {
+        if params.dry_run {
+            return Ok(WriteResult::dry_run_success());
+        }
 
-    let old_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        let backup_info = security::create_backup_if_needed(params)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
 
-    crate::excel_write::modify_file_with_wb(path, params, |_old_data, wb| {
-        // Rebuilding without protect() drops any existing sheet protection.
-        wb.worksheet_from_name(sheet)
-            .map_err(|_e| AppError::SheetNotFound(sheet.to_string()))?;
-        Ok(())
-    })?;
+        let old_hash = security::compute_file_hash(path)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
 
-    let new_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        crate::excel_write::modify_file_with_wb(path, params, |_old_data, wb| {
+            // Rebuilding without protect() drops any existing sheet protection.
+            wb.worksheet_from_name(sheet)
+                .map_err(|_e| AppError::SheetNotFound(sheet.to_string()))?;
+            Ok(())
+        })?;
 
-    Ok(WriteResult {
-        success: true,
-        message: format!("Unprotected sheet '{}'", sheet),
-        backup_info,
-        old_hash,
-        new_hash,
-        diff: None,
-    })
+        let new_hash = security::compute_file_hash(path)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+
+        Ok(WriteResult {
+            success: true,
+            message: format!("Unprotected sheet '{}'", sheet),
+            backup_info,
+            old_hash,
+            new_hash,
+            diff: None,
+        })
+    }
 }
 
 /// Check if a worksheet is protected.

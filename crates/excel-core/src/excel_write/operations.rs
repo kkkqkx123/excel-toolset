@@ -10,6 +10,11 @@ use super::core::{
 use super::format::{build_format, map_chart_type};
 
 pub fn add_sheet(path: &str, params: &SecurityParams, sheet: &str) -> Result<WriteResult> {
+    #[cfg(feature = "zip")]
+    {
+        return super::patch::add_sheet_preserving(path, params, sheet);
+    }
+    #[cfg(not(feature = "zip"))]
     modify_file(path, params, |old_data| {
         let mut new_data = old_data.clone();
         if new_data.contains_key(sheet) {
@@ -28,6 +33,11 @@ pub fn add_sheet(path: &str, params: &SecurityParams, sheet: &str) -> Result<Wri
 }
 
 pub fn delete_sheet(path: &str, params: &SecurityParams, sheet: &str) -> Result<WriteResult> {
+    #[cfg(feature = "zip")]
+    {
+        return super::patch::delete_sheet_preserving(path, params, sheet);
+    }
+    #[cfg(not(feature = "zip"))]
     modify_file(path, params, |old_data| {
         if !old_data.contains_key(sheet) {
             return Err(AppError::SheetNotFound(sheet.into()));
@@ -44,6 +54,11 @@ pub fn rename_sheet(
     old_name: &str,
     new_name: &str,
 ) -> Result<WriteResult> {
+    #[cfg(feature = "zip")]
+    {
+        return super::patch::rename_sheet_preserving(path, params, old_name, new_name);
+    }
+    #[cfg(not(feature = "zip"))]
     modify_file(path, params, |old_data| {
         if !old_data.contains_key(old_name) {
             return Err(AppError::SheetNotFound(old_name.into()));
@@ -138,6 +153,14 @@ pub fn clear_range(
 ) -> Result<WriteResult> {
     let (r_start, r_end, c_start, c_end) = cell_ref::parse_range_normalized(range_spec)?;
 
+    #[cfg(feature = "zip")]
+    {
+        return super::patch::clear_range_preserving(
+            path, params, sheet, r_start, r_end, c_start, c_end,
+        );
+    }
+
+    #[cfg(not(feature = "zip"))]
     modify_file(path, params, |old_data| {
         let mut new_data = old_data.clone();
         let sd = new_data
@@ -170,14 +193,20 @@ pub fn set_formula(
 ) -> Result<WriteResult> {
     let (row, col) = cell_ref::parse_cell_ref(cell_spec)?;
 
+    // Remove = prefix if present, as rust_xlsxwriter adds it automatically
+    let cleaned_formula = formula.strip_prefix('=').unwrap_or(formula);
+
+    #[cfg(feature = "zip")]
+    {
+        return super::patch::set_formula_preserving(path, params, sheet, row, col, cleaned_formula);
+    }
+
+    #[cfg(not(feature = "zip"))]
     modify_file(path, params, |old_data| {
         let mut new_data = old_data.clone();
         let sd = new_data
             .get_mut(sheet)
             .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
-
-        // Remove = prefix if present, as rust_xlsxwriter adds it automatically
-        let cleaned_formula = formula.strip_prefix('=').unwrap_or(formula);
 
         ensure_dimensions(sd, row as usize, col as usize);
         sd.rows[row as usize][col as usize] = CellData {
@@ -374,6 +403,14 @@ pub(crate) fn build_chart_error_bars(
 }
 
 pub fn refresh_formulas(path: &str, params: &SecurityParams, sheet: &str) -> Result<WriteResult> {
+    #[cfg(feature = "zip")]
+    {
+        if sheet != "*" {
+            return super::patch::clear_formula_values_preserving(path, params, sheet);
+        }
+        // sheet == "*" 走全量重建
+    }
+
     modify_file(path, params, |old_data| {
         let mut new_data = old_data.clone();
 
