@@ -86,7 +86,7 @@ pub fn write_cell(
     let cell = cell_value_to_data(value);
     #[cfg(feature = "zip")]
     {
-        // 保留式写入：只改目标单元格，源文件其余特性逐字节保留。
+        // Preserving write: only the target cell is modified; every other feature of the source file is kept byte-for-byte.
         return crate::excel_write::patch::write_cells_preserving(
             path,
             params,
@@ -117,7 +117,7 @@ pub fn write_range(
 
     #[cfg(feature = "zip")]
     {
-        // 保留式写入：批量单元格改动同样只重写 sheetData。
+        // Preserving write: batch cell edits likewise only rewrite sheetData.
         let mut edits = Vec::new();
         for (ri, row) in data.iter().enumerate() {
             for (ci, val) in row.iter().enumerate() {
@@ -408,7 +408,7 @@ pub fn refresh_formulas(path: &str, params: &SecurityParams, sheet: &str) -> Res
         if sheet != "*" {
             return super::patch::clear_formula_values_preserving(path, params, sheet);
         }
-        // sheet == "*" 走全量重建
+        // sheet == "*" falls back to a full rebuild
     }
 
     modify_file(path, params, |old_data| {

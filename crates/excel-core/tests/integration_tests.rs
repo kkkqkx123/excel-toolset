@@ -1062,7 +1062,7 @@ mod business_scenarios {
             value: "100".into(),
         }];
         let filtered = filter_rows(&path, "Sales", &conditions).expect("filter");
-        // 表头不计入结果：Amount>100 的数据行为 Bob(300)、Charlie(200)。
+        // The header is not counted in the result: rows matching Amount>100 are Bob(300) and Charlie(200).
         assert_eq!(filtered.len(), 2);
         assert_eq!(filtered[0][0].value.as_deref(), Some("Bob"));
         assert_eq!(filtered[1][0].value.as_deref(), Some("Charlie"));

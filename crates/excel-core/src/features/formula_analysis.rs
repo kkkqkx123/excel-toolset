@@ -330,29 +330,29 @@ fn generate_formula_description(formula: &str, language: &str) -> String {
     if let Some(func) = func_name {
         match language {
             "zh" => match func.to_uppercase().as_str() {
-                "SUM" => format!("SUM 函数: 计算参数的总和。公式: {}", clean_formula),
-                "AVERAGE" => format!("AVERAGE 函数: 计算参数的平均值。公式: {}", clean_formula),
+                "SUM" => format!("SUM function: Calculates the sum of arguments. Formula: {}", clean_formula),
+                "AVERAGE" => format!("AVERAGE function: Calculates the average of arguments. Formula: {}", clean_formula),
                 "COUNT" => format!(
-                    "COUNT 函数: 计算包含数字的单元格数量。公式: {}",
+                    "COUNT function: Counts cells containing numbers. Formula: {}",
                     clean_formula
                 ),
-                "IF" => format!("IF 函数: 根据条件返回不同的值。公式: {}", clean_formula),
-                "VLOOKUP" => format!("VLOOKUP 函数: 在表格中垂直查找值。公式: {}", clean_formula),
-                "INDEX" => format!("INDEX 函数: 返回表格或区域中的值。公式: {}", clean_formula),
-                "MATCH" => format!("MATCH 函数: 在范围中查找值的位置。公式: {}", clean_formula),
+                "IF" => format!("IF function: Returns different values based on a condition. Formula: {}", clean_formula),
+                "VLOOKUP" => format!("VLOOKUP function: Looks up a value vertically in a table. Formula: {}", clean_formula),
+                "INDEX" => format!("INDEX function: Returns a value from a table or range. Formula: {}", clean_formula),
+                "MATCH" => format!("MATCH function: Finds the position of a value within a range. Formula: {}", clean_formula),
                 "CONCATENATE" | "CONCAT" => {
-                    format!("连接函数: 将文本字符串连接起来。公式: {}", clean_formula)
+                    format!("Concat function: Joins text strings together. Formula: {}", clean_formula)
                 }
-                "LEFT" => format!("LEFT 函数: 从文本左侧提取指定字符。公式: {}", clean_formula),
+                "LEFT" => format!("LEFT function: Extracts a specified number of characters from the left of text. Formula: {}", clean_formula),
                 "RIGHT" => format!(
-                    "RIGHT 函数: 从文本右侧提取指定字符。公式: {}",
+                    "RIGHT function: Extracts a specified number of characters from the right of text. Formula: {}",
                     clean_formula
                 ),
-                "MID" => format!("MID 函数: 从文本中间提取指定字符。公式: {}", clean_formula),
-                "DATE" => format!("DATE 函数: 返回表示日期的序列号。公式: {}", clean_formula),
-                "TODAY" => format!("TODAY 函数: 返回当前日期。公式: {}", clean_formula),
-                "NOW" => format!("NOW 函数: 返回当前日期和时间。公式: {}", clean_formula),
-                _ => format!("{} 函数: Excel函数。公式: {}", func, clean_formula),
+                "MID" => format!("MID function: Extracts a specified number of characters from the middle of text. Formula: {}", clean_formula),
+                "DATE" => format!("DATE function: Returns the serial number representing a date. Formula: {}", clean_formula),
+                "TODAY" => format!("TODAY function: Returns the current date. Formula: {}", clean_formula),
+                "NOW" => format!("NOW function: Returns the current date and time. Formula: {}", clean_formula),
+                _ => format!("{} function: Excel function. Formula: {}", func, clean_formula),
             },
             "en" => match func.to_uppercase().as_str() {
                 "SUM" => format!(
@@ -425,7 +425,7 @@ fn generate_formula_description(formula: &str, language: &str) -> String {
         }
     } else {
         match language {
-            "zh" => format!("计算表达式: {}", clean_formula),
+            "zh" => format!("Calculates expression: {}", clean_formula),
             "en" => format!("Calculation expression: {}", clean_formula),
             _ => format!("Calculation expression: {}", clean_formula),
         }
@@ -481,9 +481,9 @@ fn generate_logic_flow(formula: &str, data_sources: &[String], language: &str) -
             "zh" => {
                 steps.push(LogicStep {
                     step_number: step_num,
-                    operation: "读取数据源".to_string(),
+                    operation: "Read data sources".to_string(),
                     input: data_sources.join(", "),
-                    result: format!("从 {} 个单元格读取数据", data_sources.len()),
+                    result: format!("Read data from {} cells", data_sources.len()),
                 });
             }
             "en" => {
@@ -513,9 +513,9 @@ fn generate_logic_flow(formula: &str, data_sources: &[String], language: &str) -
                 "zh" => {
                     steps.push(LogicStep {
                         step_number: step_num,
-                        operation: "计算总和".to_string(),
+                        operation: "Calculate sum".to_string(),
                         input: args.join(", "),
-                        result: "所有参数的数值之和".to_string(),
+                        result: "Sum of all arguments".to_string(),
                     });
                 }
                 "en" => {
@@ -532,9 +532,9 @@ fn generate_logic_flow(formula: &str, data_sources: &[String], language: &str) -
                 "zh" => {
                     steps.push(LogicStep {
                         step_number: step_num,
-                        operation: "计算平均值".to_string(),
+                        operation: "Calculate average".to_string(),
                         input: args.join(", "),
-                        result: "所有参数的数值之和除以参数数量".to_string(),
+                        result: "Sum of all arguments divided by count".to_string(),
                     });
                 }
                 "en" => {
@@ -551,9 +551,10 @@ fn generate_logic_flow(formula: &str, data_sources: &[String], language: &str) -
                 "zh" => {
                     steps.push(LogicStep {
                         step_number: step_num,
-                        operation: "条件判断".to_string(),
+                        operation: "Conditional check".to_string(),
                         input: args.join(", "),
-                        result: "如果条件为真返回第一个值，否则返回第二个值".to_string(),
+                        result: "Return first value if condition is true, else second value"
+                            .to_string(),
                     });
                 }
                 "en" => {
@@ -571,9 +572,10 @@ fn generate_logic_flow(formula: &str, data_sources: &[String], language: &str) -
                 "zh" => {
                     steps.push(LogicStep {
                         step_number: step_num,
-                        operation: "垂直查找".to_string(),
+                        operation: "Vertical lookup".to_string(),
                         input: args.join(", "),
-                        result: "在表格的第一列查找值，返回指定列的对应值".to_string(),
+                        result: "Look up value in first column, return value from specified column"
+                            .to_string(),
                     });
                 }
                 "en" => {
@@ -591,9 +593,9 @@ fn generate_logic_flow(formula: &str, data_sources: &[String], language: &str) -
                 "zh" => {
                     steps.push(LogicStep {
                         step_number: step_num,
-                        operation: format!("执行 {} 函数", func),
+                        operation: format!("Execute {} function", func),
                         input: args.join(", "),
-                        result: format!("{} 函数的计算结果", func),
+                        result: format!("Result of {} function", func),
                     });
                 }
                 "en" => {
@@ -614,9 +616,9 @@ fn generate_logic_flow(formula: &str, data_sources: &[String], language: &str) -
             "zh" => {
                 steps.push(LogicStep {
                     step_number: step_num,
-                    operation: "简单值".to_string(),
+                    operation: "Simple value".to_string(),
                     input: formula.trim_start_matches('=').to_string(),
-                    result: "直接使用该值".to_string(),
+                    result: "Use the value directly".to_string(),
                 });
             }
             "en" => {
@@ -715,7 +717,7 @@ mod tests {
     fn test_generate_formula_description_sum_zh() {
         let desc = generate_formula_description("=SUM(A1:A10)", "zh");
         assert!(desc.contains("SUM"));
-        assert!(desc.contains("总和"));
+        assert!(desc.contains("sum"));
     }
 
     #[test]
@@ -729,28 +731,28 @@ mod tests {
     fn test_generate_formula_description_if_zh() {
         let desc = generate_formula_description("=IF(A1>10, true, false)", "zh");
         assert!(desc.contains("IF"));
-        assert!(desc.contains("条件"));
+        assert!(desc.contains("condition"));
     }
 
     #[test]
     fn test_generate_formula_description_unknown_zh() {
         let desc = generate_formula_description("=CUSTOMFUNC(A1)", "zh");
         assert!(desc.contains("CUSTOMFUNC"));
-        assert!(desc.contains("Excel函数"));
+        assert!(desc.contains("Excel function"));
     }
 
     #[test]
     fn test_generate_formula_description_simple_zh() {
         let desc = generate_formula_description("42", "zh");
-        assert!(desc.contains("计算表达式"));
+        assert!(desc.contains("Calculates expression"));
     }
 
     #[test]
     fn test_generate_logic_flow_sum_zh() {
         let steps = generate_logic_flow("=SUM(A1:A10)", &["Sheet1!A1".to_string()], "zh");
         assert!(!steps.is_empty());
-        assert!(steps.iter().any(|s| s.operation.contains("读取数据")));
-        assert!(steps.iter().any(|s| s.operation.contains("总和")));
+        assert!(steps.iter().any(|s| s.operation.contains("Read data sources")));
+        assert!(steps.iter().any(|s| s.operation.contains("Calculate sum")));
     }
 
     #[test]

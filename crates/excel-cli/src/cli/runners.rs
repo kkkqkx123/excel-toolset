@@ -1027,13 +1027,13 @@ fn run_diff(args: &DiffArgs, format: &str) -> Result<serde_json::Value> {
         }
         DiffSub::InstallGitDriver { global, patterns } => {
             git_driver::install_git_driver(*global, patterns)?;
-            let scope = if *global { "全局" } else { "当前仓库" };
+            let scope = if *global { "global" } else { "current repository" };
             Ok(serde_json::json!({
                 "success": true,
-                "message": format!("Git diff driver 已安装（{}）。覆盖模式：{}",
+                "message": format!("Git diff driver installed ({}). Match patterns: {}",
                     scope,
                     if patterns.is_empty() {
-                        "*.xlsx, *.xls, *.xlsm, *.xlsb (默认)"
+                        "*.xlsx, *.xls, *.xlsm, *.xlsb (default)"
                     } else {
                         ""
                     }
@@ -1042,10 +1042,10 @@ fn run_diff(args: &DiffArgs, format: &str) -> Result<serde_json::Value> {
         }
         DiffSub::UninstallGitDriver { global } => {
             git_driver::uninstall_git_driver(*global)?;
-            let scope = if *global { "全局" } else { "当前仓库" };
+            let scope = if *global { "global" } else { "current repository" };
             Ok(serde_json::json!({
                 "success": true,
-                "message": format!("Git diff driver 已从{}卸载", scope)
+                "message": format!("Git diff driver uninstalled from {}", scope)
             }))
         }
     }

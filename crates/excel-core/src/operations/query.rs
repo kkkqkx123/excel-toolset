@@ -435,8 +435,8 @@ mod tests {
             value: "28".to_string(),
         }];
         let result = filter_rows(&path, "Sheet1", &conditions).unwrap();
-        // 表头行不再计入结果（filter_rows 设计上只返回数据行，避免列标题被
-        // "contains" 条件误匹配而膨胀结果集）。匹配 Age>28 的数据行为 Bob(30)、Charlie(35)。
+        // The header row is no longer counted in the result (filter_rows is designed to return data rows only,
+        // preventing column titles from being falsely matched by "contains" conditions and inflating the result set). Rows matching Age>28 are Bob(30) and Charlie(35).
         assert_eq!(result.len(), 2);
 
         let _ = std::fs::remove_file(&path);
@@ -460,7 +460,7 @@ mod tests {
             value: "100".to_string(),
         }];
         let result = filter_rows(&path, "Sheet1", &conditions).unwrap();
-        // 无数据行匹配，且表头不计入结果 → 空集合。
+        // No data row matches, and the header is not counted in the result -> empty set.
         assert_eq!(result.len(), 0);
 
         let _ = std::fs::remove_file(&path);

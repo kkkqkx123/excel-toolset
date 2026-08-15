@@ -20,8 +20,8 @@ fn is_excel_error(s: &str) -> bool {
 
 pub fn parse_cell_value(s: &str) -> CellValue {
     if let Ok(n) = s.parse::<f64>() {
-        // 前导零的纯数字串（如 "00123"、"007"）若被当作数字会丢失前导零，
-        // 对 ID / 邮编 / 证件号等是静默数据损坏。这里保留为文本，避免丢失信息。
+        // Purely numeric strings with leading zeros (e.g. "00123", "007") would lose those leading zeros if treated as numbers,
+        // which is silent data corruption for IDs / postal codes / document numbers. Keep them as text here to avoid losing information.
         if s.len() > 1 && s.starts_with('0') && s.bytes().all(|b| b.is_ascii_digit()) {
             return CellValue::String(s.to_string());
         }
@@ -287,7 +287,7 @@ mod tests {
         );
     }
 
-    // T5.18：前导零的纯数字串应保留为文本，避免 ID/邮编静默丢失前导零。
+    // T5.18: purely numeric strings with leading zeros should be kept as text, so IDs/postal codes do not silently lose their leading zeros.
     #[test]
     fn test_parse_cell_value_leading_zero_kept_as_text() {
         assert_eq!(
@@ -295,7 +295,7 @@ mod tests {
             CellValue::String("00123".to_string())
         );
         assert_eq!(parse_cell_value("007"), CellValue::String("007".to_string()));
-        // 普通数字（无前导零）仍解析为数值。
+        // Ordinary numbers (without leading zeros) are still parsed as numeric values.
         assert_eq!(parse_cell_value("123"), CellValue::Number(123.0));
         assert_eq!(parse_cell_value("0"), CellValue::Number(0.0));
         assert_eq!(parse_cell_value("0.5"), CellValue::Number(0.5));
