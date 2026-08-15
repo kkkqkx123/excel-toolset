@@ -92,6 +92,13 @@ pub fn remove_image(
     // Validate anchor cell format
     let (_, _) = crate::utils::cell_ref::parse_cell_ref(anchor_cell)?;
 
+    #[cfg(feature = "zip")]
+    {
+        return crate::excel_write::patch::remove_images_preserving(path, params, sheet);
+    }
+
+    #[cfg(not(feature = "zip"))]
+    {
     if params.dry_run {
         return Ok(WriteResult::dry_run_success());
     }
@@ -123,6 +130,7 @@ pub fn remove_image(
         new_hash,
         diff: None,
     })
+    }
 }
 
 /// Insert a shape (rectangle, ellipse, or line) into a worksheet.

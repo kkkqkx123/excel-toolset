@@ -312,26 +312,26 @@ Requires `--features sql` at build time.
 excel-cli data sql <path> <sheet> <query> [--session] [--cache]
 ```
 
-The current worksheet is mapped to table `t`. Columns use Excel letter names (A, B, C, ...).
+The current worksheet is mapped to a table named **after the sheet** (e.g. `Sheet1`), and must be referenced as `"Sheet1"` (quoted, since sheet names may contain spaces or special characters). Columns are **zero-indexed positional names** `c0, c1, c2, ...` where `c0` is the first column (A) — **not** Excel letter names.
 
 Supported clauses: SELECT, WHERE, ORDER BY, GROUP BY, LIMIT.
 Supported aggregates: COUNT, SUM, AVG, MIN, MAX.
 
 ```bash
 # Basic query
-excel-cli data sql data.xlsx Sheet1 "SELECT * FROM t"
+excel-cli data sql data.xlsx Sheet1 "SELECT * FROM \"Sheet1\""
 
 # Filtered & sorted
-excel-cli data sql data.xlsx Sheet1 "SELECT A, B, C FROM t WHERE B > 100 ORDER BY C DESC"
+excel-cli data sql data.xlsx Sheet1 "SELECT c0, c1, c2 FROM \"Sheet1\" WHERE c1 > 100 ORDER BY c2 DESC"
 
 # Aggregation
-excel-cli data sql data.xlsx Sheet1 "SELECT COUNT(*) as cnt, AVG(C) as avg_val FROM t"
+excel-cli data sql data.xlsx Sheet1 "SELECT COUNT(*) as cnt, AVG(c2) as avg_val FROM \"Sheet1\""
 
 # Grouped aggregation
-excel-cli data sql data.xlsx Sheet1 "SELECT A, SUM(C) as total FROM t GROUP BY A"
+excel-cli data sql data.xlsx Sheet1 "SELECT c0, SUM(c2) as total FROM \"Sheet1\" GROUP BY c0"
 
 # Limit
-excel-cli data sql data.xlsx Sheet1 "SELECT * FROM t LIMIT 10"
+excel-cli data sql data.xlsx Sheet1 "SELECT * FROM \"Sheet1\" LIMIT 10"
 ```
 
 ### Auto-Filter
@@ -544,4 +544,33 @@ excel-cli image remove <path> <sheet> <anchor-cell> [--dry-run]
 excel-cli image shape-insert <path> --config '<json>' [--dry-run]
 ```
 
-Supported shape types: `rectangle`, `ellipse`, `line`.
+**`image insert` config** — required: `sheet`, `image_path`, `anchor_cell`; optional: `scale`, `x_offset`, `y_offset`, `alt_text`:
+
+```json
+{
+  "sheet": "Sheet1",
+  "image_path": "/path/to/logo.png",
+  "anchor_cell": "B2",
+  "scale": { "x_scale": 0.5, "y_scale": 0.5 },
+  "alt_text": "Company logo"
+}
+```
+
+> Note: the on-disk image path key is **`image_path`** (not `path`).
+
+**`shape-insert` config** — required: `sheet`, `shape_type`, `anchor_cell`, `width`, `height`; optional: `fill_color`, `line_color`, `line_width`, `alt_text`. `width` / `height` are in **pixels** and are **required**:
+
+```json
+{
+  "sheet": "Sheet1",
+  "shape_type": "rectangle",
+  "anchor_cell": "C3",
+  "width": 200,
+  "height": 100,
+  "fill_color": "FF0000",
+  "line_color": "000000",
+  "line_width": 1.0
+}
+```
+
+Supported shape types: `rectangle`, `rounded_rectangle`, `ellipse`, `line`, `text_box`.

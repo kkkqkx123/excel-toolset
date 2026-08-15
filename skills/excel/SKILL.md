@@ -77,7 +77,7 @@ excel-cli cell write data.xlsx Sheet1 A1 "New Value"
 excel-cli range read report.xlsx Sheet1 A1:D100 --mode compact
 
 # Analyze (e.g. with SQL)
-excel-cli data sql report.xlsx Sheet1 "SELECT A, SUM(D) FROM t GROUP BY A"
+excel-cli data sql report.xlsx Sheet1 "SELECT c0, SUM(c3) FROM \"Sheet1\" GROUP BY c0"
 
 # Write results
 excel-cli sheet add report.xlsx Summary
@@ -126,10 +126,10 @@ excel-cli freeze-pane set "report.xlsx" "Monthly Report" --rows 1
 
 ## SQL Query Notes
 
-SQL queries require the `sql` feature flag at build time (`--features sql`). The current worksheet is mapped to table `t`, with columns named A, B, C, ... matching Excel column letters.
+SQL queries require the `sql` feature flag at build time (`--features sql`). The current worksheet is mapped to a table named **after the sheet** (e.g. `Sheet1`), referenced as `"Sheet1"`. Columns are **zero-indexed positional names** `c0, c1, c2, ...` (`c0` = first column A), not Excel letter names.
 
 Supported clauses: SELECT, WHERE, ORDER BY, GROUP BY, LIMIT. Supported aggregates: COUNT, SUM, AVG, MIN, MAX.
 
 ```bash
-excel-cli data sql sales.xlsx Sheet1 "SELECT A, SUM(C) FROM t GROUP BY A ORDER BY SUM(C) DESC LIMIT 10"
+excel-cli data sql sales.xlsx Sheet1 "SELECT c0, SUM(c2) FROM \"Sheet1\" GROUP BY c0 ORDER BY SUM(c2) DESC LIMIT 10"
 ```

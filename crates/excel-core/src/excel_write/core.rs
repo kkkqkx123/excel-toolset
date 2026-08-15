@@ -34,7 +34,8 @@ fn ordered_sheet_names(
     names
 }
 
-/// 把一次成功写操作记录到审计历史（非致命，失败不影响主流程）。T2.30。
+/// Records a successful write operation to the audit history (non-fatal; failure does not
+/// affect the main flow). T2.30.
 fn record_write_history(path: &str, op: &str, old_hash: &str, new_hash: &str, dry_run: bool) {
     if dry_run {
         return;
@@ -86,23 +87,21 @@ where
     } else {
         #[cfg(feature = "zip")]
         {
-            // Phase 3：保存到临时文件，然后保留所有非数据部件
-            // 如果 preserve_all_parts_transfer 失败，仍使用原始保存结果
+            // Phase 3: save to a temporary file, then preserve all non-data parts
+            // If preserve_all_parts_transfer fails, fall back to the original save result
             let tmp_path = format!("{}.rebuilt_tmp", path);
             if let Err(e) = wb.save(&tmp_path) {
                 return Err(AppError::Xlsx(e));
             }
-            eprintln!("DEBUG_CFG: zip feature enabled, calling preserve_all_parts_transfer");
             let pt_result = super::patch::preserve_all_parts_transfer(path, &tmp_path);
-            eprintln!("DEBUG_CFG: preserve_all_parts_transfer result: {:?}", pt_result.as_ref().err());
             match pt_result {
                 Ok(()) => {
                     let _ = fs::rename(&tmp_path, path);
                 }
                 Err(e) => {
-                    // Fallback: 如果 preserve_all_parts_transfer 失败，使用原始保存
+                    // Fallback: if preserve_all_parts_transfer fails, use the original save
                     let _ = fs::rename(&tmp_path, path);
-                    eprintln!("DEBUG preserve_all_parts_transfer failed for {}: {}", path, e);
+                    eprintln!("preserve_all_parts_transfer failed for {}: {}", path, e);
                 }
             }
         }
@@ -158,23 +157,21 @@ where
     } else {
         #[cfg(feature = "zip")]
         {
-            // Phase 3：保存到临时文件，然后保留所有非数据部件
-            // 如果 preserve_all_parts_transfer 失败，回退到原始保存结果
+            // Phase 3: save to a temporary file, then preserve all non-data parts
+            // If preserve_all_parts_transfer fails, fall back to the original save result
             let tmp_path = format!("{}.rebuilt_tmp", path);
             if let Err(e) = wb.save(&tmp_path) {
                 return Err(AppError::Xlsx(e));
             }
-            eprintln!("DEBUG_CFG: modify_file_with_wb calling preserve_all_parts_transfer");
             let pt_result = super::patch::preserve_all_parts_transfer(path, &tmp_path);
-            eprintln!("DEBUG_CFG: preserve_all_parts_transfer result: {:?}", pt_result.as_ref().err());
             match pt_result {
                 Ok(()) => {
                     let _ = fs::rename(&tmp_path, path);
                 }
                 Err(e) => {
-                    // Fallback: 如果 preserve_all_parts_transfer 失败，使用原始保存
+                    // Fallback: if preserve_all_parts_transfer fails, use the original save
                     let _ = fs::rename(&tmp_path, path);
-                    eprintln!("DEBUG preserve_all_parts_transfer failed for {}: {}", path, e);
+                    eprintln!("preserve_all_parts_transfer failed for {}: {}", path, e);
                 }
             }
         }

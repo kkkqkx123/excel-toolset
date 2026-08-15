@@ -48,11 +48,15 @@ pub fn build_format(style: &Style) -> Format {
 pub fn parse_color(color: &str) -> Option<Color> {
     let s = color.trim_start_matches('#');
     if s.len() == 6 {
+        // rust_xlsxwriter's Color::RGB accepts 24-bit RGB (0x000000-0xFFFFFF);
+        // do not add an alpha high byte, otherwise it becomes an out-of-range 32-bit value
+        // (e.g. 0xFFFFFFFF).
+        u32::from_str_radix(s, 16).ok().map(Color::RGB)
+    } else if s.len() == 8 {
+        // 8-digit hex is treated as ARGB; take the low 24 bits as RGB.
         u32::from_str_radix(s, 16)
             .ok()
-            .map(|v| Color::RGB(v | 0xFF000000))
-    } else if s.len() == 8 {
-        u32::from_str_radix(s, 16).ok().map(Color::RGB)
+            .map(|v| Color::RGB(v & 0x00FFFFFF))
     } else {
         match s.to_lowercase().as_str() {
             "red" => Some(Color::Red),

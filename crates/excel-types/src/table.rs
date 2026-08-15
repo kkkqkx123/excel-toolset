@@ -108,6 +108,7 @@ pub struct TableConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sheet: Option<String>,
     /// Cell range for the table (e.g. "A1:D10" or "Sheet1!A1:D10")
+    #[serde(alias = "source_range")]
     pub range: String,
     /// Whether the first row contains headers
     #[serde(default = "default_true")]

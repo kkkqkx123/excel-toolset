@@ -145,8 +145,12 @@ pub fn create_table(
 
     security::create_backup_if_needed(params)?;
 
-    // Parse and normalize the range
-    let (raw_r1, raw_c1, raw_r2, raw_c2) = crate::utils::cell_ref::parse_range(&config.range)?;
+    // Parse and normalize the range.
+    // The config range may be "Sheet1!A1:A2" (with a sheet-name prefix), while parse_range
+    // only handles the cell part, so strip the "SheetName!" prefix before parsing; otherwise
+    // the table name would be parsed as a column name and fail with "Column overflow".
+    let range_part = config.range.split('!').last().unwrap_or(&config.range);
+    let (raw_r1, raw_c1, raw_r2, raw_c2) = crate::utils::cell_ref::parse_range(range_part)?;
     let (r1, c1, r2, c2) = normalize_range(raw_r1, raw_c1, raw_r2, raw_c2);
     let normalized_range = range_to_string(r1, c1, r2, c2);
 
