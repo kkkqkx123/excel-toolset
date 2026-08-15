@@ -1078,7 +1078,7 @@ fn test_driver_with_multiple_sheets() {
 
         // Should handle multiple sheets
         assert!(
-            diff.sheet_diffs.len() >= 1,
+            !diff.sheet_diffs.is_empty(),
             "should have at least one sheet diff"
         );
         assert!(!text_output.is_empty(), "output should not be empty");

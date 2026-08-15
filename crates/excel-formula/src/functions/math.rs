@@ -15,85 +15,85 @@ pub fn register(
     >,
 ) {
     // Basic math
-    registry.insert("ABS".into(), Arc::new(|args, provider| math_abs(args)));
-    registry.insert("SUM".into(), Arc::new(|args, provider| math_sum(args)));
+    registry.insert("ABS".into(), Arc::new(|args, _provider| math_abs(args)));
+    registry.insert("SUM".into(), Arc::new(|args, _provider| math_sum(args)));
     registry.insert(
         "AVERAGE".into(),
-        Arc::new(|args, provider| math_average(args)),
+        Arc::new(|args, _provider| math_average(args)),
     );
-    registry.insert("COUNT".into(), Arc::new(|args, provider| math_count(args)));
+    registry.insert("COUNT".into(), Arc::new(|args, _provider| math_count(args)));
     registry.insert(
         "COUNTA".into(),
-        Arc::new(|args, provider| math_counta(args)),
+        Arc::new(|args, _provider| math_counta(args)),
     );
-    registry.insert("MIN".into(), Arc::new(|args, provider| math_min(args)));
-    registry.insert("MAX".into(), Arc::new(|args, provider| math_max(args)));
+    registry.insert("MIN".into(), Arc::new(|args, _provider| math_min(args)));
+    registry.insert("MAX".into(), Arc::new(|args, _provider| math_max(args)));
     registry.insert(
         "PRODUCT".into(),
-        Arc::new(|args, provider| math_product(args)),
+        Arc::new(|args, _provider| math_product(args)),
     );
-    registry.insert("ROUND".into(), Arc::new(|args, provider| math_round(args)));
+    registry.insert("ROUND".into(), Arc::new(|args, _provider| math_round(args)));
     registry.insert(
         "ROUNDUP".into(),
-        Arc::new(|args, provider| math_roundup(args)),
+        Arc::new(|args, _provider| math_roundup(args)),
     );
     registry.insert(
         "ROUNDDOWN".into(),
-        Arc::new(|args, provider| math_rounddown(args)),
+        Arc::new(|args, _provider| math_rounddown(args)),
     );
-    registry.insert("SQRT".into(), Arc::new(|args, provider| math_sqrt(args)));
-    registry.insert("POWER".into(), Arc::new(|args, provider| math_power(args)));
-    registry.insert("MOD".into(), Arc::new(|args, provider| math_mod(args)));
-    registry.insert("INT".into(), Arc::new(|args, provider| math_int(args)));
-    registry.insert("TRUNC".into(), Arc::new(|args, provider| math_trunc(args)));
+    registry.insert("SQRT".into(), Arc::new(|args, _provider| math_sqrt(args)));
+    registry.insert("POWER".into(), Arc::new(|args, _provider| math_power(args)));
+    registry.insert("MOD".into(), Arc::new(|args, _provider| math_mod(args)));
+    registry.insert("INT".into(), Arc::new(|args, _provider| math_int(args)));
+    registry.insert("TRUNC".into(), Arc::new(|args, _provider| math_trunc(args)));
 
     // Aggregate with criteria
-    registry.insert("SUMIF".into(), Arc::new(|args, provider| math_sumif(args)));
+    registry.insert("SUMIF".into(), Arc::new(|args, _provider| math_sumif(args)));
     registry.insert(
         "SUMIFS".into(),
-        Arc::new(|args, provider| math_sumifs(args)),
+        Arc::new(|args, _provider| math_sumifs(args)),
     );
     registry.insert(
         "COUNTIF".into(),
-        Arc::new(|args, provider| math_countif(args)),
+        Arc::new(|args, _provider| math_countif(args)),
     );
     registry.insert(
         "COUNTIFS".into(),
-        Arc::new(|args, provider| math_countifs(args)),
+        Arc::new(|args, _provider| math_countifs(args)),
     );
     registry.insert(
         "AVERAGEIF".into(),
-        Arc::new(|args, provider| math_averageif(args)),
+        Arc::new(|args, _provider| math_averageif(args)),
     );
 
     // Rounding
     registry.insert(
         "CEILING".into(),
-        Arc::new(|args, provider| math_ceiling(args)),
+        Arc::new(|args, _provider| math_ceiling(args)),
     );
-    registry.insert("FLOOR".into(), Arc::new(|args, provider| math_floor(args)));
-    registry.insert("EVEN".into(), Arc::new(|args, provider| math_even(args)));
-    registry.insert("ODD".into(), Arc::new(|args, provider| math_odd(args)));
+    registry.insert("FLOOR".into(), Arc::new(|args, _provider| math_floor(args)));
+    registry.insert("EVEN".into(), Arc::new(|args, _provider| math_even(args)));
+    registry.insert("ODD".into(), Arc::new(|args, _provider| math_odd(args)));
 
     // Trigonometry
     registry.insert(
         "PI".into(),
         Arc::new(|_args, _provider| CellValue::Number(std::f64::consts::PI)),
     );
-    registry.insert("SIN".into(), Arc::new(|args, provider| math_sin(args)));
-    registry.insert("COS".into(), Arc::new(|args, provider| math_cos(args)));
-    registry.insert("TAN".into(), Arc::new(|args, provider| math_tan(args)));
-    registry.insert("ASIN".into(), Arc::new(|args, provider| math_asin(args)));
-    registry.insert("ACOS".into(), Arc::new(|args, provider| math_acos(args)));
-    registry.insert("ATAN".into(), Arc::new(|args, provider| math_atan(args)));
-    registry.insert("ATAN2".into(), Arc::new(|args, provider| math_atan2(args)));
+    registry.insert("SIN".into(), Arc::new(|args, _provider| math_sin(args)));
+    registry.insert("COS".into(), Arc::new(|args, _provider| math_cos(args)));
+    registry.insert("TAN".into(), Arc::new(|args, _provider| math_tan(args)));
+    registry.insert("ASIN".into(), Arc::new(|args, _provider| math_asin(args)));
+    registry.insert("ACOS".into(), Arc::new(|args, _provider| math_acos(args)));
+    registry.insert("ATAN".into(), Arc::new(|args, _provider| math_atan(args)));
+    registry.insert("ATAN2".into(), Arc::new(|args, _provider| math_atan2(args)));
     registry.insert(
         "DEGREES".into(),
-        Arc::new(|args, provider| math_degrees(args)),
+        Arc::new(|args, _provider| math_degrees(args)),
     );
     registry.insert(
         "RADIANS".into(),
-        Arc::new(|args, provider| math_radians(args)),
+        Arc::new(|args, _provider| math_radians(args)),
     );
 
     // Random
@@ -103,23 +103,23 @@ pub fn register(
     );
     registry.insert(
         "RANDBETWEEN".into(),
-        Arc::new(|args, provider| math_randbetween(args)),
+        Arc::new(|args, _provider| math_randbetween(args)),
     );
 
     // Log/Exp
-    registry.insert("EXP".into(), Arc::new(|args, provider| math_exp(args)));
-    registry.insert("LN".into(), Arc::new(|args, provider| math_ln(args)));
-    registry.insert("LOG".into(), Arc::new(|args, provider| math_log(args)));
-    registry.insert("LOG10".into(), Arc::new(|args, provider| math_log10(args)));
+    registry.insert("EXP".into(), Arc::new(|args, _provider| math_exp(args)));
+    registry.insert("LN".into(), Arc::new(|args, _provider| math_ln(args)));
+    registry.insert("LOG".into(), Arc::new(|args, _provider| math_log(args)));
+    registry.insert("LOG10".into(), Arc::new(|args, _provider| math_log10(args)));
 
     // GCD/LCM
-    registry.insert("GCD".into(), Arc::new(|args, provider| math_gcd(args)));
-    registry.insert("LCM".into(), Arc::new(|args, provider| math_lcm(args)));
+    registry.insert("GCD".into(), Arc::new(|args, _provider| math_gcd(args)));
+    registry.insert("LCM".into(), Arc::new(|args, _provider| math_lcm(args)));
 
     // SUBTOTAL
     registry.insert(
         "SUBTOTAL".into(),
-        Arc::new(|args, provider| math_subtotal(args)),
+        Arc::new(|args, _provider| math_subtotal(args)),
     );
 }
 
@@ -337,7 +337,7 @@ fn math_tan(args: &[CellValue]) -> CellValue {
 
 fn math_asin(args: &[CellValue]) -> CellValue {
     match args.first().and_then(to_number) {
-        Some(n) if n >= -1.0 && n <= 1.0 => CellValue::Number(n.asin()),
+        Some(n) if (-1.0..=1.0).contains(&n) => CellValue::Number(n.asin()),
         Some(_) => CellValue::Error("#NUM!".into()),
         None => CellValue::Error("#VALUE!".into()),
     }
@@ -345,7 +345,7 @@ fn math_asin(args: &[CellValue]) -> CellValue {
 
 fn math_acos(args: &[CellValue]) -> CellValue {
     match args.first().and_then(to_number) {
-        Some(n) if n >= -1.0 && n <= 1.0 => CellValue::Number(n.acos()),
+        Some(n) if (-1.0..=1.0).contains(&n) => CellValue::Number(n.acos()),
         Some(_) => CellValue::Error("#NUM!".into()),
         None => CellValue::Error("#VALUE!".into()),
     }
@@ -456,7 +456,7 @@ fn math_sumifs(args: &[CellValue]) -> CellValue {
     // Parse first range (sum_range)
     if let Some(sentinel) = args.get(i).and_then(to_number) {
         if sentinel < -999_999.0 && sentinel > -2_000_000.0 {
-            let n_cols = (-(sentinel as f64 + 1_000_000.0)) as usize;
+            let n_cols = (-(sentinel + 1_000_000.0)) as usize;
             if let Some(n_rows) = args.get(i + 1).and_then(to_number) {
                 let n_rows = n_rows as usize;
                 let total = n_cols * n_rows;
@@ -482,7 +482,7 @@ fn math_sumifs(args: &[CellValue]) -> CellValue {
         let range_start = i;
         if let Some(sentinel) = args.get(range_start).and_then(to_number) {
             if sentinel < -999_999.0 && sentinel > -2_000_000.0 {
-                let n_cols = (-(sentinel as f64 + 1_000_000.0)) as usize;
+                let n_cols = (-(sentinel + 1_000_000.0)) as usize;
                 if let Some(n_rows) = args.get(range_start + 1).and_then(to_number) {
                     let n_rows = n_rows as usize;
                     let total = n_cols * n_rows;
@@ -528,11 +528,10 @@ fn math_sumifs(args: &[CellValue]) -> CellValue {
                 break;
             }
         }
-        if all_match {
-            if let Some(val) = sum_values.get(idx) {
+        if all_match
+            && let Some(val) = sum_values.get(idx) {
                 sum += to_number(val).unwrap_or(0.0);
             }
-        }
     }
 
     CellValue::Number(sum)
@@ -575,7 +574,7 @@ fn math_countifs(args: &[CellValue]) -> CellValue {
         // Range format: [sentinel: -(cols+1M), rows, n_cols*n_rows cells]
         if let Some(sentinel) = args.get(range_start).and_then(to_number) {
             if sentinel < -999_999.0 && sentinel > -2_000_000.0 {
-                let n_cols = (-(sentinel as f64 + 1_000_000.0)) as usize;
+                let n_cols = (-(sentinel + 1_000_000.0)) as usize;
                 if let Some(n_rows) = args.get(range_start + 1).and_then(to_number) {
                     let n_rows = n_rows as usize;
                     let total = n_cols * n_rows;
@@ -624,7 +623,7 @@ fn math_countifs(args: &[CellValue]) -> CellValue {
     let mut count = 0;
 
     // For each position in the first range, check if ALL criteria match
-    for (idx, val) in first_values.iter().enumerate() {
+    for (idx, _val) in first_values.iter().enumerate() {
         let mut all_match = true;
         for (range_vals, criteria) in &pairs {
             let check_val = range_vals.get(idx).unwrap_or(&CellValue::Empty);
@@ -749,9 +748,9 @@ fn matches_criteria(val: &CellValue, criteria: &CellValue) -> bool {
     let val_num = to_number(val);
 
     if let Some(rest) = criteria_str.strip_prefix(">=") {
-        val_num.map_or(false, |v| v >= rest.parse::<f64>().unwrap_or(0.0))
+        val_num.is_some_and(|v| v >= rest.parse::<f64>().unwrap_or(0.0))
     } else if let Some(rest) = criteria_str.strip_prefix("<=") {
-        val_num.map_or(false, |v| v <= rest.parse::<f64>().unwrap_or(0.0))
+        val_num.is_some_and(|v| v <= rest.parse::<f64>().unwrap_or(0.0))
     } else if let Some(rest) = criteria_str.strip_prefix("<>") {
         if let Some(v) = val_num {
             v != rest.parse::<f64>().unwrap_or(f64::NAN)
@@ -759,25 +758,23 @@ fn matches_criteria(val: &CellValue, criteria: &CellValue) -> bool {
             format_val_string(val) != rest
         }
     } else if let Some(rest) = criteria_str.strip_prefix('>') {
-        val_num.map_or(false, |v| v > rest.parse::<f64>().unwrap_or(0.0))
+        val_num.is_some_and(|v| v > rest.parse::<f64>().unwrap_or(0.0))
     } else if let Some(rest) = criteria_str.strip_prefix('<') {
-        val_num.map_or(false, |v| v < rest.parse::<f64>().unwrap_or(0.0))
+        val_num.is_some_and(|v| v < rest.parse::<f64>().unwrap_or(0.0))
     } else if let Some(rest) = criteria_str.strip_prefix('=') {
         if let Some(v) = val_num {
             (v - rest.parse::<f64>().unwrap_or(f64::NAN)).abs() < 1e-12
         } else {
             format_val_string(val) == rest
         }
-    } else {
-        if let Some(v) = val_num {
-            if let Ok(crit_num) = criteria_str.parse::<f64>() {
-                (v - crit_num).abs() < 1e-12
-            } else {
-                format_val_string(val).to_uppercase() == criteria_str.to_uppercase()
-            }
+    } else if let Some(v) = val_num {
+        if let Ok(crit_num) = criteria_str.parse::<f64>() {
+            (v - crit_num).abs() < 1e-12
         } else {
             format_val_string(val).to_uppercase() == criteria_str.to_uppercase()
         }
+    } else {
+        format_val_string(val).to_uppercase() == criteria_str.to_uppercase()
     }
 }
 
@@ -798,12 +795,12 @@ fn extract_range_values(args: &[CellValue]) -> Vec<CellValue> {
     if args.len() < 3 {
         return args.to_vec();
     }
-    if let Some(sentinel) = args.first().and_then(to_number) {
-        if sentinel < -999_999.0 && sentinel > -2_000_000.0 {
+    if let Some(sentinel) = args.first().and_then(to_number)
+        && sentinel < -999_999.0 && sentinel > -2_000_000.0 {
             // Range marker format: [sentinel, rows, data...]
             // Skip sentinel and row count, return only the data
             if let Some(n_rows) = args.get(1).and_then(to_number) {
-                let n_cols = (-(sentinel as f64 + 1_000_000.0)) as usize;
+                let n_cols = (-(sentinel + 1_000_000.0)) as usize;
                 let total = n_cols * (n_rows as usize);
                 let end = (2 + total).min(args.len() - 1); // -1 for the criteria arg at the end
                 if end > 2 {
@@ -812,7 +809,6 @@ fn extract_range_values(args: &[CellValue]) -> Vec<CellValue> {
             }
             return args[2..].to_vec();
         }
-    }
     // Non-marker: return all args except the last one (criteria)
     if args.len() > 1 {
         args[..args.len() - 1].to_vec()

@@ -16,43 +16,43 @@ pub fn register(
 ) {
     registry.insert(
         "FILTER".into(),
-        Arc::new(|args, provider| dynamic_filter(args)),
+        Arc::new(|args, _provider| dynamic_filter(args)),
     );
-    registry.insert("SORT".into(), Arc::new(|args, provider| dynamic_sort(args)));
+    registry.insert("SORT".into(), Arc::new(|args, _provider| dynamic_sort(args)));
     registry.insert(
         "SORTBY".into(),
-        Arc::new(|args, provider| dynamic_sortby(args)),
+        Arc::new(|args, _provider| dynamic_sortby(args)),
     );
     registry.insert(
         "UNIQUE".into(),
-        Arc::new(|args, provider| dynamic_unique(args)),
+        Arc::new(|args, _provider| dynamic_unique(args)),
     );
     registry.insert(
         "SEQUENCE".into(),
-        Arc::new(|args, provider| dynamic_sequence(args)),
+        Arc::new(|args, _provider| dynamic_sequence(args)),
     );
     registry.insert(
         "RANDARRAY".into(),
-        Arc::new(|args, provider| dynamic_randarray(args)),
+        Arc::new(|args, _provider| dynamic_randarray(args)),
     );
-    registry.insert("LET".into(), Arc::new(|args, provider| dynamic_let(args)));
+    registry.insert("LET".into(), Arc::new(|args, _provider| dynamic_let(args)));
     registry.insert(
         "LAMBDA".into(),
-        Arc::new(|args, provider| dynamic_lambda(args)),
+        Arc::new(|args, _provider| dynamic_lambda(args)),
     );
-    registry.insert("MAP".into(), Arc::new(|args, provider| dynamic_map(args)));
+    registry.insert("MAP".into(), Arc::new(|args, _provider| dynamic_map(args)));
     registry.insert(
         "REDUCE".into(),
-        Arc::new(|args, provider| dynamic_reduce(args)),
+        Arc::new(|args, _provider| dynamic_reduce(args)),
     );
-    registry.insert("SCAN".into(), Arc::new(|args, provider| dynamic_scan(args)));
+    registry.insert("SCAN".into(), Arc::new(|args, _provider| dynamic_scan(args)));
     registry.insert(
         "BYROW".into(),
-        Arc::new(|args, provider| dynamic_byrow(args)),
+        Arc::new(|args, _provider| dynamic_byrow(args)),
     );
     registry.insert(
         "BYCOL".into(),
-        Arc::new(|args, provider| dynamic_bycol(args)),
+        Arc::new(|args, _provider| dynamic_bycol(args)),
     );
 }
 
@@ -113,7 +113,7 @@ fn dynamic_filter(args: &[CellValue]) -> CellValue {
         return CellValue::Error("#VALUE!".into());
     }
 
-    let include = args.get(1).map_or(false, |v| match v {
+    let include = args.get(1).is_some_and(|v| match v {
         CellValue::Bool(true) => true,
         CellValue::Number(n) if *n != 0.0 => true,
         _ => false,
@@ -138,7 +138,7 @@ fn dynamic_sort(args: &[CellValue]) -> CellValue {
 
     let mut values: Vec<CellValue> = args.iter().take(1).cloned().collect();
     // For inline range, extract all values after markers
-    if let Some((n_cols, n_rows, data)) = try_extract_2d(args) {
+    if let Some((_n_cols, _n_rows, data)) = try_extract_2d(args) {
         values = data.into_iter().flatten().collect();
     }
 
@@ -170,7 +170,7 @@ fn dynamic_unique(args: &[CellValue]) -> CellValue {
         return CellValue::Error("#VALUE!".into());
     }
 
-    let exactly_once = args.get(2).map_or(false, |v| match v {
+    let exactly_once = args.get(2).is_some_and(|v| match v {
         CellValue::Bool(true) => true,
         _ => false,
     });
@@ -179,7 +179,7 @@ fn dynamic_unique(args: &[CellValue]) -> CellValue {
     let values: Vec<CellValue> = if let Some((_, _, data)) = try_extract_2d(args) {
         data.into_iter().flatten().collect()
     } else {
-        args.iter().cloned().collect()
+        args.to_vec()
     };
 
     if exactly_once {
@@ -225,7 +225,7 @@ fn dynamic_sequence(args: &[CellValue]) -> CellValue {
 fn dynamic_randarray(args: &[CellValue]) -> CellValue {
     let min_val = args.get(2).and_then(to_number).unwrap_or(0.0);
     let max_val = args.get(3).and_then(to_number).unwrap_or(1.0);
-    let integer = args.get(4).map_or(false, |v| match v {
+    let integer = args.get(4).is_some_and(|v| match v {
         CellValue::Bool(true) => true,
         CellValue::Number(n) if *n != 0.0 => true,
         _ => false,
@@ -265,18 +265,16 @@ fn dynamic_let(args: &[CellValue]) -> CellValue {
     }
 
     // Simple case: LET(name, value, calculation) where calculation is just the name
-    if args.len() == 3 {
-        if let CellValue::String(calc_name) = &last {
+    if args.len() == 3
+        && let CellValue::String(calc_name) = &last {
             let clean_name = calc_name.trim();
-            if let CellValue::String(name1) = &args[0] {
-                if name1.trim() == clean_name {
+            if let CellValue::String(name1) = &args[0]
+                && name1.trim() == clean_name {
                     return args[1].clone();
                 }
-            }
             // Otherwise return calc_name as-is (unknown reference)
             return CellValue::String(calc_name.clone());
         }
-    }
 
     // For LET(name, value, expression) where expression is a literal value
     last
@@ -311,7 +309,7 @@ fn dynamic_map(args: &[CellValue]) -> CellValue {
     let values: Vec<CellValue> = if has_range_marker(args) {
         args[2..].to_vec()
     } else {
-        args.iter().cloned().collect()
+        args.to_vec()
     };
 
     if values.is_empty() {

@@ -1,5 +1,4 @@
 use std::fs;
-use std::path::Path;
 
 use excel_diff::semantic::{Verbosity, to_natural_text};
 use excel_diff::summarize::summarize;

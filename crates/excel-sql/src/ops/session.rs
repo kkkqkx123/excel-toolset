@@ -118,7 +118,7 @@ impl QuerySession {
                 .rows()
                 .map(|row| {
                     row.iter()
-                        .map(|cell| calamine_data_to_cell_data(cell))
+                        .map(calamine_data_to_cell_data)
                         .collect()
                 })
                 .collect();

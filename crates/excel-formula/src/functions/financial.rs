@@ -14,50 +14,50 @@ pub fn register(
         Arc<dyn Fn(&[CellValue], &dyn DataProvider) -> CellValue + Send + Sync>,
     >,
 ) {
-    registry.insert("PMT".into(), Arc::new(|args, provider| fin_pmt(args)));
-    registry.insert("IPMT".into(), Arc::new(|args, provider| fin_ipmt(args)));
-    registry.insert("PPMT".into(), Arc::new(|args, provider| fin_ppmt(args)));
-    registry.insert("FV".into(), Arc::new(|args, provider| fin_fv(args)));
-    registry.insert("PV".into(), Arc::new(|args, provider| fin_pv(args)));
-    registry.insert("NPER".into(), Arc::new(|args, provider| fin_nper(args)));
-    registry.insert("RATE".into(), Arc::new(|args, provider| fin_rate(args)));
-    registry.insert("NPV".into(), Arc::new(|args, provider| fin_npv(args)));
-    registry.insert("IRR".into(), Arc::new(|args, provider| fin_irr(args)));
-    registry.insert("XIRR".into(), Arc::new(|args, provider| fin_xirr(args)));
-    registry.insert("XNPV".into(), Arc::new(|args, provider| fin_xnpv(args)));
-    registry.insert("SLN".into(), Arc::new(|args, provider| fin_sln(args)));
-    registry.insert("DB".into(), Arc::new(|args, provider| fin_db(args)));
-    registry.insert("DDB".into(), Arc::new(|args, provider| fin_ddb(args)));
-    registry.insert("EFFECT".into(), Arc::new(|args, provider| fin_effect(args)));
+    registry.insert("PMT".into(), Arc::new(|args, _provider| fin_pmt(args)));
+    registry.insert("IPMT".into(), Arc::new(|args, _provider| fin_ipmt(args)));
+    registry.insert("PPMT".into(), Arc::new(|args, _provider| fin_ppmt(args)));
+    registry.insert("FV".into(), Arc::new(|args, _provider| fin_fv(args)));
+    registry.insert("PV".into(), Arc::new(|args, _provider| fin_pv(args)));
+    registry.insert("NPER".into(), Arc::new(|args, _provider| fin_nper(args)));
+    registry.insert("RATE".into(), Arc::new(|args, _provider| fin_rate(args)));
+    registry.insert("NPV".into(), Arc::new(|args, _provider| fin_npv(args)));
+    registry.insert("IRR".into(), Arc::new(|args, _provider| fin_irr(args)));
+    registry.insert("XIRR".into(), Arc::new(|args, _provider| fin_xirr(args)));
+    registry.insert("XNPV".into(), Arc::new(|args, _provider| fin_xnpv(args)));
+    registry.insert("SLN".into(), Arc::new(|args, _provider| fin_sln(args)));
+    registry.insert("DB".into(), Arc::new(|args, _provider| fin_db(args)));
+    registry.insert("DDB".into(), Arc::new(|args, _provider| fin_ddb(args)));
+    registry.insert("EFFECT".into(), Arc::new(|args, _provider| fin_effect(args)));
     registry.insert(
         "NOMINAL".into(),
-        Arc::new(|args, provider| fin_nominal(args)),
+        Arc::new(|args, _provider| fin_nominal(args)),
     );
-    registry.insert("PRICE".into(), Arc::new(|args, provider| fin_price(args)));
-    registry.insert("YIELD".into(), Arc::new(|args, provider| fin_yield(args)));
+    registry.insert("PRICE".into(), Arc::new(|args, _provider| fin_price(args)));
+    registry.insert("YIELD".into(), Arc::new(|args, _provider| fin_yield(args)));
     registry.insert(
         "DURATION".into(),
-        Arc::new(|args, provider| fin_duration(args)),
+        Arc::new(|args, _provider| fin_duration(args)),
     );
     registry.insert(
         "MDURATION".into(),
-        Arc::new(|args, provider| fin_mduration(args)),
+        Arc::new(|args, _provider| fin_mduration(args)),
     );
     registry.insert(
         "COUPNUM".into(),
-        Arc::new(|args, provider| fin_coupnum(args)),
+        Arc::new(|args, _provider| fin_coupnum(args)),
     );
     registry.insert(
         "COUPDAYS".into(),
-        Arc::new(|args, provider| fin_coupdays(args)),
+        Arc::new(|args, _provider| fin_coupdays(args)),
     );
     registry.insert(
         "COUPDAYBS".into(),
-        Arc::new(|args, provider| fin_coupdaybs(args)),
+        Arc::new(|args, _provider| fin_coupdaybs(args)),
     );
     registry.insert(
         "COUPDAYSNC".into(),
-        Arc::new(|args, provider| fin_coupdaysnc(args)),
+        Arc::new(|args, _provider| fin_coupdaysnc(args)),
     );
 }
 
@@ -260,7 +260,7 @@ fn fin_irr(args: &[CellValue]) -> CellValue {
 }
 
 /// XIRR(values, dates, [guess])
-fn fin_xirr(args: &[CellValue]) -> CellValue {
+fn fin_xirr(_args: &[CellValue]) -> CellValue {
     // XIRR requires date information and is complex
     // Returns #NUM! as a stub; full implementation needs cashflow+date pair processing
     CellValue::Error("#NUM!".into())
@@ -509,8 +509,7 @@ fn fin_price(args: &[CellValue]) -> CellValue {
         || rate < 0.0
         || yld < 0.0
         || redemption <= 0.0
-        || frequency < 1
-        || frequency > 4
+        || !(1..=4).contains(&frequency)
     {
         return CellValue::Error("#NUM!".into());
     }
@@ -518,11 +517,11 @@ fn fin_price(args: &[CellValue]) -> CellValue {
     let freq = frequency as f64;
 
     // Use 30/360 day count for simplicity (basis=0)
-    let dsr = days_360(settlement, settlement); // 0
+    let _dsr = days_360(settlement, settlement); // 0
 
     // Find coupon dates working backwards from maturity
     let months_per_period = 12.0 / freq;
-    let (mat_y, mat_m, mat_d) = excel_date_to_ymd(maturity);
+    let (_mat_y, _mat_m, _mat_d) = excel_date_to_ymd(maturity);
 
     // Number of coupons remaining
     let n = coupnum(settlement, maturity, frequency);
@@ -557,7 +556,7 @@ fn fin_price(args: &[CellValue]) -> CellValue {
     let coupon = 100.0 * rate / freq;
     let mut pv_coupons = 0.0;
     for k in 0..(n as i32) {
-        let exponent = (k as f64 + dsc / e);
+        let exponent = k as f64 + dsc / e;
         pv_coupons += coupon / (1.0 + yld / freq).powf(exponent);
     }
 
@@ -585,8 +584,7 @@ fn fin_yield(args: &[CellValue]) -> CellValue {
         || rate < 0.0
         || pr <= 0.0
         || redemption <= 0.0
-        || frequency < 1
-        || frequency > 4
+        || !(1..=4).contains(&frequency)
     {
         return CellValue::Error("#NUM!".into());
     }
@@ -659,7 +657,7 @@ fn fin_duration(args: &[CellValue]) -> CellValue {
     let frequency = args.get(4).and_then(to_number).unwrap_or(2.0) as i32;
     let _basis = args.get(5).and_then(to_number).unwrap_or(0.0) as i32;
 
-    if settlement >= maturity || coupon < 0.0 || yld < 0.0 || frequency < 1 || frequency > 4 {
+    if settlement >= maturity || coupon < 0.0 || yld < 0.0 || !(1..=4).contains(&frequency) {
         return CellValue::Error("#NUM!".into());
     }
 
@@ -719,7 +717,7 @@ fn fin_coupnum(args: &[CellValue]) -> CellValue {
     let frequency = args.get(2).and_then(to_number).unwrap_or(2.0) as i32;
     let _basis = args.get(3).and_then(to_number).unwrap_or(0.0) as i32;
 
-    if settlement >= maturity || frequency < 1 || frequency > 4 {
+    if settlement >= maturity || !(1..=4).contains(&frequency) {
         return CellValue::Error("#NUM!".into());
     }
 
@@ -738,7 +736,7 @@ fn coupnum(settlement: f64, maturity: f64, frequency: i32) -> f64 {
 fn fin_coupdays(args: &[CellValue]) -> CellValue {
     let frequency = args.get(2).and_then(to_number).unwrap_or(2.0) as i32;
 
-    if frequency < 1 || frequency > 4 {
+    if !(1..=4).contains(&frequency) {
         return CellValue::Error("#NUM!".into());
     }
 
@@ -753,7 +751,7 @@ fn fin_coupdaybs(args: &[CellValue]) -> CellValue {
     let frequency = args.get(2).and_then(to_number).unwrap_or(2.0) as i32;
     let _basis = args.get(3).and_then(to_number).unwrap_or(0.0) as i32;
 
-    if settlement >= maturity || frequency < 1 || frequency > 4 {
+    if settlement >= maturity || !(1..=4).contains(&frequency) {
         return CellValue::Error("#NUM!".into());
     }
 
@@ -773,7 +771,7 @@ fn fin_coupdaysnc(args: &[CellValue]) -> CellValue {
     let frequency = args.get(2).and_then(to_number).unwrap_or(2.0) as i32;
     let _basis = args.get(3).and_then(to_number).unwrap_or(0.0) as i32;
 
-    if settlement >= maturity || frequency < 1 || frequency > 4 {
+    if settlement >= maturity || !(1..=4).contains(&frequency) {
         return CellValue::Error("#NUM!".into());
     }
 

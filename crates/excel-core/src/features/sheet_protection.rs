@@ -11,7 +11,6 @@
 
 use std::io::Read;
 
-use crate::security;
 use crate::types::*;
 
 /// Protect a worksheet with optional password and protection options.
@@ -22,7 +21,7 @@ pub fn protect_sheet(
 ) -> Result<WriteResult> {
     #[cfg(feature = "zip")]
     {
-        return crate::excel_write::patch::protect_sheet_preserving(path, params, &config.sheet, config);
+        crate::excel_write::patch::protect_sheet_preserving(path, params, &config.sheet, config)
     }
 
     #[cfg(not(feature = "zip"))]
@@ -104,7 +103,7 @@ pub fn protect_sheet(
 pub fn unprotect_sheet(path: &str, sheet: &str, params: &SecurityParams) -> Result<WriteResult> {
     #[cfg(feature = "zip")]
     {
-        return crate::excel_write::patch::unprotect_sheet_preserving(path, params, sheet);
+        crate::excel_write::patch::unprotect_sheet_preserving(path, params, sheet)
     }
 
     #[cfg(not(feature = "zip"))]
@@ -164,8 +163,8 @@ pub fn is_sheet_protected(path: &str, sheet: &str) -> Result<bool> {
                             current_sheet_name = Some(rest[..end].to_string());
                         }
                     }
-                    if current_sheet_name.as_deref() == Some(sheet) {
-                        if let Some(start) = line.find("sheetId=\"") {
+                    if current_sheet_name.as_deref() == Some(sheet)
+                        && let Some(start) = line.find("sheetId=\"") {
                             let rest = &line[start + 9..];
                             if let Some(end) = rest.find('"') {
                                 let sheet_id: String = rest[..end].to_string();
@@ -174,13 +173,12 @@ pub fn is_sheet_protected(path: &str, sheet: &str) -> Result<bool> {
                                 break;
                             }
                         }
-                    }
                 }
             }
         }
     }
 
-    let sheet_filename = sheet_filename.unwrap_or_else(|| format!("xl/worksheets/sheet1.xml"));
+    let sheet_filename = sheet_filename.unwrap_or_else(|| "xl/worksheets/sheet1.xml".to_string());
 
     match archive.by_name(&sheet_filename) {
         Ok(mut ws_xml) => {

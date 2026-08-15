@@ -23,64 +23,64 @@ pub fn register(
     registry.insert("NOW".into(), Arc::new(|_args, _provider| datetime_now()));
     registry.insert(
         "DATE".into(),
-        Arc::new(|args, provider| datetime_date(args)),
+        Arc::new(|args, _provider| datetime_date(args)),
     );
     registry.insert(
         "TIME".into(),
-        Arc::new(|args, provider| datetime_time(args)),
+        Arc::new(|args, _provider| datetime_time(args)),
     );
     registry.insert(
         "YEAR".into(),
-        Arc::new(|args, provider| datetime_year(args)),
+        Arc::new(|args, _provider| datetime_year(args)),
     );
     registry.insert(
         "MONTH".into(),
-        Arc::new(|args, provider| datetime_month(args)),
+        Arc::new(|args, _provider| datetime_month(args)),
     );
-    registry.insert("DAY".into(), Arc::new(|args, provider| datetime_day(args)));
+    registry.insert("DAY".into(), Arc::new(|args, _provider| datetime_day(args)));
     registry.insert(
         "HOUR".into(),
-        Arc::new(|args, provider| datetime_hour(args)),
+        Arc::new(|args, _provider| datetime_hour(args)),
     );
     registry.insert(
         "MINUTE".into(),
-        Arc::new(|args, provider| datetime_minute(args)),
+        Arc::new(|args, _provider| datetime_minute(args)),
     );
     registry.insert(
         "SECOND".into(),
-        Arc::new(|args, provider| datetime_second(args)),
+        Arc::new(|args, _provider| datetime_second(args)),
     );
     registry.insert(
         "WEEKDAY".into(),
-        Arc::new(|args, provider| datetime_weekday(args)),
+        Arc::new(|args, _provider| datetime_weekday(args)),
     );
     registry.insert(
         "WEEKNUM".into(),
-        Arc::new(|args, provider| datetime_weeknum(args)),
+        Arc::new(|args, _provider| datetime_weeknum(args)),
     );
     registry.insert(
         "EDATE".into(),
-        Arc::new(|args, provider| datetime_edate(args)),
+        Arc::new(|args, _provider| datetime_edate(args)),
     );
     registry.insert(
         "EOMONTH".into(),
-        Arc::new(|args, provider| datetime_eomonth(args)),
+        Arc::new(|args, _provider| datetime_eomonth(args)),
     );
     registry.insert(
         "DAYS".into(),
-        Arc::new(|args, provider| datetime_days(args)),
+        Arc::new(|args, _provider| datetime_days(args)),
     );
     registry.insert(
         "DAYS360".into(),
-        Arc::new(|args, provider| datetime_days360(args)),
+        Arc::new(|args, _provider| datetime_days360(args)),
     );
     registry.insert(
         "NETWORKDAYS".into(),
-        Arc::new(|args, provider| datetime_networkdays(args)),
+        Arc::new(|args, _provider| datetime_networkdays(args)),
     );
     registry.insert(
         "DATEDIF".into(),
-        Arc::new(|args, provider| datetime_datedif(args)),
+        Arc::new(|args, _provider| datetime_datedif(args)),
     );
 }
 

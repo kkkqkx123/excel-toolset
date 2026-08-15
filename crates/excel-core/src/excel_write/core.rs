@@ -531,8 +531,7 @@ pub fn build_workbook_with_ops(
                     for (range_str, style) in &formats {
                         if let Ok((r_start, r_end, c_start, c_end)) =
                             cell_ref::parse_range_normalized(range_str)
-                        {
-                            if ri as u32 >= r_start
+                            && ri as u32 >= r_start
                                 && ri as u32 <= r_end
                                 && ci as u16 >= c_start
                                 && ci as u16 <= c_end
@@ -542,7 +541,6 @@ pub fn build_workbook_with_ops(
                                 applied_format = true;
                                 break;
                             }
-                        }
                     }
                     if !applied_format {
                         write_cell_data(ws, ri as u32, ci as u16, cell)?;
@@ -588,7 +586,7 @@ pub fn build_workbook_with_ops(
                     continue;
                 }
                 let (r1, c1, r2, c2) = cell_ref::parse_range(&config.range)?;
-                let dv = crate::features::data_validation::build_data_validation(&config)?;
+                let dv = crate::features::data_validation::build_data_validation(config)?;
                 ws.add_data_validation(r1, c1, r2, c2, &dv)
                     .map_err(AppError::Xlsx)?;
             }
@@ -637,7 +635,7 @@ pub fn build_workbook_with_ops(
             if let Ok(ws) = wb.worksheet_from_index(target_sheet_idx) {
                 let (target_r, target_c) = cell_ref::parse_cell_ref(&config.target_cell)?;
                 // Write pivot table label as a placeholder
-                ws.write(target_r, target_c, &format!("PivotTable: {}", config.name))
+                ws.write(target_r, target_c, format!("PivotTable: {}", config.name))
                     .map_err(AppError::Xlsx)?;
                 // Note: Full pivot table rendering is handled by
                 // features::pivot_table::create_pivot_table via modify_file_with_wb

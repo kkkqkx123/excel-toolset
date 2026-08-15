@@ -115,7 +115,7 @@ pub fn create_large_xlsx(path: &std::path::Path) {
     for i in 1..=100 {
         let row = i as u32;
         ws.write_number(row, 0, i as f64).unwrap();
-        ws.write_string(row, 1, &format!("Item {}", i)).unwrap();
+        ws.write_string(row, 1, format!("Item {}", i)).unwrap();
         ws.write_number(row, 2, (i * 10) as f64).unwrap();
     }
     wb.save(path).unwrap();
@@ -132,7 +132,7 @@ pub fn create_large_modified_xlsx(path: &std::path::Path) {
     for i in 1..=100 {
         let row = i as u32;
         ws.write_number(row, 0, i as f64).unwrap();
-        ws.write_string(row, 1, &format!("Item {}", i)).unwrap();
+        ws.write_string(row, 1, format!("Item {}", i)).unwrap();
         // Modify values for some rows
         let value = if i % 10 == 0 {
             (i * 15) as f64

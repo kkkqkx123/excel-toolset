@@ -330,7 +330,7 @@ mod tests {
             CellDataType::Int
         );
         assert_eq!(
-            duckdb_to_cell(&Value::HugeInt(1i128.into())).data_type,
+            duckdb_to_cell(&Value::HugeInt(1i128)).data_type,
             CellDataType::Int
         );
         assert_eq!(

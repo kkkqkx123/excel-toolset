@@ -9,7 +9,7 @@ use excel_types::CellValue;
 
 use crate::engine::DataProvider;
 use crate::evaluator::{EvalError, EvalResult, Evaluator, partial_cmp_cell_values, to_number};
-use crate::types::{AstNode, BinOp};
+use crate::types::AstNode;
 
 /// Result of a dynamic array spill.
 #[derive(Debug, Clone)]
@@ -605,30 +605,26 @@ fn evaluate_filter_condition<P: DataProvider>(
     _sheet: &str,
     _evaluator: &mut Evaluator<'_, P>,
 ) -> EvalResult<Vec<bool>> {
-    match condition {
-        AstNode::BinaryOp {
+    if let AstNode::BinaryOp {
             op: crate::types::BinOp::Gt,
             left: _,
             right,
-        } => {
-            if let AstNode::Number(threshold) = **right {
-                let mut result = Vec::new();
-                for row in data.iter().skip(1) {
-                    if let Some(first_val) = row.first() {
-                        if let Some(n) = to_number(first_val) {
-                            result.push(n > threshold);
-                        } else {
-                            result.push(false);
-                        }
+        } = condition
+        && let AstNode::Number(threshold) = **right {
+            let mut result = Vec::new();
+            for row in data.iter().skip(1) {
+                if let Some(first_val) = row.first() {
+                    if let Some(n) = to_number(first_val) {
+                        result.push(n > threshold);
                     } else {
                         result.push(false);
                     }
+                } else {
+                    result.push(false);
                 }
-                return Ok(result);
             }
+            return Ok(result);
         }
-        _ => {}
-    }
     Ok(vec![true; data.len().saturating_sub(1)])
 }
 

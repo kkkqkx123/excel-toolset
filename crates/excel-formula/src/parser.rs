@@ -717,6 +717,8 @@ fn col_letters_to_index(s: &str) -> u32 {
 }
 
 #[cfg(test)]
+// 测试断言里的 3.14 是预期数值数据，并非 PI 近似，属 clippy::approx_constant 误报
+#[allow(clippy::approx_constant)]
 mod tests {
     use super::*;
 

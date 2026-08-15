@@ -103,8 +103,8 @@ pub fn get_column_summary(path: &str, sheet: &str, col: &str) -> Result<ColumnSu
     let mut first_value: Option<String> = None;
 
     for (row_idx, row) in data.rows.iter().enumerate() {
-        if let Some(cell) = row.get(col_idx as usize) {
-            if cell.value.is_some() {
+        if let Some(cell) = row.get(col_idx as usize)
+            && cell.value.is_some() {
                 non_empty += 1;
                 if first_value.is_none() {
                     first_value = cell.value.clone();
@@ -120,7 +120,6 @@ pub fn get_column_summary(path: &str, sheet: &str, col: &str) -> Result<ColumnSu
                     }
                 }
             }
-        }
     }
 
     let total_typed = (sample_end.min(non_empty)).max(1);

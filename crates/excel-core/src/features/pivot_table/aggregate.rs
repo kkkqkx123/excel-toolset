@@ -1,196 +1,9 @@
-//! Pivot "table" feature implementation.
-//!
-//! **This does not produce a native Excel PivotTable.** rust_xlsxwriter cannot
-//! emit `xl/pivotTables/*.xml`, so there is no pivot cache, no field list and
-//! no interactive refresh. What we do instead is read the source range,
-//! aggregate it in memory, and write the resulting **flattened summary table**
-//! into the target sheet as ordinary cells.
-//!
-//! The distinction matters: callers previously got `success: true` and assumed
-//! a real pivot part existed. Every successful result now says so explicitly in
-//! `WriteResult::message`.
-
 use std::collections::HashMap;
-
-use crate::excel_read;
-use crate::security;
 use crate::types::*;
 
-/// Aggregate data by row/column fields and create a pivot table.
-pub fn create_pivot_table(
-    path: &str,
-    config: &PivotTableConfig,
-    params: &SecurityParams,
-) -> Result<WriteResult> {
-    if params.dry_run {
-        return Ok(WriteResult::dry_run_success());
-    }
-
-    security::create_backup_if_needed(params)?;
-
-    let (source_sheet, source_range) = parse_source_range(&config.source_range)?;
-
-    let source_data = excel_read::read_range(path, &source_sheet, &source_range)?;
-
-    if source_data.is_empty() {
-        return Err(AppError::InvalidInput(
-            "Source data is empty for pivot table".to_string(),
-        ));
-    }
-
-    let headers: Vec<String> = source_data[0]
-        .iter()
-        .map(|c| c.value.clone().unwrap_or_default())
-        .collect();
-    let data_rows: Vec<&Vec<CellData>> = source_data[1..].iter().collect();
-
-    // Apply date grouping if configured
-    let (mut adjusted_headers, mut adjusted_rows) =
-        apply_date_grouping(config, &headers, &data_rows);
-
-    // Process calculated fields: evaluate formulas and append as new columns
-    let calc_field_columns =
-        process_calculated_fields(config, &mut adjusted_headers, &mut adjusted_rows)?;
-
-    let pivot_data = build_pivot_data(
-        config,
-        &adjusted_headers,
-        &adjusted_rows,
-        &calc_field_columns,
-    )?;
-
-    let (target_r, target_c) = crate::utils::cell_ref::parse_cell_ref(&config.target_cell)?;
-
-    let params_for_write = SecurityParams {
-        file_path: path.to_string(),
-        ..params.clone()
-    };
-
-    let rows_written = pivot_data.len();
-    let cols_written = pivot_data.iter().map(|r| r.len()).max().unwrap_or(0);
-
-    let mut result = crate::excel_write::modify_file_with_wb(path, &params_for_write, |_, wb| {
-        let worksheet = wb
-            .worksheet_from_name(&config.target_sheet)
-            .map_err(|_e| AppError::SheetNotFound(config.target_sheet.clone()))?;
-
-        let mut row = target_r;
-
-        for data_row in &pivot_data {
-            let mut col = target_c;
-            for cell_value in data_row {
-                write_cell_value_to_worksheet(worksheet, row, col, cell_value)?;
-                col += 1;
-            }
-            row += 1;
-        }
-
-        Ok(())
-    })?;
-
-    // C3: do not claim we created a native PivotTable — we did not.
-    result.message = format!(
-        "Wrote a flattened aggregate summary ({} rows x {} cols) to '{}'!{}. \
-         NOTE: this is NOT a native Excel PivotTable — no pivot cache or field \
-         list is created, and the cells will not refresh when the source data \
-         changes.",
-        rows_written, cols_written, config.target_sheet, config.target_cell
-    );
-
-    Ok(result)
-}
-
-/// Apply date grouping to source data.
-/// Returns adjusted headers and new data rows with grouped date values.
-fn apply_date_grouping(
-    config: &PivotTableConfig,
-    headers: &[String],
-    data_rows: &[&Vec<CellData>],
-) -> (Vec<String>, Vec<Vec<CellData>>) {
-    let grouping = match &config.date_grouping {
-        Some(g) => g,
-        None => {
-            // No date grouping, return original data
-            let cloned: Vec<Vec<CellData>> = data_rows.iter().map(|r| (*r).clone()).collect();
-            return (headers.to_vec(), cloned);
-        }
-    };
-
-    let new_headers = headers.to_vec();
-    let col = grouping.column as usize;
-    if col >= new_headers.len() {
-        return (
-            headers.to_vec(),
-            data_rows.iter().map(|r| (*r).clone()).collect(),
-        );
-    }
-
-    let mut new_rows: Vec<Vec<CellData>> = Vec::new();
-
-    for row in data_rows {
-        let mut new_row = (*row).clone();
-        let date_val = row
-            .get(col)
-            .and_then(|c| c.value.clone())
-            .unwrap_or_default();
-
-        // Try to parse as date and group
-        if let Some(grouped) = group_date_value(&date_val, grouping) {
-            new_row[col] = CellData {
-                value: Some(grouped),
-                data_type: CellDataType::String,
-                formula: None,
-            };
-        }
-
-        new_rows.push(new_row);
-    }
-
-    (new_headers, new_rows)
-}
-
-/// Group a date value string by year/quarter/month/day.
-fn group_date_value(value: &str, grouping: &DateGrouping) -> Option<String> {
-    // Parse YYYY-MM-DD or YYYY/MM/DD
-    let parts: Vec<&str> = value.split(|c: char| c == '-' || c == '/').collect();
-
-    if parts.len() < 3 {
-        return None;
-    }
-
-    let year: i32 = parts[0].parse().ok()?;
-    let month: u32 = parts[1].parse().ok()?;
-    let day: u32 = parts[2].parse().ok()?;
-
-    if month == 0 || month > 12 || day == 0 || day > 31 {
-        return None;
-    }
-
-    let mut result_parts: Vec<String> = Vec::new();
-
-    if grouping.by_year {
-        result_parts.push(format!("{}", year));
-    }
-    if grouping.by_quarter {
-        let quarter = (month + 2) / 3;
-        result_parts.push(format!("Q{}", quarter));
-    }
-    if grouping.by_month {
-        result_parts.push(format!("{:02}", month));
-    }
-    if grouping.by_day {
-        result_parts.push(format!("{:02}", day));
-    }
-
-    if result_parts.is_empty() {
-        None
-    } else {
-        Some(result_parts.join("-"))
-    }
-}
 
 /// Parse "SheetName!A1:E100" into ("SheetName", "A1:E100").
-fn parse_source_range(source: &str) -> Result<(String, String)> {
+pub(crate) fn parse_source_range(source: &str) -> Result<(String, String)> {
     if let Some(bang_pos) = source.find('!') {
         let sheet = source[..bang_pos].trim_matches('\'').to_string();
         let range = source[bang_pos + 1..].to_string();
@@ -203,8 +16,9 @@ fn parse_source_range(source: &str) -> Result<(String, String)> {
     }
 }
 
+
 /// Build pivot table data by aggregating source rows.
-fn build_pivot_data(
+pub(crate) fn build_pivot_data(
     config: &PivotTableConfig,
     headers: &[String],
     data_rows: &[Vec<CellData>],
@@ -234,8 +48,9 @@ fn build_pivot_data(
     }
 }
 
+
 /// Build pivot with row fields and data fields only.
-fn build_simple_pivot(
+pub(crate) fn build_simple_pivot(
     config: &PivotTableConfig,
     _col_index: &HashMap<String, u16>,
     headers: &[String],
@@ -467,8 +282,9 @@ fn build_simple_pivot(
     Ok(result)
 }
 
+
 /// Insert subtotal rows into pivot data.
-fn insert_subtotals(
+pub(crate) fn insert_subtotals(
     data: Vec<Vec<String>>,
     config: &PivotTableConfig,
     _data_fields: &[PivotDataField],
@@ -532,15 +348,17 @@ fn insert_subtotals(
     result
 }
 
+
 /// Compute subtotal values for a group (simplified: returns zeros placeholder).
-fn compute_subtotal_for_group(_config: &PivotTableConfig, _group_key: String) -> Vec<String> {
+pub(crate) fn compute_subtotal_for_group(_config: &PivotTableConfig, _group_key: String) -> Vec<String> {
     // In a full implementation, this would aggregate the actual group data
     // For now, return placeholder
     Vec::new()
 }
 
+
 /// Check if any data field needs grand total for show_as calculation.
-fn needs_grand_total_for_show_as(data_fields: &[PivotDataField]) -> bool {
+pub(crate) fn needs_grand_total_for_show_as(data_fields: &[PivotDataField]) -> bool {
     data_fields.iter().any(|df| {
         matches!(
             df.show_as,
@@ -552,8 +370,9 @@ fn needs_grand_total_for_show_as(data_fields: &[PivotDataField]) -> bool {
     })
 }
 
+
 /// Compute grand totals for each data field.
-fn compute_grand_totals(data_fields: &[PivotDataField], data_rows: &[Vec<CellData>]) -> Vec<f64> {
+pub(crate) fn compute_grand_totals(data_fields: &[PivotDataField], data_rows: &[Vec<CellData>]) -> Vec<f64> {
     data_fields
         .iter()
         .map(|df| {
@@ -566,8 +385,9 @@ fn compute_grand_totals(data_fields: &[PivotDataField], data_rows: &[Vec<CellDat
         .collect()
 }
 
+
 /// Compute row totals per group for PercentOfRowTotal.
-fn compute_row_totals(
+pub(crate) fn compute_row_totals(
     data_fields: &[PivotDataField],
     groups: &HashMap<Vec<String>, Vec<&Vec<CellData>>>,
 ) -> HashMap<Vec<String>, f64> {
@@ -588,8 +408,9 @@ fn compute_row_totals(
     totals
 }
 
+
 /// Apply show_as transformation to a value.
-fn apply_show_as(
+pub(crate) fn apply_show_as(
     value: f64,
     show_as: &Option<PivotShowAs>,
     df_index: usize,
@@ -651,8 +472,9 @@ fn apply_show_as(
     }
 }
 
+
 /// Apply show_as on grand total value.
-fn apply_show_as_on_grand_total(
+pub(crate) fn apply_show_as_on_grand_total(
     value: f64,
     show_as: &Option<PivotShowAs>,
     _df_index: usize,
@@ -666,8 +488,9 @@ fn apply_show_as_on_grand_total(
     }
 }
 
+
 /// Build pivot with column fields (cross-tabulation).
-fn build_grouped_pivot(
+pub(crate) fn build_grouped_pivot(
     config: &PivotTableConfig,
     _col_index: &HashMap<String, u16>,
     headers: &[String],
@@ -833,8 +656,9 @@ fn build_grouped_pivot(
     Ok(result)
 }
 
+
 /// Sort key vectors based on pivot sort configuration.
-fn sort_keys(keys: &mut [Vec<String>], config: &PivotTableConfig, _data_rows: &[Vec<CellData>]) {
+pub(crate) fn sort_keys(keys: &mut [Vec<String>], config: &PivotTableConfig, _data_rows: &[Vec<CellData>]) {
     match &config.sort {
         Some(sort_config) => match sort_config.order {
             PivotSortOrder::Ascending => {
@@ -850,22 +674,25 @@ fn sort_keys(keys: &mut [Vec<String>], config: &PivotTableConfig, _data_rows: &[
     }
 }
 
+
 /// Get cell value as string.
-fn cell_value_to_string(row: &Vec<CellData>, col: u16) -> String {
+pub(crate) fn cell_value_to_string(row: &Vec<CellData>, col: u16) -> String {
     row.get(col as usize)
         .and_then(|c| c.value.clone())
         .unwrap_or_default()
 }
 
+
 /// Get cell value as f64 if possible.
-fn cell_value_to_f64(row: &Vec<CellData>, col: u16) -> Option<f64> {
+pub(crate) fn cell_value_to_f64(row: &Vec<CellData>, col: u16) -> Option<f64> {
     row.get(col as usize)
         .and_then(|c| c.value.as_ref())
         .and_then(|v| v.parse::<f64>().ok())
 }
 
+
 /// Compute aggregation over a set of rows.
-fn compute_aggregation(rows: &[&Vec<CellData>], col: u16, agg: &PivotAggregation) -> String {
+pub(crate) fn compute_aggregation(rows: &[&Vec<CellData>], col: u16, agg: &PivotAggregation) -> String {
     let values: Vec<f64> = rows
         .iter()
         .filter_map(|r| cell_value_to_f64(r, col))
@@ -874,8 +701,9 @@ fn compute_aggregation(rows: &[&Vec<CellData>], col: u16, agg: &PivotAggregation
     format!("{:.2}", result)
 }
 
+
 /// Apply aggregation function to a slice of f64 values.
-fn aggregate_values(values: &[f64], agg: &PivotAggregation) -> f64 {
+pub(crate) fn aggregate_values(values: &[f64], agg: &PivotAggregation) -> f64 {
     match agg {
         PivotAggregation::Sum => values.iter().sum(),
         PivotAggregation::Count => values.len() as f64,
@@ -919,7 +747,8 @@ fn aggregate_values(values: &[f64], agg: &PivotAggregation) -> f64 {
     }
 }
 
-fn format_aggregation(agg: &PivotAggregation) -> &str {
+
+pub(crate) fn format_aggregation(agg: &PivotAggregation) -> &str {
     match agg {
         PivotAggregation::Sum => "Sum",
         PivotAggregation::Count => "Count",
@@ -935,8 +764,9 @@ fn format_aggregation(agg: &PivotAggregation) -> &str {
     }
 }
 
+
 /// Write a string value to a worksheet cell.
-fn write_cell_value_to_worksheet(
+pub(crate) fn write_cell_value_to_worksheet(
     ws: &mut rust_xlsxwriter::Worksheet,
     row: u32,
     col: u16,
@@ -953,319 +783,3 @@ fn write_cell_value_to_worksheet(
 
 // ── Calculated Field Expression Parser ──
 
-/// Token types for the calculated field expression parser.
-#[derive(Debug, Clone, PartialEq)]
-enum Token {
-    Number(f64),
-    Identifier(String),
-    Plus,
-    Minus,
-    Star,
-    Slash,
-    LParen,
-    RParen,
-}
-
-/// AST node for a calculated field expression.
-#[derive(Debug, Clone)]
-enum Expr {
-    Number(f64),
-    Field(String),
-    Binary(Box<Expr>, BinOp, Box<Expr>),
-}
-
-#[derive(Debug, Clone)]
-enum BinOp {
-    Add,
-    Sub,
-    Mul,
-    Div,
-}
-
-/// Tokenize a formula string like "=Revenue - Cost" or "Price * (Qty + 1)".
-fn tokenize(formula: &str) -> Result<Vec<Token>> {
-    let s = formula.trim();
-    let s = s.strip_prefix('=').unwrap_or(s).trim();
-    let mut tokens: Vec<Token> = Vec::new();
-    let chars: Vec<char> = s.chars().collect();
-    let len = chars.len();
-    let mut i = 0;
-
-    while i < len {
-        let c = chars[i];
-        if c.is_whitespace() {
-            i += 1;
-            continue;
-        }
-        match c {
-            '+' => {
-                tokens.push(Token::Plus);
-                i += 1;
-            }
-            '-' => {
-                tokens.push(Token::Minus);
-                i += 1;
-            }
-            '*' => {
-                tokens.push(Token::Star);
-                i += 1;
-            }
-            '/' => {
-                tokens.push(Token::Slash);
-                i += 1;
-            }
-            '(' => {
-                tokens.push(Token::LParen);
-                i += 1;
-            }
-            ')' => {
-                tokens.push(Token::RParen);
-                i += 1;
-            }
-            _ if c.is_ascii_digit()
-                || (c == '.' && i + 1 < len && chars[i + 1].is_ascii_digit()) =>
-            {
-                let start = i;
-                while i < len && (chars[i].is_ascii_digit() || chars[i] == '.') {
-                    i += 1;
-                }
-                let num_str: String = chars[start..i].iter().collect();
-                let num = num_str
-                    .parse::<f64>()
-                    .map_err(|_| AppError::InvalidInput(format!("Invalid number: {}", num_str)))?;
-                tokens.push(Token::Number(num));
-            }
-            _ if c.is_alphabetic() || c == '_' => {
-                let start = i;
-                while i < len && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '.')
-                {
-                    i += 1;
-                }
-                let ident: String = chars[start..i].iter().collect();
-                tokens.push(Token::Identifier(ident));
-            }
-            _ => {
-                return Err(AppError::InvalidInput(format!(
-                    "Unexpected character '{}' in formula: {}",
-                    c, formula
-                )));
-            }
-        }
-    }
-
-    Ok(tokens)
-}
-
-/// Get operator precedence for precedence-climbing parser.
-fn precedence(token: &Token) -> u8 {
-    match token {
-        Token::Plus | Token::Minus => 1,
-        Token::Star | Token::Slash => 2,
-        _ => 0,
-    }
-}
-
-/// Parse expression with precedence climbing.
-fn parse_expr(tokens: &[Token], pos: usize, min_prec: u8) -> Result<(Expr, usize)> {
-    let (mut left, mut pos) = parse_prefix(tokens, pos)?;
-
-    while pos < tokens.len() {
-        let prec = precedence(&tokens[pos]);
-        if prec < min_prec {
-            break;
-        }
-        let op = match &tokens[pos] {
-            Token::Plus => BinOp::Add,
-            Token::Minus => BinOp::Sub,
-            Token::Star => BinOp::Mul,
-            Token::Slash => BinOp::Div,
-            _ => break,
-        };
-        pos += 1;
-        let (right, new_pos) = parse_expr(tokens, pos, prec + 1)?;
-        left = Expr::Binary(Box::new(left), op, Box::new(right));
-        pos = new_pos;
-    }
-
-    Ok((left, pos))
-}
-
-/// Parse a prefix expression (number, field name, parenthesized, or unary minus).
-fn parse_prefix(tokens: &[Token], pos: usize) -> Result<(Expr, usize)> {
-    if pos >= tokens.len() {
-        return Err(AppError::InvalidInput(
-            "Unexpected end of formula".to_string(),
-        ));
-    }
-    match &tokens[pos] {
-        Token::Number(n) => Ok((Expr::Number(*n), pos + 1)),
-        Token::Identifier(name) => Ok((Expr::Field(name.clone()), pos + 1)),
-        Token::LParen => {
-            let (inner, pos) = parse_expr(tokens, pos + 1, 0)?;
-            if pos >= tokens.len() || tokens[pos] != Token::RParen {
-                return Err(AppError::InvalidInput(
-                    "Missing closing parenthesis in formula".to_string(),
-                ));
-            }
-            Ok((inner, pos + 1))
-        }
-        Token::Minus => {
-            // Unary minus: parse with higher precedence
-            let (inner, pos) = parse_expr(tokens, pos + 1, 3)?;
-            Ok((
-                Expr::Binary(Box::new(Expr::Number(0.0)), BinOp::Sub, Box::new(inner)),
-                pos,
-            ))
-        }
-        _ => Err(AppError::InvalidInput(format!(
-            "Unexpected token in formula: {:?}",
-            tokens[pos]
-        ))),
-    }
-}
-
-/// Parse a complete formula string into an AST.
-fn parse_expression(formula: &str) -> Result<Expr> {
-    let tokens = tokenize(formula)?;
-    if tokens.is_empty() {
-        return Err(AppError::InvalidInput("Empty formula".to_string()));
-    }
-    let (expr, pos) = parse_expr(&tokens, 0, 0)?;
-    if pos < tokens.len() {
-        return Err(AppError::InvalidInput(format!(
-            "Unexpected trailing tokens in formula: {:?}",
-            &tokens[pos..]
-        )));
-    }
-    Ok(expr)
-}
-
-/// Evaluate a parsed expression against a single data row.
-fn evaluate_expr(expr: &Expr, headers: &[String], row: &[CellData]) -> Result<f64> {
-    match expr {
-        Expr::Number(n) => Ok(*n),
-        Expr::Field(name) => {
-            let col_idx = headers.iter().position(|h| h == name).ok_or_else(|| {
-                AppError::InvalidInput(format!("Field '{}' not found in column headers", name))
-            })?;
-            cell_value_to_f64_idx(row, col_idx).ok_or_else(|| {
-                AppError::InvalidInput(format!(
-                    "Field '{}' contains a non-numeric value in source data",
-                    name
-                ))
-            })
-        }
-        Expr::Binary(left, op, right) => {
-            let l = evaluate_expr(left, headers, row)?;
-            let r = evaluate_expr(right, headers, row)?;
-            match op {
-                BinOp::Add => Ok(l + r),
-                BinOp::Sub => Ok(l - r),
-                BinOp::Mul => Ok(l * r),
-                BinOp::Div => {
-                    if r == 0.0 {
-                        Err(AppError::InvalidInput(
-                            "Division by zero in calculated field formula".to_string(),
-                        ))
-                    } else {
-                        Ok(l / r)
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// Get cell value as f64 by usize index.
-fn cell_value_to_f64_idx(row: &[CellData], col: usize) -> Option<f64> {
-    row.get(col)
-        .and_then(|c| c.value.as_ref())
-        .and_then(|v| v.parse::<f64>().ok())
-}
-
-/// Process calculated fields: parse formulas, evaluate per row, and append results
-/// as new columns to headers and data_rows.
-/// Returns the mapping of calculated field name to its new column index.
-fn process_calculated_fields(
-    config: &PivotTableConfig,
-    headers: &mut Vec<String>,
-    data_rows: &mut [Vec<CellData>],
-) -> Result<Vec<(String, u16)>> {
-    let mut calc_cols: Vec<(String, u16)> = Vec::new();
-
-    for cf in &config.calculated_fields {
-        // Name conflict detection
-        if headers.contains(&cf.name) {
-            return Err(AppError::InvalidInput(format!(
-                "Calculated field name '{}' conflicts with an existing column header",
-                cf.name
-            )));
-        }
-
-        // Parse expression (use current headers for field name resolution)
-        let expr = parse_expression(&cf.formula)?;
-
-        // Evaluate for each row and append result
-        let col_idx = headers.len() as u16;
-        for row in data_rows.iter_mut() {
-            let val = evaluate_expr(&expr, headers, row)?;
-            row.push(CellData {
-                value: Some(format!("{}", val)),
-                data_type: CellDataType::Float,
-                formula: None,
-            });
-        }
-
-        headers.push(cf.name.clone());
-        calc_cols.push((cf.name.clone(), col_idx));
-    }
-
-    Ok(calc_cols)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_date_grouping_year() {
-        let grouping = DateGrouping {
-            column: 0,
-            by_year: true,
-            by_quarter: false,
-            by_month: false,
-            by_day: false,
-        };
-        assert_eq!(
-            group_date_value("2024-03-15", &grouping),
-            Some("2024".to_string())
-        );
-    }
-
-    #[test]
-    fn test_date_grouping_year_quarter() {
-        let grouping = DateGrouping {
-            column: 0,
-            by_year: true,
-            by_quarter: true,
-            by_month: false,
-            by_day: false,
-        };
-        assert_eq!(
-            group_date_value("2024-03-15", &grouping),
-            Some("2024-Q1".to_string())
-        );
-    }
-
-    #[test]
-    fn test_date_grouping_invalid() {
-        let grouping = DateGrouping {
-            column: 0,
-            by_year: true,
-            by_quarter: false,
-            by_month: false,
-            by_day: false,
-        };
-        assert_eq!(group_date_value("not-a-date", &grouping), None);
-    }
-}

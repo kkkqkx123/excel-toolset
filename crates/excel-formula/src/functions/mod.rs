@@ -55,8 +55,8 @@ fn range_data_iter(args: &[CellValue]) -> impl Iterator<Item = &CellValue> {
     let mut blocks: Vec<&CellValue> = Vec::new();
     let mut i = 0;
     while i < args.len() {
-        if let CellValue::Number(n) = &args[i] {
-            if *n < RANGE_MARKER_THRESHOLD {
+        if let CellValue::Number(n) = &args[i]
+            && *n < RANGE_MARKER_THRESHOLD {
                 let cols = (-(*n + RANGE_MARKER_OFFSET)) as usize;
                 if let Some(CellValue::Number(rows)) = args.get(i + 1) {
                     let rows = *rows as usize;
@@ -67,7 +67,6 @@ fn range_data_iter(args: &[CellValue]) -> impl Iterator<Item = &CellValue> {
                     continue;
                 }
             }
-        }
         blocks.push(&args[i]);
         i += 1;
     }

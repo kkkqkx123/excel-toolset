@@ -14,37 +14,37 @@ pub fn register(
         Arc<dyn Fn(&[CellValue], &dyn DataProvider) -> CellValue + Send + Sync>,
     >,
 ) {
-    registry.insert("LEN".into(), Arc::new(|args, provider| text_len(args)));
-    registry.insert("LEFT".into(), Arc::new(|args, provider| text_left(args)));
-    registry.insert("RIGHT".into(), Arc::new(|args, provider| text_right(args)));
-    registry.insert("MID".into(), Arc::new(|args, provider| text_mid(args)));
-    registry.insert("UPPER".into(), Arc::new(|args, provider| text_upper(args)));
-    registry.insert("LOWER".into(), Arc::new(|args, provider| text_lower(args)));
-    registry.insert("TRIM".into(), Arc::new(|args, provider| text_trim(args)));
+    registry.insert("LEN".into(), Arc::new(|args, _provider| text_len(args)));
+    registry.insert("LEFT".into(), Arc::new(|args, _provider| text_left(args)));
+    registry.insert("RIGHT".into(), Arc::new(|args, _provider| text_right(args)));
+    registry.insert("MID".into(), Arc::new(|args, _provider| text_mid(args)));
+    registry.insert("UPPER".into(), Arc::new(|args, _provider| text_upper(args)));
+    registry.insert("LOWER".into(), Arc::new(|args, _provider| text_lower(args)));
+    registry.insert("TRIM".into(), Arc::new(|args, _provider| text_trim(args)));
     registry.insert(
         "CONCATENATE".into(),
-        Arc::new(|args, provider| text_concat(args)),
+        Arc::new(|args, _provider| text_concat(args)),
     );
     registry.insert(
         "CONCAT".into(),
-        Arc::new(|args, provider| text_concat(args)),
+        Arc::new(|args, _provider| text_concat(args)),
     );
-    registry.insert("FIND".into(), Arc::new(|args, provider| text_find(args)));
+    registry.insert("FIND".into(), Arc::new(|args, _provider| text_find(args)));
     registry.insert(
         "SEARCH".into(),
-        Arc::new(|args, provider| text_search(args)),
+        Arc::new(|args, _provider| text_search(args)),
     );
     registry.insert(
         "REPLACE".into(),
-        Arc::new(|args, provider| text_replace(args)),
+        Arc::new(|args, _provider| text_replace(args)),
     );
     registry.insert(
         "SUBSTITUTE".into(),
-        Arc::new(|args, provider| text_substitute(args)),
+        Arc::new(|args, _provider| text_substitute(args)),
     );
-    registry.insert("TEXT".into(), Arc::new(|args, provider| text_text(args)));
-    registry.insert("VALUE".into(), Arc::new(|args, provider| text_value(args)));
-    registry.insert("REPT".into(), Arc::new(|args, provider| text_rept(args)));
+    registry.insert("TEXT".into(), Arc::new(|args, _provider| text_text(args)));
+    registry.insert("VALUE".into(), Arc::new(|args, _provider| text_value(args)));
+    registry.insert("REPT".into(), Arc::new(|args, _provider| text_rept(args)));
 }
 
 fn text_len(args: &[CellValue]) -> CellValue {

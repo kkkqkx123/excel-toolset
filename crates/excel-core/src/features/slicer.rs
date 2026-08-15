@@ -54,10 +54,10 @@ pub fn create_slicer(
     }
 
     let backup_info = security::create_backup_if_needed(params)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
     let old_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
     // Collect unique values from the pivot source data for the slicer field
     let unique_values = collect_slicer_values(path, config)?;
@@ -75,7 +75,7 @@ pub fn create_slicer(
     inject_slicer_xml(path, config, &unique_values, &target_sheet)?;
 
     let new_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
     Ok(WriteResult {
         success: true,
@@ -113,14 +113,13 @@ fn collect_slicer_values(path: &str, config: &SlicerConfig) -> Result<Vec<String
     let mut values: Vec<String> = Vec::new();
 
     for row in source_data.iter().skip(1) {
-        if let Some(cell) = row.get(field_col) {
-            if let Some(ref val) = cell.value {
+        if let Some(cell) = row.get(field_col)
+            && let Some(ref val) = cell.value {
                 let trimmed = val.trim().to_string();
                 if !trimmed.is_empty() && seen.insert(trimmed.clone()) {
                     values.push(trimmed);
                 }
             }
-        }
     }
 
     // Sort for consistent ordering
@@ -139,16 +138,14 @@ fn inject_slicer_xml(
 ) -> Result<()> {
     // Read the existing xlsx file
     let file_bytes = std::fs::read(path).map_err(|e| {
-        AppError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        AppError::Io(std::io::Error::other(
             format!("Failed to read xlsx for slicer injection: {e}"),
         ))
     })?;
 
     let cursor = Cursor::new(file_bytes);
     let mut archive = ZipArchive::new(cursor).map_err(|e| {
-        AppError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        AppError::Io(std::io::Error::other(
             format!("Failed to open xlsx as ZIP: {e}"),
         ))
     })?;
@@ -215,8 +212,7 @@ fn inject_slicer_xml(
     // Rebuild the ZIP with injected parts
     let output = rebuild_zip(&new_entries)?;
     std::fs::write(path, output).map_err(|e| {
-        AppError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        AppError::Io(std::io::Error::other(
             format!("Failed to write modified xlsx: {e}"),
         ))
     })?;
@@ -248,11 +244,10 @@ fn find_sheet_index<R: Read + std::io::Seek>(
             // Extract the rId to determine index
             if let Some(r_id_pos) = line.find("r:id=\"rId") {
                 let rest = &line[r_id_pos + 8..]; // skip 'r:id="rId'
-                if let Some(end) = rest.find('"') {
-                    if let Ok(num) = rest[..end].parse::<usize>() {
+                if let Some(end) = rest.find('"')
+                    && let Ok(num) = rest[..end].parse::<usize>() {
                         sheet_idx = num - 1; // rId1 -> index 0
                     }
-                }
             }
             break;
         }
@@ -460,11 +455,10 @@ fn update_workbook_rels(original: &[u8]) -> Vec<u8> {
     for line in xml_str.lines() {
         if let Some(pos) = line.find("Id=\"rId") {
             let rest = &line[pos + 7..];
-            if let Some(end) = rest.find('"') {
-                if let Ok(n) = rest[..end].parse::<usize>() {
+            if let Some(end) = rest.find('"')
+                && let Ok(n) = rest[..end].parse::<usize>() {
                     max_rid = max_rid.max(n);
                 }
-            }
         }
     }
 
@@ -519,8 +513,7 @@ fn xml_escape(s: &str) -> String {
 }
 
 fn zip_error_to_app(e: ZipError) -> AppError {
-    AppError::Io(std::io::Error::new(
-        std::io::ErrorKind::Other,
+    AppError::Io(std::io::Error::other(
         e.to_string(),
     ))
 }

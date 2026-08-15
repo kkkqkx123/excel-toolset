@@ -1,18 +1,18 @@
-use rust_xlsxwriter::{Chart, Format, Workbook};
+use rust_xlsxwriter::{Chart, Format};
 
 use crate::types::*;
 use crate::utils::cell_ref;
 
 use super::core::{
-    cell_value_to_data, ensure_dimensions, modify_file, modify_file_with_wb, write_cell_data,
-    write_cell_with_format, write_sheet_data,
+    cell_value_to_data, modify_file, modify_file_with_wb, write_cell_data,
+    write_cell_with_format,
 };
 use super::format::{build_format, map_chart_type};
 
 pub fn add_sheet(path: &str, params: &SecurityParams, sheet: &str) -> Result<WriteResult> {
     #[cfg(feature = "zip")]
     {
-        return super::patch::add_sheet_preserving(path, params, sheet);
+        super::patch::add_sheet_preserving(path, params, sheet)
     }
     #[cfg(not(feature = "zip"))]
     modify_file(path, params, |old_data| {
@@ -35,7 +35,7 @@ pub fn add_sheet(path: &str, params: &SecurityParams, sheet: &str) -> Result<Wri
 pub fn delete_sheet(path: &str, params: &SecurityParams, sheet: &str) -> Result<WriteResult> {
     #[cfg(feature = "zip")]
     {
-        return super::patch::delete_sheet_preserving(path, params, sheet);
+        super::patch::delete_sheet_preserving(path, params, sheet)
     }
     #[cfg(not(feature = "zip"))]
     modify_file(path, params, |old_data| {
@@ -56,7 +56,7 @@ pub fn rename_sheet(
 ) -> Result<WriteResult> {
     #[cfg(feature = "zip")]
     {
-        return super::patch::rename_sheet_preserving(path, params, old_name, new_name);
+        super::patch::rename_sheet_preserving(path, params, old_name, new_name)
     }
     #[cfg(not(feature = "zip"))]
     modify_file(path, params, |old_data| {
@@ -87,12 +87,12 @@ pub fn write_cell(
     #[cfg(feature = "zip")]
     {
         // Preserving write: only the target cell is modified; every other feature of the source file is kept byte-for-byte.
-        return crate::excel_write::patch::write_cells_preserving(
+        crate::excel_write::patch::write_cells_preserving(
             path,
             params,
             sheet,
             &[(row, col, cell)],
-        );
+        )
     }
     #[cfg(not(feature = "zip"))]
     modify_file(path, params, |old_data| {
@@ -100,7 +100,7 @@ pub fn write_cell(
         let sd = new_data
             .get_mut(sheet)
             .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
-        ensure_dimensions(sd, row as usize, col as usize);
+        crate::excel_write::ensure_dimensions(sd, row as usize, col as usize);
         sd.rows[row as usize][col as usize] = cell;
         Ok(new_data)
     })
@@ -124,7 +124,7 @@ pub fn write_range(
                 edits.push((r1 + ri as u32, c1 + ci as u16, cell_value_to_data(val)));
             }
         }
-        return crate::excel_write::patch::write_cells_preserving(path, params, sheet, &edits);
+        crate::excel_write::patch::write_cells_preserving(path, params, sheet, &edits)
     }
     #[cfg(not(feature = "zip"))]
     modify_file(path, params, |old_data| {
@@ -137,7 +137,7 @@ pub fn write_range(
             for (ci, val) in row.iter().enumerate() {
                 let target_row = r1 as usize + ri;
                 let target_col = c1 as usize + ci;
-                ensure_dimensions(sd, target_row, target_col);
+                crate::excel_write::ensure_dimensions(sd, target_row, target_col);
                 sd.rows[target_row][target_col] = cell_value_to_data(val);
             }
         }
@@ -155,9 +155,9 @@ pub fn clear_range(
 
     #[cfg(feature = "zip")]
     {
-        return super::patch::clear_range_preserving(
+        super::patch::clear_range_preserving(
             path, params, sheet, r_start, r_end, c_start, c_end,
-        );
+        )
     }
 
     #[cfg(not(feature = "zip"))]
@@ -198,7 +198,7 @@ pub fn set_formula(
 
     #[cfg(feature = "zip")]
     {
-        return super::patch::set_formula_preserving(path, params, sheet, row, col, cleaned_formula);
+        super::patch::set_formula_preserving(path, params, sheet, row, col, cleaned_formula)
     }
 
     #[cfg(not(feature = "zip"))]
@@ -208,7 +208,7 @@ pub fn set_formula(
             .get_mut(sheet)
             .ok_or_else(|| AppError::SheetNotFound(sheet.into()))?;
 
-        ensure_dimensions(sd, row as usize, col as usize);
+        crate::excel_write::ensure_dimensions(sd, row as usize, col as usize);
         sd.rows[row as usize][col as usize] = CellData {
             value: None,
             data_type: CellDataType::String,
@@ -720,9 +720,12 @@ pub fn insert_textbox(
 }
 
 #[cfg(test)]
+// 测试断言里的 3.14 是预期数值数据，并非 PI 近似，属 clippy::approx_constant 误报
+#[allow(clippy::approx_constant)]
 mod tests {
     use super::*;
     use crate::types::{CellData, CellDataType};
+    use crate::excel_write::ensure_dimensions;
     use std::collections::HashMap;
 
     fn make_cell(value: &str) -> CellData {

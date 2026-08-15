@@ -60,6 +60,8 @@ pub fn collect_row_types(data: &[Vec<CellData>]) -> Vec<Vec<CellDataType>> {
 }
 
 #[cfg(test)]
+// 测试断言里的 3.14 是预期浮点数据（验证 "3.14" 解析结果），并非 PI 近似，属 clippy::approx_constant 误报
+#[allow(clippy::approx_constant)]
 mod tests {
     use super::*;
 

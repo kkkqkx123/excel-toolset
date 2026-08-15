@@ -149,7 +149,7 @@ pub fn create_table(
     // The config range may be "Sheet1!A1:A2" (with a sheet-name prefix), while parse_range
     // only handles the cell part, so strip the "SheetName!" prefix before parsing; otherwise
     // the table name would be parsed as a column name and fail with "Column overflow".
-    let range_part = config.range.split('!').last().unwrap_or(&config.range);
+    let range_part = config.range.split('!').next_back().unwrap_or(&config.range);
     let (raw_r1, raw_c1, raw_r2, raw_c2) = crate::utils::cell_ref::parse_range(range_part)?;
     let (r1, c1, r2, c2) = normalize_range(raw_r1, raw_c1, raw_r2, raw_c2);
     let normalized_range = range_to_string(r1, c1, r2, c2);
@@ -185,16 +185,14 @@ pub fn create_table(
     {
         let existing_tables = list_tables(path)?;
         for t in &existing_tables {
-            if t.sheet.eq_ignore_ascii_case(&target_sheet) {
-                if let Ok((er1, ec1, er2, ec2)) = crate::utils::cell_ref::parse_range(&t.range) {
-                    if ranges_overlap(r1, c1, r2, c2, er1, ec1, er2, ec2) {
+            if t.sheet.eq_ignore_ascii_case(&target_sheet)
+                && let Ok((er1, ec1, er2, ec2)) = crate::utils::cell_ref::parse_range(&t.range)
+                    && ranges_overlap(r1, c1, r2, c2, er1, ec1, er2, ec2) {
                         return Err(AppError::InvalidInput(format!(
                             "Table range '{}' overlaps with existing table '{}' at '{}' on sheet '{}'",
                             normalized_range, t.name, t.range, target_sheet
                         )));
                     }
-                }
-            }
         }
     }
 
@@ -333,11 +331,10 @@ pub fn list_tables(path: &str) -> Result<Vec<TableInfo>> {
         // Look for table XML files: xl/tables/tableN.xml
         if name.starts_with("xl/tables/table") && name.ends_with(".xml") {
             let mut xml_str = String::new();
-            if entry.read_to_string(&mut xml_str).is_ok() {
-                if let Some(info) = parse_table_xml(&xml_str) {
+            if entry.read_to_string(&mut xml_str).is_ok()
+                && let Some(info) = parse_table_xml(&xml_str) {
                     tables.push(info);
                 }
-            }
         }
     }
 
@@ -365,8 +362,8 @@ pub fn list_tables(path: &str) -> Result<Vec<TableInfo>> {
 
                 // Find table references in this sheet's rels
                 for line in rels_str.lines() {
-                    if line.contains("table") && line.contains("Target=") {
-                        if let Some(target) = extract_xml_attr(line, "Target") {
+                    if line.contains("table") && line.contains("Target=")
+                        && let Some(target) = extract_xml_attr(line, "Target") {
                             // Match table target to the tables we found
                             let table_file = target.strip_prefix("../tables/").unwrap_or(&target);
                             for table in &mut tables {
@@ -379,7 +376,6 @@ pub fn list_tables(path: &str) -> Result<Vec<TableInfo>> {
                             }
                             let _ = (sheet_num, table_file);
                         }
-                    }
                 }
             }
         }
@@ -556,11 +552,10 @@ fn extract_xml_attr(line: &str, attr_name: &str) -> Option<String> {
 /// Helper: extract an XML attribute from a specific tag in multi-line XML.
 fn extract_xml_attr_on_tag(xml: &str, tag: &str, attr_name: &str) -> Option<String> {
     for line in xml.lines() {
-        if line.contains(tag) {
-            if let Some(val) = extract_xml_attr(line, attr_name) {
+        if line.contains(tag)
+            && let Some(val) = extract_xml_attr(line, attr_name) {
                 return Some(val);
             }
-        }
     }
     None
 }

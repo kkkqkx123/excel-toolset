@@ -289,7 +289,7 @@ fn get_invocation_command() -> Result<String> {
     // In test environment, return a placeholder command name
     #[cfg(test)]
     {
-        return Ok(format!("{} diff git-driver", DEFAULT_COMMAND_NAME));
+        Ok(format!("{} diff git-driver", DEFAULT_COMMAND_NAME))
     }
 
     // Production environment: get actual executable path
@@ -668,11 +668,9 @@ mod tests {
 
     #[test]
     fn test_remove_excel_entries_preserves_other() {
-        let lines = vec![
-            "*.xml diff=xml-diff",
+        let lines = ["*.xml diff=xml-diff",
             "*.xlsx diff=excel-diff",
-            "*.json diff=json-diff",
-        ];
+            "*.json diff=json-diff"];
         let remaining: Vec<&str> = lines
             .iter()
             .filter(|line| !line.contains(GITATTR_PATTERN))

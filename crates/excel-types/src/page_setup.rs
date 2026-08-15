@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 /// Page setup configuration for a worksheet.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct PageSetupConfig {
     /// Target sheet name.
     pub sheet: String,
@@ -38,25 +39,6 @@ pub struct PageSetupConfig {
     pub center_vertically: bool,
 }
 
-impl Default for PageSetupConfig {
-    fn default() -> Self {
-        Self {
-            sheet: String::new(),
-            paper_size: None,
-            orientation: None,
-            margins: None,
-            print_area: None,
-            print_title_rows: None,
-            print_title_cols: None,
-            fit_to_pages: None,
-            scale: None,
-            print_gridlines: false,
-            print_headings: false,
-            center_horizontally: false,
-            center_vertically: false,
-        }
-    }
-}
 
 /// Paper size enumeration.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

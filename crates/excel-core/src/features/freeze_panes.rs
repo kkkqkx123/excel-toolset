@@ -3,7 +3,6 @@
 //! Keeps specified rows and/or columns visible while scrolling the worksheet.
 //! Supports row freezing, column freezing, or both simultaneously.
 
-use crate::security;
 use crate::types::*;
 
 /// Set freeze panes on a worksheet.
@@ -17,9 +16,9 @@ pub fn set_freeze_panes(
 ) -> Result<WriteResult> {
     #[cfg(feature = "zip")]
     {
-        return crate::excel_write::patch::set_freeze_panes_preserving(
+        crate::excel_write::patch::set_freeze_panes_preserving(
             path, params, &config.sheet, config.rows, config.cols,
-        );
+        )
     }
 
     #[cfg(not(feature = "zip"))]

@@ -31,21 +31,21 @@ pub fn insert_image(
     }
 
     let backup_info = security::create_backup_if_needed(params)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
     let old_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
     let (anchor_row, anchor_col) = crate::utils::cell_ref::parse_cell_ref(&config.anchor_cell)?;
 
-    crate::excel_write::modify_file_with_wb(path, params, |old_data, wb| {
+    crate::excel_write::modify_file_with_wb(path, params, |_old_data, wb| {
         let ws = wb
             .worksheet_from_name(&config.sheet)
             .map_err(|_e| AppError::SheetNotFound(config.sheet.clone()))?;
 
         let mut image =
             rust_xlsxwriter::Image::new(&config.image_path)
-                .map_err(|e| AppError::Xlsx(e))?;
+                .map_err(AppError::Xlsx)?;
 
         if let Some(ref scale) = config.scale {
             image = image
@@ -64,7 +64,7 @@ pub fn insert_image(
     })?;
 
     let new_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
     Ok(WriteResult {
         success: true,
@@ -94,7 +94,7 @@ pub fn remove_image(
 
     #[cfg(feature = "zip")]
     {
-        return crate::excel_write::patch::remove_images_preserving(path, params, sheet);
+        crate::excel_write::patch::remove_images_preserving(path, params, sheet)
     }
 
     #[cfg(not(feature = "zip"))]

@@ -39,8 +39,7 @@ fn main() {
     println!("Initial data:");
     for (i, row) in sheet.rows.iter().enumerate() {
         let none_str = "None".to_string();
-        let val = row
-            .get(0)
+        let val = row.first()
             .and_then(|c| c.value.as_ref())
             .unwrap_or(&none_str);
         println!("  Row {}: {}", i, val);
@@ -81,8 +80,7 @@ fn main() {
     println!("Updated data:");
     for (i, row) in updated_sheet.rows.iter().enumerate() {
         let none_str = "None".to_string();
-        let val = row
-            .get(0)
+        let val = row.first()
             .and_then(|c| c.value.as_ref())
             .unwrap_or(&none_str);
         println!("  Row {}: {}", i, val);
@@ -98,7 +96,7 @@ fn main() {
 
     // Check the last row
     let last_row = updated_sheet.rows.last().unwrap();
-    let last_val = last_row.get(0).and_then(|c| c.value.as_ref());
+    let last_val = last_row.first().and_then(|c| c.value.as_ref());
     println!("Last row first cell: {:?}", last_val);
 
     // Clean up

@@ -39,6 +39,12 @@ pub struct InMemoryDataProvider {
     data: Arc<HashMap<String, Vec<Vec<CellValue>>>>,
 }
 
+impl Default for InMemoryDataProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InMemoryDataProvider {
     pub fn new() -> Self {
         Self {
@@ -176,7 +182,7 @@ impl<P: DataProvider + 'static> FormulaEngine<P> {
     pub fn evaluate(
         &self,
         sheet: &str,
-        cell_ref: &str,
+        _cell_ref: &str,
         formula: &str,
     ) -> EvalResult<FormulaResult> {
         let ast = parser::parse(formula).map_err(|e| crate::evaluator::EvalError::parse(e.msg))?;
@@ -190,12 +196,11 @@ impl<P: DataProvider + 'static> FormulaEngine<P> {
         let cell_value = evaluator.evaluate(sheet, &ast)?;
 
         // Check if this is a dynamic array spill function
-        if let AstNode::Function { ref name, .. } = ast {
-            if spill::is_spill_function(name) {
+        if let AstNode::Function { ref name, .. } = ast
+            && spill::is_spill_function(name) {
                 let spill_result = spill::try_spill(sheet, &ast, &mut evaluator)?;
                 return Ok(FormulaResult::Spill(spill_result));
             }
-        }
 
         Ok(FormulaResult::Single(cell_value))
     }
@@ -223,7 +228,7 @@ mod tmp_debug_tests {
             cells[i][2] = CellValue::Number(*v);
         }
         let p = InMemoryDataProvider::new().with_sheet("S", cells);
-        let mut e = FormulaEngine::new(p);
+        let e = FormulaEngine::new(p);
         for f in ["=SUM(C2:C6)", "=AVERAGE(C2:C6)", "=COUNT(C2:C6)", "=MIN(C2:C6)", "=MAX(C2:C6)"] {
             println!("{f} => {:?}", e.evaluate("S", "A1", f));
         }

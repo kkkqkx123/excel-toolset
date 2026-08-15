@@ -49,7 +49,7 @@ fn main() {
     // Create test data
     let mut data = std::collections::HashMap::new();
 
-    let mut sheet = SheetData {
+    let sheet = SheetData {
         name: "Sheet1".to_string(),
         rows: vec![
             vec![
@@ -111,8 +111,7 @@ fn main() {
     println!("Before sort:");
     for (i, row) in sheet.rows.iter().enumerate() {
         let none_str = "None".to_string();
-        let name = row
-            .get(0)
+        let name = row.first()
             .and_then(|c| c.value.as_ref())
             .unwrap_or(&none_str);
         let age = row
@@ -137,8 +136,7 @@ fn main() {
     println!("After sort:");
     for (i, row) in sorted_sheet.rows.iter().enumerate() {
         let none_str = "None".to_string();
-        let name = row
-            .get(0)
+        let name = row.first()
             .and_then(|c| c.value.as_ref())
             .unwrap_or(&none_str);
         let age = row

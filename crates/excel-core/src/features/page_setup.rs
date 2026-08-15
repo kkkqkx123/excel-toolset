@@ -21,12 +21,12 @@ pub fn configure_page_setup(
     }
 
     let backup_info = security::create_backup_if_needed(params)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
     let old_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
-    crate::excel_write::modify_file_with_wb(path, params, |old_data, wb| {
+    crate::excel_write::modify_file_with_wb(path, params, |_old_data, wb| {
         let ws = wb
             .worksheet_from_name(&config.sheet)
             .map_err(|_e| AppError::SheetNotFound(config.sheet.clone()))?;
@@ -133,7 +133,7 @@ pub fn configure_page_setup(
     })?;
 
     let new_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
     Ok(WriteResult {
         success: true,
@@ -159,29 +159,29 @@ pub fn set_page_breaks(
     }
 
     let backup_info = security::create_backup_if_needed(params)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
     let old_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
-    crate::excel_write::modify_file_with_wb(path, params, |old_data, wb| {
+    crate::excel_write::modify_file_with_wb(path, params, |_old_data, wb| {
         let ws = wb
             .worksheet_from_name(&config.sheet)
             .map_err(|_e| AppError::SheetNotFound(config.sheet.clone()))?;
 
         if !config.horizontal_breaks.is_empty() {
-            ws.set_page_breaks(&config.horizontal_breaks);
+            ws.set_page_breaks(&config.horizontal_breaks)?;
         }
         if !config.vertical_breaks.is_empty() {
             let vbreaks: Vec<u32> = config.vertical_breaks.iter().map(|&v| v as u32).collect();
-            ws.set_vertical_page_breaks(&vbreaks);
+            ws.set_vertical_page_breaks(&vbreaks)?;
         }
 
         Ok(())
     })?;
 
     let new_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
     Ok(WriteResult {
         success: true,

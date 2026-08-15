@@ -13,36 +13,36 @@ pub fn register(
         Arc<dyn Fn(&[CellValue], &dyn DataProvider) -> CellValue + Send + Sync>,
     >,
 ) {
-    registry.insert("IF".into(), Arc::new(|args, provider| logical_if(args)));
-    registry.insert("AND".into(), Arc::new(|args, provider| logical_and(args)));
-    registry.insert("OR".into(), Arc::new(|args, provider| logical_or(args)));
-    registry.insert("NOT".into(), Arc::new(|args, provider| logical_not(args)));
+    registry.insert("IF".into(), Arc::new(|args, _provider| logical_if(args)));
+    registry.insert("AND".into(), Arc::new(|args, _provider| logical_and(args)));
+    registry.insert("OR".into(), Arc::new(|args, _provider| logical_or(args)));
+    registry.insert("NOT".into(), Arc::new(|args, _provider| logical_not(args)));
     registry.insert(
         "IFERROR".into(),
-        Arc::new(|args, provider| logical_iferror(args)),
+        Arc::new(|args, _provider| logical_iferror(args)),
     );
-    registry.insert("IFNA".into(), Arc::new(|args, provider| logical_ifna(args)));
+    registry.insert("IFNA".into(), Arc::new(|args, _provider| logical_ifna(args)));
     registry.insert(
         "ISBLANK".into(),
-        Arc::new(|args, provider| logical_isblank(args)),
+        Arc::new(|args, _provider| logical_isblank(args)),
     );
     registry.insert(
         "ISERROR".into(),
-        Arc::new(|args, provider| logical_iserror(args)),
+        Arc::new(|args, _provider| logical_iserror(args)),
     );
     registry.insert(
         "ISNUMBER".into(),
-        Arc::new(|args, provider| logical_isnumber(args)),
+        Arc::new(|args, _provider| logical_isnumber(args)),
     );
     registry.insert(
         "ISTEXT".into(),
-        Arc::new(|args, provider| logical_istext(args)),
+        Arc::new(|args, _provider| logical_istext(args)),
     );
     registry.insert(
         "ISLOGICAL".into(),
-        Arc::new(|args, provider| logical_islogical(args)),
+        Arc::new(|args, _provider| logical_islogical(args)),
     );
-    registry.insert("ISNA".into(), Arc::new(|args, provider| logical_isna(args)));
+    registry.insert("ISNA".into(), Arc::new(|args, _provider| logical_isna(args)));
     registry.insert(
         "TRUE".into(),
         Arc::new(|_args, _provider| CellValue::Bool(true)),
@@ -51,12 +51,12 @@ pub fn register(
         "FALSE".into(),
         Arc::new(|_args, _provider| CellValue::Bool(false)),
     );
-    registry.insert("XOR".into(), Arc::new(|args, provider| logical_xor(args)));
+    registry.insert("XOR".into(), Arc::new(|args, _provider| logical_xor(args)));
     registry.insert(
         "SWITCH".into(),
-        Arc::new(|args, provider| logical_switch(args)),
+        Arc::new(|args, _provider| logical_switch(args)),
     );
-    registry.insert("IFS".into(), Arc::new(|args, provider| logical_ifs(args)));
+    registry.insert("IFS".into(), Arc::new(|args, _provider| logical_ifs(args)));
 }
 
 /// Convert a CellValue to a boolean (Excel truthiness rules).
@@ -120,41 +120,41 @@ fn logical_ifna(args: &[CellValue]) -> CellValue {
 }
 
 fn logical_isblank(args: &[CellValue]) -> CellValue {
-    CellValue::Bool(args.first().map_or(true, |v| matches!(v, CellValue::Empty)))
+    CellValue::Bool(args.first().is_none_or(|v| matches!(v, CellValue::Empty)))
 }
 
 fn logical_iserror(args: &[CellValue]) -> CellValue {
     CellValue::Bool(
         args.first()
-            .map_or(false, |v| matches!(v, CellValue::Error(_))),
+            .is_some_and(|v| matches!(v, CellValue::Error(_))),
     )
 }
 
 fn logical_isnumber(args: &[CellValue]) -> CellValue {
     CellValue::Bool(
         args.first()
-            .map_or(false, |v| matches!(v, CellValue::Number(_))),
+            .is_some_and(|v| matches!(v, CellValue::Number(_))),
     )
 }
 
 fn logical_istext(args: &[CellValue]) -> CellValue {
     CellValue::Bool(
         args.first()
-            .map_or(false, |v| matches!(v, CellValue::String(_))),
+            .is_some_and(|v| matches!(v, CellValue::String(_))),
     )
 }
 
 fn logical_islogical(args: &[CellValue]) -> CellValue {
     CellValue::Bool(
         args.first()
-            .map_or(false, |v| matches!(v, CellValue::Bool(_))),
+            .is_some_and(|v| matches!(v, CellValue::Bool(_))),
     )
 }
 
 fn logical_isna(args: &[CellValue]) -> CellValue {
     CellValue::Bool(
         args.first()
-            .map_or(false, |v| matches!(v, CellValue::Error(e) if e == "#N/A")),
+            .is_some_and(|v| matches!(v, CellValue::Error(e) if e == "#N/A")),
     )
 }
 
@@ -197,11 +197,10 @@ fn logical_ifs(args: &[CellValue]) -> CellValue {
     }
 
     for i in (0..args.len()).step_by(2) {
-        if i + 1 < args.len() {
-            if to_bool(&args[i]) {
+        if i + 1 < args.len()
+            && to_bool(&args[i]) {
                 return args[i + 1].clone();
             }
-        }
     }
 
     CellValue::Error("#N/A".into())

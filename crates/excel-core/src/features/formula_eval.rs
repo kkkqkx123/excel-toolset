@@ -5,10 +5,9 @@
 //! evaluates it and stores the computed result alongside the formula string.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use calamine::Reader;
-use excel_formula::{DataProvider, FormulaEngine, InMemoryDataProvider};
+use excel_formula::{DataProvider, FormulaEngine};
 use excel_types::CellValue;
 
 use crate::types::*;
@@ -281,7 +280,7 @@ pub fn set_formula_with_eval(
 
 /// Refresh all formulas in a worksheet by re-evaluating them.
 pub fn refresh_formulas(path: &str, sheet: &str, params: &SecurityParams) -> Result<WriteResult> {
-    use crate::excel_write::{ensure_dimensions, modify_file};
+    use crate::excel_write::modify_file;
 
     let result = modify_file(path, params, |old_data| {
         let mut new_data = old_data.clone();

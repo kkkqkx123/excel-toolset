@@ -5,7 +5,6 @@
 //! - Hidden: hidden but user can unhide via Excel UI
 //! - VeryHidden: deeply hidden, can only be unhidden via VBA
 
-use crate::security;
 use crate::types::*;
 
 /// Set the visibility of a worksheet.
@@ -17,7 +16,7 @@ pub fn set_sheet_visibility(
 ) -> Result<WriteResult> {
     #[cfg(feature = "zip")]
     {
-        return crate::excel_write::patch::set_sheet_visibility_preserving(path, params, sheet, visibility);
+        crate::excel_write::patch::set_sheet_visibility_preserving(path, params, sheet, visibility)
     }
 
     #[cfg(not(feature = "zip"))]

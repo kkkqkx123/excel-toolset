@@ -230,7 +230,7 @@ pub fn read_sheet_all(path: &str, sheet: &str) -> Result<SheetData> {
             .saturating_add(range.width() as u32)
             .saturating_sub(1),
     );
-    let (f_start, f_end) = match &ws_formulas {
+    let (_f_start, f_end) = match &ws_formulas {
         Some(f) => {
             let s = f.start().unwrap_or((0, 0));
             (

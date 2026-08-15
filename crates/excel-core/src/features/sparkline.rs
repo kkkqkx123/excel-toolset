@@ -28,7 +28,7 @@ pub fn add_sparkline(
 
     security::create_backup_if_needed(params)?;
 
-    crate::excel_write::modify_file_with_wb(path, params, |old_data, wb| {
+    crate::excel_write::modify_file_with_wb(path, params, |_old_data, wb| {
         let ws = wb
             .worksheet_from_name(&config.sheet)
             .map_err(|_e| AppError::SheetNotFound(config.sheet.clone()))?;

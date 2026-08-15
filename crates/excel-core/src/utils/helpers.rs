@@ -214,6 +214,8 @@ pub fn resolve_number_format(name: &str) -> &str {
 }
 
 #[cfg(test)]
+// 测试断言里的 3.14 是预期数值数据（如 JSON 3.14 转换、矩阵取值），并非 PI 近似，属 clippy::approx_constant 误报
+#[allow(clippy::approx_constant)]
 mod tests {
     use super::*;
 

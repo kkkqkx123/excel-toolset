@@ -10,9 +10,7 @@
 
 use std::io::Read;
 
-use crate::security;
 use crate::types::*;
-use crate::utils::cell_ref;
 
 /// Set an autofilter range on a worksheet.
 ///
@@ -25,9 +23,9 @@ pub fn set_auto_filter(
 ) -> Result<WriteResult> {
     #[cfg(feature = "zip")]
     {
-        return crate::excel_write::patch::set_auto_filter_preserving(
+        crate::excel_write::patch::set_auto_filter_preserving(
             path, params, &config.sheet, &config.range,
-        );
+        )
     }
 
     #[cfg(not(feature = "zip"))]
@@ -76,7 +74,7 @@ pub fn set_auto_filter(
 pub fn remove_auto_filter(path: &str, sheet: &str, params: &SecurityParams) -> Result<WriteResult> {
     #[cfg(feature = "zip")]
     {
-        return crate::excel_write::patch::remove_auto_filter_preserving(path, params, sheet);
+        crate::excel_write::patch::remove_auto_filter_preserving(path, params, sheet)
     }
 
     #[cfg(not(feature = "zip"))]
@@ -140,8 +138,8 @@ pub fn get_auto_filter(path: &str, sheet: &str) -> Result<AutoFilterInfo> {
                             current_sheet_name = Some(rest[..end].to_string());
                         }
                     }
-                    if current_sheet_name.as_deref() == Some(sheet) {
-                        if let Some(start) = line.find("sheetId=\"") {
+                    if current_sheet_name.as_deref() == Some(sheet)
+                        && let Some(start) = line.find("sheetId=\"") {
                             let rest = &line[start + 9..];
                             if let Some(end) = rest.find('"') {
                                 let sheet_id: String = rest[..end].to_string();
@@ -150,14 +148,13 @@ pub fn get_auto_filter(path: &str, sheet: &str) -> Result<AutoFilterInfo> {
                                 break;
                             }
                         }
-                    }
                 }
             }
         }
     }
 
     // If we couldn't find via workbook.xml, try the standard naming
-    let sheet_filename = sheet_filename.unwrap_or_else(|| format!("xl/worksheets/sheet1.xml"));
+    let sheet_filename = sheet_filename.unwrap_or_else(|| "xl/worksheets/sheet1.xml".to_string());
 
     // Read the worksheet XML and check for <autoFilter>
     let enabled = match archive.by_name(&sheet_filename) {

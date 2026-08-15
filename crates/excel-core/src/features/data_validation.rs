@@ -15,7 +15,7 @@ pub fn add_data_validation(
 ) -> Result<WriteResult> {
     #[cfg(feature = "zip")]
     {
-        return crate::excel_write::patch::add_data_validation_preserving(path, params, sheet, config);
+        crate::excel_write::patch::add_data_validation_preserving(path, params, sheet, config)
     }
 
     #[cfg(not(feature = "zip"))]

@@ -20,7 +20,7 @@ fn main() {
 
     // Read initial sheets
     use calamine::Reader;
-    let mut workbook: calamine::Xlsx<_> = calamine::open_workbook(path).unwrap();
+    let workbook: calamine::Xlsx<_> = calamine::open_workbook(path).unwrap();
     println!("Initial sheets: {:?}", workbook.sheet_names());
 
     // Now delete the sheet
@@ -37,7 +37,7 @@ fn main() {
     println!("Delete result: {:?}", result);
 
     // Read sheets after deletion
-    let mut workbook2: calamine::Xlsx<_> = calamine::open_workbook(path).unwrap();
+    let workbook2: calamine::Xlsx<_> = calamine::open_workbook(path).unwrap();
     println!("Sheets after deletion: {:?}", workbook2.sheet_names());
 
     // Try to list sheets using the API

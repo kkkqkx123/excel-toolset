@@ -91,11 +91,10 @@ impl<'a, P: DataProvider> Evaluator<'a, P> {
             AstNode::Function { name, args } => self.eval_function(name, args),
             AstNode::Array(rows) => {
                 // Return first element for scalar evaluation
-                if let Some(first_row) = rows.first() {
-                    if let Some(first_cell) = first_row.first() {
+                if let Some(first_row) = rows.first()
+                    && let Some(first_cell) = first_row.first() {
                         return self.eval_node(first_cell);
                     }
-                }
                 Ok(CellValue::Empty)
             }
         }
@@ -344,6 +343,8 @@ pub fn partial_cmp_cell_values(a: &CellValue, b: &CellValue) -> Option<Ordering>
 }
 
 #[cfg(test)]
+// 测试断言里的 3.14 是预期数值数据（如验证 "3.14" 解析结果），并非 PI 近似，属 clippy::approx_constant 误报
+#[allow(clippy::approx_constant)]
 mod tests {
     use super::*;
 

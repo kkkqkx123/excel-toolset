@@ -31,7 +31,7 @@ pub fn string_prop(description: &str, required: bool) -> Value {
     if required {
         s
     } else {
-        let mut s = s;
+        
         // Non-required properties don't need special marking in JSON Schema;
         // they're only required if listed in the "required" array.
         s
@@ -77,7 +77,7 @@ pub fn array_prop(description: &str, required: bool) -> Value {
     if required {
         s
     } else {
-        let mut s = s;
+        
         s
     }
 }

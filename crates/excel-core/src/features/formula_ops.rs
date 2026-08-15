@@ -39,7 +39,7 @@ pub fn fill_formula(
             .get(src_row as usize)
             .and_then(|row| row.get(src_col as usize))
             .and_then(|cell| cell.formula.clone())
-            .ok_or_else(|| AppError::CellNotFound(src_row, src_col))?;
+            .ok_or(AppError::CellNotFound(src_row, src_col))?;
 
         for target_row in tgt_start_row..=tgt_end_row {
             let row_offset = target_row as i64 - src_row as i64;

@@ -16,105 +16,105 @@ pub fn register(
 ) {
     registry.insert(
         "AVEDEV".into(),
-        Arc::new(|args, provider| stat_avedev(args)),
+        Arc::new(|args, _provider| stat_avedev(args)),
     );
     registry.insert(
         "STDEV.P".into(),
-        Arc::new(|args, provider| stat_stdevp(args)),
+        Arc::new(|args, _provider| stat_stdevp(args)),
     );
     registry.insert(
         "STDEV.S".into(),
-        Arc::new(|args, provider| stat_stdevs(args)),
+        Arc::new(|args, _provider| stat_stdevs(args)),
     );
-    registry.insert("VAR.P".into(), Arc::new(|args, provider| stat_varp(args)));
-    registry.insert("VAR.S".into(), Arc::new(|args, provider| stat_vars(args)));
+    registry.insert("VAR.P".into(), Arc::new(|args, _provider| stat_varp(args)));
+    registry.insert("VAR.S".into(), Arc::new(|args, _provider| stat_vars(args)));
     registry.insert(
         "MEDIAN".into(),
-        Arc::new(|args, provider| stat_median(args)),
+        Arc::new(|args, _provider| stat_median(args)),
     );
-    registry.insert("MODE".into(), Arc::new(|args, provider| stat_mode(args)));
+    registry.insert("MODE".into(), Arc::new(|args, _provider| stat_mode(args)));
     registry.insert(
         "MODE.SNGL".into(),
-        Arc::new(|args, provider| stat_mode(args)),
+        Arc::new(|args, _provider| stat_mode(args)),
     );
     registry.insert(
         "QUARTILE".into(),
-        Arc::new(|args, provider| stat_quartile(args)),
+        Arc::new(|args, _provider| stat_quartile(args)),
     );
     registry.insert(
         "QUARTILE.INC".into(),
-        Arc::new(|args, provider| stat_quartile(args)),
+        Arc::new(|args, _provider| stat_quartile(args)),
     );
     registry.insert(
         "QUARTILE.EXC".into(),
-        Arc::new(|args, provider| stat_quartile_exc(args)),
+        Arc::new(|args, _provider| stat_quartile_exc(args)),
     );
     registry.insert(
         "PERCENTILE".into(),
-        Arc::new(|args, provider| stat_percentile(args)),
+        Arc::new(|args, _provider| stat_percentile(args)),
     );
     registry.insert(
         "PERCENTILE.INC".into(),
-        Arc::new(|args, provider| stat_percentile(args)),
+        Arc::new(|args, _provider| stat_percentile(args)),
     );
     registry.insert(
         "NORM.DIST".into(),
-        Arc::new(|args, provider| stat_norm_dist(args)),
+        Arc::new(|args, _provider| stat_norm_dist(args)),
     );
     registry.insert(
         "NORM.INV".into(),
-        Arc::new(|args, provider| stat_norm_inv(args)),
+        Arc::new(|args, _provider| stat_norm_inv(args)),
     );
     registry.insert(
         "NORM.S.DIST".into(),
-        Arc::new(|args, provider| stat_norm_s_dist(args)),
+        Arc::new(|args, _provider| stat_norm_s_dist(args)),
     );
     registry.insert(
         "NORM.S.INV".into(),
-        Arc::new(|args, provider| stat_norm_s_inv(args)),
+        Arc::new(|args, _provider| stat_norm_s_inv(args)),
     );
     registry.insert(
         "T.DIST".into(),
-        Arc::new(|args, provider| stat_t_dist(args)),
+        Arc::new(|args, _provider| stat_t_dist(args)),
     );
-    registry.insert("T.INV".into(), Arc::new(|args, provider| stat_t_inv(args)));
+    registry.insert("T.INV".into(), Arc::new(|args, _provider| stat_t_inv(args)));
     registry.insert(
         "T.TEST".into(),
-        Arc::new(|args, provider| stat_t_test(args)),
+        Arc::new(|args, _provider| stat_t_test(args)),
     );
     registry.insert(
         "CORREL".into(),
-        Arc::new(|args, provider| stat_correl(args)),
+        Arc::new(|args, _provider| stat_correl(args)),
     );
-    registry.insert("COVAR".into(), Arc::new(|args, provider| stat_covar(args)));
+    registry.insert("COVAR".into(), Arc::new(|args, _provider| stat_covar(args)));
     registry.insert(
         "CONFIDENCE.NORM".into(),
-        Arc::new(|args, provider| stat_confidence_norm(args)),
+        Arc::new(|args, _provider| stat_confidence_norm(args)),
     );
     registry.insert(
         "CONFIDENCE.T".into(),
-        Arc::new(|args, provider| stat_confidence_t(args)),
+        Arc::new(|args, _provider| stat_confidence_t(args)),
     );
     registry.insert(
         "CHISQ.DIST".into(),
-        Arc::new(|args, provider| stat_chisq_dist(args)),
+        Arc::new(|args, _provider| stat_chisq_dist(args)),
     );
     registry.insert(
         "CHISQ.TEST".into(),
-        Arc::new(|args, provider| stat_chisq_test(args)),
+        Arc::new(|args, _provider| stat_chisq_test(args)),
     );
     registry.insert(
         "LINEST".into(),
-        Arc::new(|args, provider| stat_linest(args)),
+        Arc::new(|args, _provider| stat_linest(args)),
     );
     registry.insert(
         "LOGEST".into(),
-        Arc::new(|args, provider| stat_logest(args)),
+        Arc::new(|args, _provider| stat_logest(args)),
     );
-    registry.insert("TREND".into(), Arc::new(|args, provider| stat_trend(args)));
+    registry.insert("TREND".into(), Arc::new(|args, _provider| stat_trend(args)));
     registry.insert(
         "GROWTH".into(),
-        Arc::new(|args, provider| stat_growth(args)),
+        Arc::new(|args, _provider| stat_growth(args)),
     );
 }
 
@@ -129,12 +129,11 @@ fn extract_numbers_from_range_args(args: &[CellValue]) -> Vec<f64> {
         return flatten_numbers(args);
     }
     // Check for range marker: sentinel = -(cols + 1_000_000.0)
-    if let Some(sentinel) = args.first().and_then(to_number) {
-        if sentinel < -999_999.0 && sentinel > -2_000_000.0 {
+    if let Some(sentinel) = args.first().and_then(to_number)
+        && sentinel < -999_999.0 && sentinel > -2_000_000.0 {
             // Range marker format: skip sentinel and row count
             return args[2..].iter().filter_map(to_number).collect();
         }
-    }
     flatten_numbers(args)
 }
 
@@ -200,7 +199,7 @@ fn stat_median(args: &[CellValue]) -> CellValue {
     }
     nums.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let mid = nums.len() / 2;
-    if nums.len() % 2 == 0 {
+    if nums.len().is_multiple_of(2) {
         CellValue::Number((nums[mid - 1] + nums[mid]) / 2.0)
     } else {
         CellValue::Number(nums[mid])
@@ -246,7 +245,7 @@ fn stat_quartile(args: &[CellValue]) -> CellValue {
         }
         2 => {
             let mid = n / 2;
-            if n % 2 == 0 {
+            if n.is_multiple_of(2) {
                 CellValue::Number((nums[mid - 1] + nums[mid]) / 2.0)
             } else {
                 CellValue::Number(nums[mid])
@@ -296,7 +295,7 @@ fn stat_percentile(args: &[CellValue]) -> CellValue {
     let nums = &args[..args.len() - 1];
     let mut nums = extract_numbers_from_range_args(nums);
 
-    if nums.is_empty() || k < 0.0 || k > 1.0 {
+    if nums.is_empty() || !(0.0..=1.0).contains(&k) {
         return CellValue::Error("#NUM!".into());
     }
 
@@ -328,7 +327,7 @@ fn stat_norm_dist(args: &[CellValue]) -> CellValue {
     let x = args.first().and_then(to_number).unwrap_or(0.0);
     let mean = args.get(1).and_then(to_number).unwrap_or(0.0);
     let std_dev = args.get(2).and_then(to_number).unwrap_or(1.0);
-    let cumulative = args.get(3).map_or(true, |v| match v {
+    let cumulative = args.get(3).is_none_or(|v| match v {
         CellValue::Bool(true) => true,
         CellValue::Number(n) if *n != 0.0 => true,
         _ => false,
@@ -363,7 +362,7 @@ fn stat_norm_inv(args: &[CellValue]) -> CellValue {
 /// NORM.S.DIST(z, cumulative)
 fn stat_norm_s_dist(args: &[CellValue]) -> CellValue {
     let z = args.first().and_then(to_number).unwrap_or(0.0);
-    let cumulative = args.get(1).map_or(true, |v| match v {
+    let cumulative = args.get(1).is_none_or(|v| match v {
         CellValue::Bool(true) => true,
         CellValue::Number(n) if *n != 0.0 => true,
         _ => false,
@@ -451,7 +450,7 @@ fn norm_inv(p: f64) -> f64 {
 fn stat_t_dist(args: &[CellValue]) -> CellValue {
     let x = args.first().and_then(to_number).unwrap_or(0.0);
     let df = args.get(1).and_then(to_number).unwrap_or(1.0);
-    let cumulative = args.get(2).map_or(true, |v| match v {
+    let cumulative = args.get(2).is_none_or(|v| match v {
         CellValue::Bool(true) => true,
         CellValue::Number(n) if *n != 0.0 => true,
         _ => false,
@@ -581,8 +580,7 @@ fn stat_t_test(args: &[CellValue]) -> CellValue {
     if array1.len() < 2
         || array2.len() < 2
         || (tails != 1 && tails != 2)
-        || test_type < 1
-        || test_type > 3
+        || !(1..=3).contains(&test_type)
     {
         return CellValue::Error("#NUM!".into());
     }
@@ -754,7 +752,7 @@ fn stat_confidence_t(args: &[CellValue]) -> CellValue {
 fn stat_chisq_dist(args: &[CellValue]) -> CellValue {
     let x = args.first().and_then(to_number).unwrap_or(0.0);
     let df = args.get(1).and_then(to_number).unwrap_or(1.0);
-    let cumulative = args.get(2).map_or(true, |v| match v {
+    let cumulative = args.get(2).is_none_or(|v| match v {
         CellValue::Bool(true) => true,
         CellValue::Number(n) if *n != 0.0 => true,
         _ => false,
@@ -872,7 +870,7 @@ fn stat_linest(args: &[CellValue]) -> CellValue {
     }
 
     let slope = num / den;
-    let intercept = mean_y - slope * mean_x;
+    let _intercept = mean_y - slope * mean_x;
 
     // Return slope as single cell value; intercept would need array output
     CellValue::Number(slope)
@@ -914,7 +912,7 @@ fn stat_logest(args: &[CellValue]) -> CellValue {
     }
 
     let b_ln = num / den;
-    let a_ln = mean_ly - b_ln * mean_x;
+    let _a_ln = mean_ly - b_ln * mean_x;
 
     // b (growth rate) and a (coefficient)
     CellValue::Number(b_ln.exp())

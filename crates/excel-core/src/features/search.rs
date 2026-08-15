@@ -221,6 +221,8 @@ impl Default for SearchQuery {
 }
 
 #[cfg(test)]
+// 测试断言里的 3.14 是预期数值数据（验证 Float(3.14) 转字符串），并非 PI 近似，属 clippy::approx_constant 误报
+#[allow(clippy::approx_constant)]
 mod tests {
     use super::*;
 
