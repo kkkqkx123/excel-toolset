@@ -198,6 +198,7 @@ mod tests {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn cell_modified_op(
         sheet: &str,
         cell_ref: &str,

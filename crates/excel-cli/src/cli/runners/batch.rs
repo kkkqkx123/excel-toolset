@@ -1,7 +1,7 @@
+use crate::cli::args::*;
 use excel_core::excel_write;
 use excel_core::types::*;
 use excel_diff::semantic::{self, Verbosity};
-use crate::cli::args::*;
 
 pub(crate) fn run_batch(args: &BatchArgs, format: &str) -> Result<serde_json::Value> {
     match &args.command {
@@ -67,4 +67,3 @@ pub(crate) fn run_batch(args: &BatchArgs, format: &str) -> Result<serde_json::Va
         }
     }
 }
-

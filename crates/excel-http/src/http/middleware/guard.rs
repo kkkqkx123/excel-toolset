@@ -154,10 +154,11 @@ fn walk(v: &Value, root: &std::path::Path, found: &mut Option<String>) {
             for (k, val) in map {
                 if PATH_FIELDS.contains(&k.as_str())
                     && let Some(p) = val.as_str()
-                        && let Err(e) = validate_path_inside_root(p, root) {
-                            *found = Some(e.to_string());
-                            return;
-                        }
+                    && let Err(e) = validate_path_inside_root(p, root)
+                {
+                    *found = Some(e.to_string());
+                    return;
+                }
                 walk(val, root, found);
             }
         }

@@ -1,9 +1,7 @@
 use crate::types::{
-    AppError, DataValidationConfig, DataValidationType,
-    Result, SheetProtectionConfig,
+    AppError, DataValidationConfig, DataValidationType, Result, SheetProtectionConfig,
 };
 use crate::utils::cell_ref::index_to_col;
-
 
 pub(crate) fn patch_merge_cells_str(xml: &[u8], new_range: &str) -> Result<Vec<u8>> {
     let s = String::from_utf8(xml.to_vec())
@@ -43,11 +41,9 @@ pub(crate) fn patch_merge_cells_str(xml: &[u8], new_range: &str) -> Result<Vec<u
     Ok(result.into_bytes())
 }
 
-
 pub(crate) fn count_merge_cells(xml: &str) -> usize {
     xml.matches("<mergeCell ").count()
 }
-
 
 pub(crate) fn patch_freeze_panes_str(xml: &[u8], rows: u32, cols: u16) -> Result<Vec<u8>> {
     let s = String::from_utf8(xml.to_vec())
@@ -55,11 +51,7 @@ pub(crate) fn patch_freeze_panes_str(xml: &[u8], rows: u32, cols: u16) -> Result
     let mut result = s;
 
     // 1) Remove all existing <pane .../> or <pane ...></pane>
-    loop {
-        let start = match result.find("<pane") {
-            Some(s) => s,
-            None => break,
-        };
+    while let Some(start) = result.find("<pane") {
         let after = &result[start..];
         let gt = match after.find('>') {
             Some(g) => g,
@@ -146,7 +138,6 @@ pub(crate) fn patch_freeze_panes_str(xml: &[u8], rows: u32, cols: u16) -> Result
     Ok(result.into_bytes())
 }
 
-
 pub(crate) fn patch_auto_filter_str(xml: &[u8], new_range: Option<&str>) -> Result<Vec<u8>> {
     let s = String::from_utf8(xml.to_vec())
         .map_err(|e| AppError::Custom(format!("XML is not valid UTF-8: {}", e)))?;
@@ -154,11 +145,7 @@ pub(crate) fn patch_auto_filter_str(xml: &[u8], new_range: Option<&str>) -> Resu
 
     // Remove all existing <autoFilter .../> elements
     // Note: search for the terminator from the match position, otherwise any `/>` earlier in the file breaks the check
-    loop {
-        let start = match result.find("<autoFilter ") {
-            Some(s) => s,
-            None => break,
-        };
+    while let Some(start) = result.find("<autoFilter ") {
         match result[start..].find("/>") {
             Some(rel) => {
                 let af_end = start + rel + 2;
@@ -169,11 +156,7 @@ pub(crate) fn patch_auto_filter_str(xml: &[u8], new_range: Option<&str>) -> Resu
     }
 
     // Remove all <autoFilter>...</autoFilter> blocks
-    loop {
-        let start = match result.find("<autoFilter ") {
-            Some(s) => s,
-            None => break,
-        };
+    while let Some(start) = result.find("<autoFilter ") {
         match result[start..].find("</autoFilter>") {
             Some(rel) => {
                 let af_end = start + rel + 13;
@@ -185,13 +168,13 @@ pub(crate) fn patch_auto_filter_str(xml: &[u8], new_range: Option<&str>) -> Resu
 
     // If a new range is provided, insert it
     if let Some(range) = new_range
-        && let Some(pos) = result.find("</worksheet>") {
-            result.insert_str(pos, &format!("  <autoFilter ref=\"{}\"/>\n", range));
-        }
+        && let Some(pos) = result.find("</worksheet>")
+    {
+        result.insert_str(pos, &format!("  <autoFilter ref=\"{}\"/>\n", range));
+    }
 
     Ok(result.into_bytes())
 }
-
 
 pub(crate) fn build_data_validation_xml_str(config: &DataValidationConfig) -> String {
     let type_attr = match config.validation_type {
@@ -216,11 +199,10 @@ pub(crate) fn build_data_validation_xml_str(config: &DataValidationConfig) -> St
     }
 
     let mut inner = String::new();
-    if let (DataValidationType::List, Some(values)) = (&config.validation_type, &config.list_values) {
+    if let (DataValidationType::List, Some(values)) = (&config.validation_type, &config.list_values)
+    {
         if !values.is_empty() {
-            let quoted: Vec<String> = values.iter()
-                .map(|v| format!("\"{}\"", v))
-                .collect();
+            let quoted: Vec<String> = values.iter().map(|v| format!("\"{}\"", v)).collect();
             inner.push_str(&format!("<formula1>{}</formula1>", quoted.join(",")));
         }
     } else if let Some(f1) = &config.formula1 {
@@ -236,7 +218,6 @@ pub(crate) fn build_data_validation_xml_str(config: &DataValidationConfig) -> St
         format!("{}>{}</dataValidation>", dv, inner)
     }
 }
-
 
 pub(crate) fn patch_data_validation_str(xml: &[u8], new_dv: &str) -> Result<Vec<u8>> {
     let s = String::from_utf8(xml.to_vec())
@@ -272,7 +253,6 @@ pub(crate) fn patch_data_validation_str(xml: &[u8], new_dv: &str) -> Result<Vec<
     Ok(result.into_bytes())
 }
 
-
 pub(crate) fn build_sheet_protection_xml_str(config: &SheetProtectionConfig) -> String {
     let opts = &config.options;
     format!(
@@ -283,20 +263,27 @@ pub(crate) fn build_sheet_protection_xml_str(config: &SheetProtectionConfig) -> 
          sort=\"{}\" autoFilter=\"{}\" pivotTables=\"{}\" \
          objects=\"{}\" scenarios=\"{}\"/>",
         config.password.as_deref().unwrap_or(""),
-        bool_to_01(opts.select_locked_cells), bool_to_01(opts.select_unlocked_cells),
-        bool_to_01(opts.format_cells), bool_to_01(opts.format_columns), bool_to_01(opts.format_rows),
-        bool_to_01(opts.insert_columns), bool_to_01(opts.insert_rows), bool_to_01(opts.insert_links),
-        bool_to_01(opts.delete_columns), bool_to_01(opts.delete_rows),
-        bool_to_01(opts.sort), bool_to_01(opts.auto_filter), bool_to_01(opts.pivot_tables),
-        bool_to_01(opts.edit_objects), bool_to_01(opts.edit_scenarios),
+        bool_to_01(opts.select_locked_cells),
+        bool_to_01(opts.select_unlocked_cells),
+        bool_to_01(opts.format_cells),
+        bool_to_01(opts.format_columns),
+        bool_to_01(opts.format_rows),
+        bool_to_01(opts.insert_columns),
+        bool_to_01(opts.insert_rows),
+        bool_to_01(opts.insert_links),
+        bool_to_01(opts.delete_columns),
+        bool_to_01(opts.delete_rows),
+        bool_to_01(opts.sort),
+        bool_to_01(opts.auto_filter),
+        bool_to_01(opts.pivot_tables),
+        bool_to_01(opts.edit_objects),
+        bool_to_01(opts.edit_scenarios),
     )
 }
-
 
 pub(crate) fn bool_to_01(b: bool) -> &'static str {
     if b { "1" } else { "0" }
 }
-
 
 pub(crate) fn patch_sheet_protection_str(xml: &[u8], new_sp: Option<&str>) -> Result<Vec<u8>> {
     let s = String::from_utf8(xml.to_vec())
@@ -331,15 +318,19 @@ pub(crate) fn patch_sheet_protection_str(xml: &[u8], new_sp: Option<&str>) -> Re
 
     // If new protection is provided, insert it before </worksheet>
     if let Some(sp) = new_sp
-        && let Some(pos) = result.find("</worksheet>") {
-            result.insert_str(pos, &format!("  {}\n", sp));
-        }
+        && let Some(pos) = result.find("</worksheet>")
+    {
+        result.insert_str(pos, &format!("  {}\n", sp));
+    }
 
     Ok(result.into_bytes())
 }
 
-
-pub(crate) fn patch_sheet_visibility_str(wb_xml: &[u8], sheet_name: &str, state: Option<&str>) -> Result<Vec<u8>> {
+pub(crate) fn patch_sheet_visibility_str(
+    wb_xml: &[u8],
+    sheet_name: &str,
+    state: Option<&str>,
+) -> Result<Vec<u8>> {
     let s = String::from_utf8(wb_xml.to_vec())
         .map_err(|e| AppError::Custom(format!("XML is not valid UTF-8: {}", e)))?;
     let mut result = s;
@@ -349,14 +340,15 @@ pub(crate) fn patch_sheet_visibility_str(wb_xml: &[u8], sheet_name: &str, state:
     if let Some(name_pos) = result.find(&marker) {
         // Search backwards for <sheet
         let prefix = &result[..name_pos];
-        let tag_start = prefix.rfind("<sheet").ok_or_else(|| {
-            AppError::Custom(format!("sheet tag not found: {}", sheet_name))
-        })?;
+        let tag_start = prefix
+            .rfind("<sheet")
+            .ok_or_else(|| AppError::Custom(format!("sheet tag not found: {}", sheet_name)))?;
 
         // From tag_start, find the tag end (> or />)
-        let tag_end = result[tag_start..].find('>').ok_or_else(|| {
-            AppError::Custom("cannot find sheet tag end".to_string())
-        })? + tag_start;
+        let tag_end = result[tag_start..]
+            .find('>')
+            .ok_or_else(|| AppError::Custom("cannot find sheet tag end".to_string()))?
+            + tag_start;
 
         let tag = &result[tag_start..=tag_end];
 
@@ -395,4 +387,3 @@ pub(crate) fn patch_sheet_visibility_str(wb_xml: &[u8], sheet_name: &str, state:
 // ───────────────────────────────────────────────────────────────────────────
 // R2.2 — add / delete / rename sheet preserving
 // ───────────────────────────────────────────────────────────────────────────
-

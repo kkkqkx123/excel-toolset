@@ -1,6 +1,6 @@
+use crate::cli::args::*;
 use excel_core::excel_write;
 use excel_core::types::*;
-use crate::cli::args::*;
 
 pub(crate) fn run_pivot_table(args: &PivotTableArgs) -> Result<serde_json::Value> {
     match &args.command {
@@ -24,4 +24,3 @@ pub(crate) fn run_pivot_table(args: &PivotTableArgs) -> Result<serde_json::Value
 }
 
 // ── Slicer ──
-

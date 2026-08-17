@@ -1,13 +1,9 @@
+use crate::security::{compute_file_hash, create_backup};
+use crate::types::{AppError, CellData, CellDataType, Result, SecurityParams, WriteResult};
+use crate::utils::cell_ref::index_to_col;
 use std::collections::HashMap;
 use std::fs::File;
 use zip::ZipArchive;
-use crate::security::{compute_file_hash, create_backup};
-use crate::types::{
-    AppError, CellData, CellDataType,
-    Result, SecurityParams,
-    WriteResult,
-};
-use crate::utils::cell_ref::index_to_col;
 
 use super::*;
 
@@ -61,7 +57,6 @@ pub fn write_cells_preserving(
     })
 }
 
-
 /// Preserving formula set: rewrites only the formula of cell `(row, col)` in `sheet`,
 /// keeping every other zip part byte-for-byte. `row`/`col` are both 0-based.
 pub fn set_formula_preserving(
@@ -80,9 +75,9 @@ pub fn set_formula_preserving(
     write_cells_preserving(path, params, sheet, &[(row, col, cd)])
 }
 
-
 /// Preserving formula + cached value set: writes both `<f>` and `<v>`,
 /// keeping every other zip part byte-for-byte.
+#[allow(clippy::too_many_arguments)]
 pub fn set_formula_with_value_preserving(
     path: &str,
     params: &SecurityParams,
@@ -101,7 +96,6 @@ pub fn set_formula_with_value_preserving(
     write_cells_preserving(path, params, sheet, &[(row, col, cd)])
 }
 
-
 /// Preserving range clear: removes the `<f>`/`<v>` of every existing cell inside the range,
 /// keeping every other zip part byte-for-byte.
 /// `r_start/r_end` are 0-based row indexes, `c_start/c_end` are 0-based column indexes.
@@ -109,7 +103,10 @@ pub fn clear_range_preserving(
     path: &str,
     params: &SecurityParams,
     sheet: &str,
-    r_start: u32, r_end: u32, c_start: u16, c_end: u16,
+    r_start: u32,
+    r_end: u32,
+    c_start: u16,
+    c_end: u16,
 ) -> Result<WriteResult> {
     let old_hash = compute_file_hash(path).map_err(AppError::Io)?;
     let backup_info = if params.create_backup {
@@ -210,7 +207,6 @@ pub fn clear_range_preserving(
     })
 }
 
-
 /// Preserving formula cached-value clear: removes the `<v>` element of every formula cell in
 /// `sheet` so formulas are recomputed on next open.
 pub fn clear_formula_values_preserving(
@@ -295,7 +291,13 @@ pub fn clear_formula_values_preserving(
     repackage_zip(&mut archive, path, &part, &new_xml)?;
     let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
 
-    append_history(path, "refresh_formulas", &old_hash, &new_hash, params.dry_run);
+    append_history(
+        path,
+        "refresh_formulas",
+        &old_hash,
+        &new_hash,
+        params.dry_run,
+    );
 
     Ok(WriteResult {
         success: true,
@@ -307,16 +309,19 @@ pub fn clear_formula_values_preserving(
     })
 }
 
-
 /// Preserving merge: appends the merged range to the target sheet,
 /// keeping every other zip part byte-for-byte.
 /// `r1/r2` are 0-based row indexes, `c1/c2` are 0-based column indexes.
 /// Writes the given value into the top-left cell.
+#[allow(clippy::too_many_arguments)]
 pub fn merge_cells_preserving(
     path: &str,
     params: &SecurityParams,
     sheet: &str,
-    r1: u32, c1: u16, r2: u32, c2: u16,
+    r1: u32,
+    c1: u16,
+    r2: u32,
+    c2: u16,
     value: &str,
 ) -> Result<WriteResult> {
     let range_ref = format!(
@@ -378,7 +383,6 @@ pub fn merge_cells_preserving(
         diff: None,
     })
 }
-
 
 /// Preserving removal of all images on the sheet (including the drawing layer).
 ///
@@ -448,7 +452,10 @@ pub fn remove_images_preserving(
         .ok_or_else(|| AppError::Custom("drawing relationship target not found".into()))?;
     let drawing_part = normalize_rel_target(&sheet_part, &drawing_target);
 
-    let drawing_file = drawing_part.split('/').next_back().unwrap_or("drawing1.xml");
+    let drawing_file = drawing_part
+        .split('/')
+        .next_back()
+        .unwrap_or("drawing1.xml");
     let drawing_rels = format!(
         "xl/drawings/_rels/{}.xml.rels",
         drawing_file.trim_end_matches(".xml")

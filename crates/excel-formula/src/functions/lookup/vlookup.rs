@@ -1,6 +1,6 @@
-use excel_types::CellValue;
 use crate::engine::DataProvider;
 use crate::evaluator::to_number;
+use excel_types::CellValue;
 
 use super::*;
 
@@ -65,11 +65,12 @@ pub(crate) fn lookup_vlookup(args: &[CellValue], _provider: &dyn DataProvider) -
     }
 }
 
-
 /// Parse inline args for VLOOKUP when no range marker is present.
 ///
 /// Inline pattern: `args[0]=lookup, args[1..n-2/1]=table cells, ..., col_index, [range_lookup]`.
-pub(crate) fn parse_inline_vlookup_args(args: &[CellValue]) -> Option<(Vec<Vec<CellValue>>, usize, bool)> {
+pub(crate) fn parse_inline_vlookup_args(
+    args: &[CellValue],
+) -> Option<(Vec<Vec<CellValue>>, usize, bool)> {
     if args.len() < 3 {
         return None;
     }
@@ -104,4 +105,3 @@ pub(crate) fn parse_inline_vlookup_args(args: &[CellValue]) -> Option<(Vec<Vec<C
 // ---------------------------------------------------------------------------
 // XLOOKUP(lookup_value, lookup_array, return_array, [if_not_found], [match_mode], [search_mode])
 // ---------------------------------------------------------------------------
-

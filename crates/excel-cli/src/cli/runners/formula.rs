@@ -1,10 +1,10 @@
+use crate::cli::args::*;
 use excel_core::excel_read;
 use excel_core::excel_write;
 use excel_core::features::formula_analysis;
 use excel_core::features::formula_eval;
 use excel_core::features::formula_ops;
 use excel_core::types::*;
-use crate::cli::args::*;
 
 pub(crate) fn run_formula(args: &FormulaArgs) -> Result<serde_json::Value> {
     match &args.command {
@@ -167,4 +167,3 @@ pub(crate) fn run_formula(args: &FormulaArgs) -> Result<serde_json::Value> {
         }
     }
 }
-

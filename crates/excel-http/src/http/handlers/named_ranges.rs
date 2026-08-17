@@ -1,9 +1,9 @@
 use axum::Json;
 use serde::Deserialize;
 
+use crate::http::response::ApiJson;
 use excel_core::features::named_ranges;
 use excel_core::types::*;
-use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct ListNamedRangesReq {
@@ -53,9 +53,7 @@ pub async fn get_named_range_value(
     }
 }
 
-pub async fn create_named_range(
-    Json(req): Json<CreateNamedRangeReq>,
-) -> ApiJson<WriteResult> {
+pub async fn create_named_range(Json(req): Json<CreateNamedRangeReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,
@@ -74,9 +72,7 @@ pub async fn create_named_range(
     }
 }
 
-pub async fn delete_named_range(
-    Json(req): Json<DeleteNamedRangeReq>,
-) -> ApiJson<WriteResult> {
+pub async fn delete_named_range(Json(req): Json<DeleteNamedRangeReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,

@@ -230,13 +230,11 @@ fn try_spill_sort<P: DataProvider>(
         let n_cols = result[0].len();
 
         // Build column-major data, sort, then transpose back
-        let mut cols: Vec<Vec<CellValue>> = Vec::new();
-        for c in 0..n_cols {
-            let mut col_data = Vec::new();
-            for r in 0..result.len() {
-                col_data.push(result[r][c].clone());
+        let mut cols: Vec<Vec<CellValue>> = vec![Vec::new(); n_cols];
+        for row in &result {
+            for (c, val) in row.iter().take(n_cols).enumerate() {
+                cols[c].push(val.clone());
             }
-            cols.push(col_data);
         }
 
         let mut indices: Vec<usize> = (0..n_cols).collect();
@@ -247,10 +245,10 @@ fn try_spill_sort<P: DataProvider>(
         });
 
         let mut sorted: Vec<Vec<CellValue>> = Vec::new();
-        for r in 0..result.len() {
+        for row in &result {
             let mut new_row = Vec::new();
             for &idx in &indices {
-                new_row.push(result[r][idx].clone());
+                new_row.push(row[idx].clone());
             }
             sorted.push(new_row);
         }
@@ -373,13 +371,11 @@ fn try_spill_unique<P: DataProvider>(
         let n_rows = data.len();
         let n_cols = data[0].len();
 
-        let mut cols: Vec<Vec<CellValue>> = Vec::new();
-        for c in 0..n_cols {
-            let mut col_data = Vec::new();
-            for r in 0..n_rows {
-                col_data.push(data[r][c].clone());
+        let mut cols: Vec<Vec<CellValue>> = vec![Vec::new(); n_cols];
+        for row in &data {
+            for (c, val) in row.iter().take(n_cols).enumerate() {
+                cols[c].push(val.clone());
             }
-            cols.push(col_data);
         }
 
         if exactly_once {
@@ -401,17 +397,15 @@ fn try_spill_unique<P: DataProvider>(
                 .collect();
 
             // Transpose back
-            let mut result: Vec<Vec<CellValue>> = Vec::new();
             let out_cols = unique_cols.len();
             if out_cols == 0 {
                 return Ok(SpillResult::from_2d(Vec::new()));
             }
-            for r in 0..n_rows {
-                let mut row_vals = Vec::new();
-                for c in 0..out_cols {
-                    row_vals.push(unique_cols[c][r].clone());
+            let mut result: Vec<Vec<CellValue>> = vec![Vec::new(); n_rows];
+            for col in &unique_cols {
+                for (r, val) in col.iter().enumerate() {
+                    result[r].push(val.clone());
                 }
-                result.push(row_vals);
             }
             Ok(SpillResult::from_2d(result))
         } else {
@@ -423,14 +417,14 @@ fn try_spill_unique<P: DataProvider>(
                     unique_cols.push(col);
                 }
             }
-            let out_cols = unique_cols.len();
             let mut result: Vec<Vec<CellValue>> = Vec::new();
-            for r in 0..n_rows {
-                let mut row_vals = Vec::new();
-                for c in 0..out_cols {
-                    row_vals.push(unique_cols[c][r].clone());
+            for col in &unique_cols {
+                for (r, val) in col.iter().enumerate() {
+                    if r >= result.len() {
+                        result.push(Vec::new());
+                    }
+                    result[r].push(val.clone());
                 }
-                result.push(row_vals);
             }
             Ok(SpillResult::from_2d(result))
         }
@@ -606,25 +600,26 @@ fn evaluate_filter_condition<P: DataProvider>(
     _evaluator: &mut Evaluator<'_, P>,
 ) -> EvalResult<Vec<bool>> {
     if let AstNode::BinaryOp {
-            op: crate::types::BinOp::Gt,
-            left: _,
-            right,
-        } = condition
-        && let AstNode::Number(threshold) = **right {
-            let mut result = Vec::new();
-            for row in data.iter().skip(1) {
-                if let Some(first_val) = row.first() {
-                    if let Some(n) = to_number(first_val) {
-                        result.push(n > threshold);
-                    } else {
-                        result.push(false);
-                    }
+        op: crate::types::BinOp::Gt,
+        left: _,
+        right,
+    } = condition
+        && let AstNode::Number(threshold) = **right
+    {
+        let mut result = Vec::new();
+        for row in data.iter().skip(1) {
+            if let Some(first_val) = row.first() {
+                if let Some(n) = to_number(first_val) {
+                    result.push(n > threshold);
                 } else {
                     result.push(false);
                 }
+            } else {
+                result.push(false);
             }
-            return Ok(result);
         }
+        return Ok(result);
+    }
     Ok(vec![true; data.len().saturating_sub(1)])
 }
 

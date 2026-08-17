@@ -330,29 +330,68 @@ fn generate_formula_description(formula: &str, language: &str) -> String {
     if let Some(func) = func_name {
         match language {
             "zh" => match func.to_uppercase().as_str() {
-                "SUM" => format!("SUM function: Calculates the sum of arguments. Formula: {}", clean_formula),
-                "AVERAGE" => format!("AVERAGE function: Calculates the average of arguments. Formula: {}", clean_formula),
+                "SUM" => format!(
+                    "SUM function: Calculates the sum of arguments. Formula: {}",
+                    clean_formula
+                ),
+                "AVERAGE" => format!(
+                    "AVERAGE function: Calculates the average of arguments. Formula: {}",
+                    clean_formula
+                ),
                 "COUNT" => format!(
                     "COUNT function: Counts cells containing numbers. Formula: {}",
                     clean_formula
                 ),
-                "IF" => format!("IF function: Returns different values based on a condition. Formula: {}", clean_formula),
-                "VLOOKUP" => format!("VLOOKUP function: Looks up a value vertically in a table. Formula: {}", clean_formula),
-                "INDEX" => format!("INDEX function: Returns a value from a table or range. Formula: {}", clean_formula),
-                "MATCH" => format!("MATCH function: Finds the position of a value within a range. Formula: {}", clean_formula),
+                "IF" => format!(
+                    "IF function: Returns different values based on a condition. Formula: {}",
+                    clean_formula
+                ),
+                "VLOOKUP" => format!(
+                    "VLOOKUP function: Looks up a value vertically in a table. Formula: {}",
+                    clean_formula
+                ),
+                "INDEX" => format!(
+                    "INDEX function: Returns a value from a table or range. Formula: {}",
+                    clean_formula
+                ),
+                "MATCH" => format!(
+                    "MATCH function: Finds the position of a value within a range. Formula: {}",
+                    clean_formula
+                ),
                 "CONCATENATE" | "CONCAT" => {
-                    format!("Concat function: Joins text strings together. Formula: {}", clean_formula)
+                    format!(
+                        "Concat function: Joins text strings together. Formula: {}",
+                        clean_formula
+                    )
                 }
-                "LEFT" => format!("LEFT function: Extracts a specified number of characters from the left of text. Formula: {}", clean_formula),
+                "LEFT" => format!(
+                    "LEFT function: Extracts a specified number of characters from the left of text. Formula: {}",
+                    clean_formula
+                ),
                 "RIGHT" => format!(
                     "RIGHT function: Extracts a specified number of characters from the right of text. Formula: {}",
                     clean_formula
                 ),
-                "MID" => format!("MID function: Extracts a specified number of characters from the middle of text. Formula: {}", clean_formula),
-                "DATE" => format!("DATE function: Returns the serial number representing a date. Formula: {}", clean_formula),
-                "TODAY" => format!("TODAY function: Returns the current date. Formula: {}", clean_formula),
-                "NOW" => format!("NOW function: Returns the current date and time. Formula: {}", clean_formula),
-                _ => format!("{} function: Excel function. Formula: {}", func, clean_formula),
+                "MID" => format!(
+                    "MID function: Extracts a specified number of characters from the middle of text. Formula: {}",
+                    clean_formula
+                ),
+                "DATE" => format!(
+                    "DATE function: Returns the serial number representing a date. Formula: {}",
+                    clean_formula
+                ),
+                "TODAY" => format!(
+                    "TODAY function: Returns the current date. Formula: {}",
+                    clean_formula
+                ),
+                "NOW" => format!(
+                    "NOW function: Returns the current date and time. Formula: {}",
+                    clean_formula
+                ),
+                _ => format!(
+                    "{} function: Excel function. Formula: {}",
+                    func, clean_formula
+                ),
             },
             "en" => match func.to_uppercase().as_str() {
                 "SUM" => format!(
@@ -751,7 +790,11 @@ mod tests {
     fn test_generate_logic_flow_sum_zh() {
         let steps = generate_logic_flow("=SUM(A1:A10)", &["Sheet1!A1".to_string()], "zh");
         assert!(!steps.is_empty());
-        assert!(steps.iter().any(|s| s.operation.contains("Read data sources")));
+        assert!(
+            steps
+                .iter()
+                .any(|s| s.operation.contains("Read data sources"))
+        );
         assert!(steps.iter().any(|s| s.operation.contains("Calculate sum")));
     }
 

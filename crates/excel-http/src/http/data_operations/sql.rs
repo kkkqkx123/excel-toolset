@@ -5,12 +5,13 @@ use std::collections::HashMap;
 #[cfg(feature = "sql")]
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::http::response::ApiJson;
 #[cfg(feature = "sql")]
 use excel_core::operations;
 use excel_core::types::*;
-use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 pub struct SqlReq {
     pub path: String,
     pub sheet: String,
@@ -25,6 +26,7 @@ pub struct SqlReq {
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 pub struct CreateSessionReq {
     pub path: String,
 }
@@ -125,9 +127,7 @@ pub async fn data_sql(Json(req): Json<SqlReq>) -> ApiJson<Vec<Vec<CellData>>> {
     }
 }
 
-pub async fn create_session(
-    Json(req): Json<CreateSessionReq>,
-) -> ApiJson<CreateSessionResp> {
+pub async fn create_session(Json(req): Json<CreateSessionReq>) -> ApiJson<CreateSessionResp> {
     #[cfg(feature = "sql")]
     {
         let session_id = format!("sess-{}", SESSION_COUNTER.fetch_add(1, Ordering::SeqCst));

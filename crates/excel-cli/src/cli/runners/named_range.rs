@@ -1,6 +1,6 @@
+use crate::cli::args::*;
 use excel_core::features::named_ranges;
 use excel_core::types::*;
-use crate::cli::args::*;
 
 pub(crate) fn run_named_range(args: &NamedRangeArgs) -> Result<serde_json::Value> {
     match &args.command {
@@ -45,4 +45,3 @@ pub(crate) fn run_named_range(args: &NamedRangeArgs) -> Result<serde_json::Value
 }
 
 // ── Search ──
-

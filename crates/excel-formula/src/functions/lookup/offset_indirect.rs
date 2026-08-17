@@ -1,6 +1,6 @@
-use excel_types::CellValue;
 use crate::engine::DataProvider;
 use crate::evaluator::{cell_value_to_string, to_number};
+use excel_types::CellValue;
 
 use super::*;
 
@@ -19,12 +19,8 @@ pub(crate) fn lookup_offset(args: &[CellValue], _provider: &dyn DataProvider) ->
 // INDIRECT(ref_text, [a1])
 // ---------------------------------------------------------------------------
 
-
 pub(crate) fn lookup_indirect(args: &[CellValue], provider: &dyn DataProvider) -> CellValue {
-    let ref_text = args
-        .first()
-        .map(cell_value_to_string)
-        .unwrap_or_default();
+    let ref_text = args.first().map(cell_value_to_string).unwrap_or_default();
     // A1 flag: if FALSE, use R1C1; not yet supported.
     let _a1 = args
         .get(1)
@@ -56,4 +52,3 @@ pub(crate) fn lookup_indirect(args: &[CellValue], provider: &dyn DataProvider) -
 // ---------------------------------------------------------------------------
 // ROW([reference])
 // ---------------------------------------------------------------------------
-

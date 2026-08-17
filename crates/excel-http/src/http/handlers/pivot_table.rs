@@ -1,9 +1,9 @@
 use axum::Json;
 use serde::Deserialize;
 
+use crate::http::response::ApiJson;
 use excel_core::excel_write;
 use excel_core::types::*;
-use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct PivotTableCreateReq {
@@ -13,9 +13,7 @@ pub struct PivotTableCreateReq {
     pub dry_run: bool,
 }
 
-pub async fn pivot_table_create(
-    Json(req): Json<PivotTableCreateReq>,
-) -> ApiJson<WriteResult> {
+pub async fn pivot_table_create(Json(req): Json<PivotTableCreateReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,

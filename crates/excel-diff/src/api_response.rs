@@ -2,6 +2,7 @@ use crate::formula_tracker::FormulaTracker;
 use excel_types::FileDiff;
 use serde_json::Value;
 
+#[allow(dead_code)]
 pub fn to_api_response(diff: &FileDiff, tracker: Option<&FormulaTracker>) -> Value {
     let response = serde_json::json!({
         "success": true,

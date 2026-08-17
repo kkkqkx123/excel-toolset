@@ -1,4 +1,4 @@
-#![expect(dead_code)]
+#![allow(dead_code)]
 use std::sync::OnceLock;
 
 #[derive(Debug, Clone)]

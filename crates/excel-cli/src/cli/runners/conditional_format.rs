@@ -1,6 +1,6 @@
+use crate::cli::args::*;
 use excel_core::features::conditional_format;
 use excel_core::types::*;
-use crate::cli::args::*;
 
 pub(crate) fn run_conditional_format(args: &ConditionalFormatArgs) -> Result<serde_json::Value> {
     match &args.command {
@@ -72,4 +72,3 @@ pub(crate) fn run_conditional_format(args: &ConditionalFormatArgs) -> Result<ser
 }
 
 // ── Table ──
-

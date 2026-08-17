@@ -1,15 +1,12 @@
+use crate::security::append_history_entry;
+use crate::types::{AppError, Result, WorkbookHistoryEntry};
+use quick_xml::Reader;
+use quick_xml::events::Event;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{Cursor, Read, Write};
 use std::path::Path;
-use quick_xml::events::Event;
-use quick_xml::Reader;
 use zip::{ZipArchive, ZipWriter};
-use crate::security::append_history_entry;
-use crate::types::{
-    AppError,
-    Result, WorkbookHistoryEntry,
-};
 
 use super::*;
 
@@ -48,7 +45,6 @@ pub(crate) fn repackage_zip(
     Ok(())
 }
 
-
 pub(crate) fn repackage_zip_multi(
     archive: &mut ZipArchive<File>,
     path: &str,
@@ -62,8 +58,8 @@ pub(crate) fn repackage_zip_multi(
     let default_opt = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
     #[cfg(not(feature = "flate2"))]
-    let default_opt = zip::write::SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Stored);
+    let default_opt =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
     let mut buf = Vec::new();
     let n = archive.len();
 
@@ -113,7 +109,6 @@ pub(crate) fn repackage_zip_multi(
     Ok(())
 }
 
-
 pub(crate) fn append_history(path: &str, op: &str, old_hash: &str, new_hash: &str, dry_run: bool) {
     if dry_run {
         return;
@@ -129,11 +124,9 @@ pub(crate) fn append_history(path: &str, op: &str, old_hash: &str, new_hash: &st
     let _ = append_history_entry(path, &entry);
 }
 
-
 pub(crate) fn has_formula(raw: &[u8]) -> bool {
     raw.windows(3).any(|w| w == b"<f>") || raw.windows(4).any(|w| w == b"<f ")
 }
-
 
 pub(crate) fn strip_v_element(raw: &[u8]) -> Vec<u8> {
     // Locate the start of <v or <v>
@@ -180,7 +173,6 @@ pub(crate) fn strip_v_element(raw: &[u8]) -> Vec<u8> {
 // sheet name -> zip part resolution
 // ───────────────────────────────────────────────────────────────────────────
 
-
 pub(crate) fn read_zip_entry(archive: &mut ZipArchive<File>, name: &str) -> Result<Vec<u8>> {
     let mut zf = archive
         .by_name(name)
@@ -190,12 +182,10 @@ pub(crate) fn read_zip_entry(archive: &mut ZipArchive<File>, name: &str) -> Resu
     Ok(buf)
 }
 
-
 pub(crate) fn resolve_sheet_part(archive: &mut ZipArchive<File>, sheet: &str) -> Result<String> {
     let wb = read_zip_entry(archive, "xl/workbook.xml")?;
-    let rid = find_sheet_rid(&wb, sheet).ok_or_else(|| {
-        AppError::Custom(format!("sheet '{}' not found in workbook", sheet))
-    })?;
+    let rid = find_sheet_rid(&wb, sheet)
+        .ok_or_else(|| AppError::Custom(format!("sheet '{}' not found in workbook", sheet)))?;
     let rels = read_zip_entry(archive, "xl/_rels/workbook.xml.rels")?;
     let target = find_rel_target(&rels, &rid)
         .ok_or_else(|| AppError::Custom(format!("target not found for relationship {}", rid)))?;
@@ -218,7 +208,6 @@ pub(crate) fn resolve_sheet_part(archive: &mut ZipArchive<File>, sheet: &str) ->
     Ok(part)
 }
 
-
 pub(crate) fn find_sheet_rid(wb: &[u8], sheet: &str) -> Option<String> {
     let mut reader = Reader::from_reader(Cursor::new(wb));
     let mut buf = Vec::new();
@@ -228,10 +217,10 @@ pub(crate) fn find_sheet_rid(wb: &[u8], sheet: &str) -> Option<String> {
                 // Note: quick-xml events expose only the inner tag content via Deref
                 // (e.g. `sheet name=...`), without `<`, so match the prefix `sheet` not `<sheet`.
                 let raw: &[u8] = &e;
-                if raw.starts_with(b"sheet")
-                    && extract_attr(raw, b"name").as_deref() == Some(sheet) {
-                        return extract_attr(raw, b"r:id");
-                    }
+                if raw.starts_with(b"sheet") && extract_attr(raw, b"name").as_deref() == Some(sheet)
+                {
+                    return extract_attr(raw, b"r:id");
+                }
             }
             Ok(Event::Eof) => break,
             Ok(_) => {}
@@ -240,7 +229,6 @@ pub(crate) fn find_sheet_rid(wb: &[u8], sheet: &str) -> Option<String> {
     }
     None
 }
-
 
 pub(crate) fn find_rel_target(rels: &[u8], rid: &str) -> Option<String> {
     let mut reader = Reader::from_reader(Cursor::new(rels));
@@ -251,9 +239,10 @@ pub(crate) fn find_rel_target(rels: &[u8], rid: &str) -> Option<String> {
                 // Same as above: deref content is `Relationship Id=...`, without `<`.
                 let raw: &[u8] = &e;
                 if raw.starts_with(b"Relationship")
-                    && extract_attr(raw, b"Id").as_deref() == Some(rid) {
-                        return extract_attr(raw, b"Target");
-                    }
+                    && extract_attr(raw, b"Id").as_deref() == Some(rid)
+                {
+                    return extract_attr(raw, b"Target");
+                }
             }
             Ok(Event::Eof) => break,
             Ok(_) => {}
@@ -262,7 +251,6 @@ pub(crate) fn find_rel_target(rels: &[u8], rid: &str) -> Option<String> {
     }
     None
 }
-
 
 pub(crate) fn find_rel_by_type(rels: &[u8], type_suffix: &str) -> Option<String> {
     let mut reader = Reader::from_reader(Cursor::new(rels));
@@ -273,9 +261,10 @@ pub(crate) fn find_rel_by_type(rels: &[u8], type_suffix: &str) -> Option<String>
                 let raw: &[u8] = &e;
                 if raw.starts_with(b"Relationship")
                     && let Some(ty) = extract_attr(raw, b"Type")
-                        && ty.ends_with(type_suffix) {
-                            return extract_attr(raw, b"Id");
-                        }
+                    && ty.ends_with(type_suffix)
+                {
+                    return extract_attr(raw, b"Id");
+                }
             }
             Ok(Event::Eof) => break,
             Ok(_) => {}
@@ -284,7 +273,6 @@ pub(crate) fn find_rel_by_type(rels: &[u8], type_suffix: &str) -> Option<String>
     }
     None
 }
-
 
 pub(crate) fn find_all_rel_targets_by_type(rels: &[u8], type_suffix: &str) -> Vec<String> {
     let mut out = Vec::new();
@@ -297,9 +285,10 @@ pub(crate) fn find_all_rel_targets_by_type(rels: &[u8], type_suffix: &str) -> Ve
                 if raw.starts_with(b"Relationship")
                     && let (Some(ty), Some(tgt)) =
                         (extract_attr(raw, b"Type"), extract_attr(raw, b"Target"))
-                        && ty.ends_with(type_suffix) {
-                            out.push(tgt);
-                        }
+                    && ty.ends_with(type_suffix)
+                {
+                    out.push(tgt);
+                }
             }
             Ok(Event::Eof) => break,
             Ok(_) => {}
@@ -308,7 +297,6 @@ pub(crate) fn find_all_rel_targets_by_type(rels: &[u8], type_suffix: &str) -> Ve
     }
     out
 }
-
 
 pub(crate) fn normalize_rel_target(base_part: &str, target: &str) -> String {
     let t = target.trim_start_matches('/');
@@ -329,7 +317,6 @@ pub(crate) fn normalize_rel_target(base_part: &str, target: &str) -> String {
     }
     segs.join("/")
 }
-
 
 pub(crate) fn remove_rel_by_id(rels: &[u8], rid: &str) -> String {
     let mut result = String::from_utf8_lossy(rels).into_owned();
@@ -366,7 +353,6 @@ pub(crate) fn remove_rel_by_id(rels: &[u8], rid: &str) -> String {
     result
 }
 
-
 pub(crate) fn remove_drawing_elem(sheet_xml: &[u8], rid: &str) -> String {
     let mut result = String::from_utf8_lossy(sheet_xml).into_owned();
     let start = match result.find("<drawing") {
@@ -384,9 +370,7 @@ pub(crate) fn remove_drawing_elem(sheet_xml: &[u8], rid: &str) -> String {
     let elem = &result[start..start + end_rel];
     if extract_attr(elem.as_bytes(), b"r:id").as_deref() == Some(rid) {
         let mut end = start + end_rel;
-        while end < result.len()
-            && matches!(result.as_bytes()[end], b'\n' | b' ' | b'\r' | b'\t')
-        {
+        while end < result.len() && matches!(result.as_bytes()[end], b'\n' | b' ' | b'\r' | b'\t') {
             end += 1;
         }
         result.replace_range(start..end, "");
@@ -397,7 +381,6 @@ pub(crate) fn remove_drawing_elem(sheet_xml: &[u8], rid: &str) -> String {
 // ───────────────────────────────────────────────────────────────────────────
 // sheetData "rewrite only" edits
 // ───────────────────────────────────────────────────────────────────────────
-
 
 pub(crate) const NON_DATA_PREFIXES: &[&str] = &[
     "xl/styles.xml",
@@ -428,11 +411,9 @@ pub(crate) const NON_DATA_PREFIXES: &[&str] = &[
     "xl/dbPr",
 ];
 
-
 pub(crate) fn is_non_data_part(name: &str) -> bool {
     NON_DATA_PREFIXES.iter().any(|p| name.starts_with(p))
 }
-
 
 pub(crate) fn read_zip_map(path: &str) -> Result<HashMap<String, Vec<u8>>> {
     use std::io::Read;
@@ -452,7 +433,6 @@ pub(crate) fn read_zip_map(path: &str) -> Result<HashMap<String, Vec<u8>>> {
     Ok(map)
 }
 
-
 pub(crate) fn write_zip_map(path: &str, entries: &HashMap<String, Vec<u8>>) -> Result<()> {
     use std::io::Write;
     let tmp = Path::new(path).with_extension("transfer_tmp");
@@ -462,8 +442,8 @@ pub(crate) fn write_zip_map(path: &str, entries: &HashMap<String, Vec<u8>>) -> R
     let opt = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
     #[cfg(not(feature = "flate2"))]
-    let opt = zip::write::SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Stored);
+    let opt =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
     // Keep the original order: emit the source's order, but iterate the sorted key list
     for (name, content) in entries {
         zw.start_file(name, opt)
@@ -475,46 +455,6 @@ pub(crate) fn write_zip_map(path: &str, entries: &HashMap<String, Vec<u8>>) -> R
     fs::rename(&tmp, path).map_err(AppError::Io)?;
     Ok(())
 }
-
-
-pub(crate) fn parse_sheet_name_to_part(wb_xml: &[u8], rels_xml: &[u8]) -> HashMap<String, String> {
-    let wb_str = String::from_utf8_lossy(wb_xml);
-    let mut result = HashMap::new();
-
-    // Parse all <sheet name="..." r:id="...">
-    let mut pos = 0;
-    while let Some(sheet_start) = wb_str[pos..].find("<sheet ") {
-        let tag = &wb_str[pos + sheet_start..];
-        let tag_end = tag.find('>').unwrap_or(tag.len());
-        let tag_content = &tag[..tag_end];
-
-        // Extract name and r:id
-        let name = extract_attr_str(tag_content, "name");
-        let rid = extract_attr_str(tag_content, "r:id");
-
-        if let (Some(name), Some(rid)) = (name, rid) {
-            // Find the Target for rid from the rels
-            if let Ok(target) = find_rel_target_str(rels_xml, &rid) {
-                result.insert(name, target);
-            }
-        }
-        pos += sheet_start + 1;
-    }
-    result
-}
-
-
-pub(crate) fn extract_attr_str(s: &str, key: &str) -> Option<String> {
-    let marker = format!("{}=\"", key);
-    if let Some(start) = s.find(&marker) {
-        let val_start = start + marker.len();
-        if let Some(end) = s[val_start..].find('"') {
-            return Some(s[val_start..val_start + end].to_string());
-        }
-    }
-    None
-}
-
 
 pub(crate) fn extract_non_data_elements(xml: &[u8]) -> Vec<(String, String)> {
     let s = match std::str::from_utf8(xml) {
@@ -565,10 +505,7 @@ pub(crate) fn extract_non_data_elements(xml: &[u8]) -> Vec<(String, String)> {
                 j += 1;
             }
             let tag = &body[i + 1..j];
-            let local = tag
-                .split([' ', ':'])
-                .next_back()
-                .unwrap_or(tag);
+            let local = tag.split([' ', ':']).next_back().unwrap_or(tag);
             let local_str = local;
             if local_str.eq_ignore_ascii_case("sheetData") {
                 // Skip the whole <sheetData>...</sheetData> (including nesting)
@@ -586,7 +523,6 @@ pub(crate) fn extract_non_data_elements(xml: &[u8]) -> Vec<(String, String)> {
     out
 }
 
-
 pub(crate) fn capture_element(body: &str, start: usize) -> (String, usize) {
     let bytes = body.as_bytes();
     let n = bytes.len();
@@ -596,10 +532,7 @@ pub(crate) fn capture_element(body: &str, start: usize) -> (String, usize) {
         j += 1;
     }
     let tag = &body[start + 1..j];
-    let local = tag
-        .split([' ', ':'])
-        .next_back()
-        .unwrap_or(tag);
+    let local = tag.split([' ', ':']).next_back().unwrap_or(tag);
     // Find the open tag's terminating '>'
     let mut k = start + 1;
     while k < n && bytes[k] != b'>' {
@@ -621,10 +554,7 @@ pub(crate) fn capture_element(body: &str, start: usize) -> (String, usize) {
                     q += 1;
                 }
                 let close_tag = &body[p + 2..q];
-                let close_local = close_tag
-                    .split([' ', ':'])
-                    .next()
-                    .unwrap_or(close_tag);
+                let close_local = close_tag.split([' ', ':']).next().unwrap_or(close_tag);
                 if close_local.eq_ignore_ascii_case(local) {
                     depth -= 1;
                     if depth == 0 {
@@ -659,12 +589,10 @@ pub(crate) fn capture_element(body: &str, start: usize) -> (String, usize) {
     (body[start..n].to_string(), n)
 }
 
-
 pub(crate) fn skip_element(body: &str, start: usize) -> usize {
     let (_, next) = capture_element(body, start);
     next
 }
-
 
 pub(crate) fn has_element(xml: &str, tag_name: &str) -> bool {
     // Look for an open tag (excluding </)
@@ -673,7 +601,6 @@ pub(crate) fn has_element(xml: &str, tag_name: &str) -> bool {
     let open3 = format!("<{}/>", tag_name);
     xml.contains(&open) || xml.contains(&open2) || xml.contains(&open3)
 }
-
 
 pub(crate) fn merge_worksheet_xml(source_xml: &[u8], rebuilt_xml: &[u8]) -> Vec<u8> {
     let rebuilt_str = String::from_utf8_lossy(rebuilt_xml);
@@ -722,7 +649,6 @@ pub(crate) fn merge_worksheet_xml(source_xml: &[u8], rebuilt_xml: &[u8]) -> Vec<
     }
 }
 
-
 /// Preserves all non-data zip parts during a full rebuild.
 ///
 /// Flow:
@@ -738,7 +664,7 @@ pub(crate) fn merge_worksheet_xml(source_xml: &[u8], rebuilt_xml: &[u8]) -> Vec<
 /// # Arguments
 /// * `src_path` - the original xlsx file path (before modification)
 /// * `rebuilt_path` - the xlsx file path rebuilt by rust_xlsxwriter (which lost the
-///                    non-data parts); this file is modified in place
+///   non-data parts); this file is modified in place
 pub fn preserve_all_parts_transfer(src_path: &str, rebuilt_path: &str) -> Result<()> {
     // 1. Read the source zip and the rebuilt zip
     let src_entries = read_zip_map(src_path)?;
@@ -797,35 +723,35 @@ pub fn preserve_all_parts_transfer(src_path: &str, rebuilt_path: &str) -> Result
 
     // 6. Update [Content_Types].xml: add the newly added non-data parts
     if !added_content_types.is_empty()
-        && let Some(ct_content) = output.get("[Content_Types].xml") {
-            let mut ct_str = String::from_utf8_lossy(ct_content).to_string();
-            let mut modified = false;
-            for part_name in &added_content_types {
-                // Check whether it already exists
-                if !ct_str.contains(&format!("PartName=\"{}\"", part_name)) {
-                    // Determine the ContentType
-                    let content_type = guess_content_type(part_name);
-                    let override_xml = format!(
-                        "  <Override PartName=\"{}\" ContentType=\"{}\"/>\n",
-                        part_name, content_type
-                    );
-                    if let Some(pos) = ct_str.rfind("</Types>") {
-                        ct_str.insert_str(pos, &override_xml);
-                        modified = true;
-                    }
+        && let Some(ct_content) = output.get("[Content_Types].xml")
+    {
+        let mut ct_str = String::from_utf8_lossy(ct_content).to_string();
+        let mut modified = false;
+        for part_name in &added_content_types {
+            // Check whether it already exists
+            if !ct_str.contains(&format!("PartName=\"{}\"", part_name)) {
+                // Determine the ContentType
+                let content_type = guess_content_type(part_name);
+                let override_xml = format!(
+                    "  <Override PartName=\"{}\" ContentType=\"{}\"/>\n",
+                    part_name, content_type
+                );
+                if let Some(pos) = ct_str.rfind("</Types>") {
+                    ct_str.insert_str(pos, &override_xml);
+                    modified = true;
                 }
             }
-            if modified {
-                output.insert("[Content_Types].xml".to_string(), ct_str.into_bytes());
-            }
         }
+        if modified {
+            output.insert("[Content_Types].xml".to_string(), ct_str.into_bytes());
+        }
+    }
 
     // 7. Write the output zip
     write_zip_map(rebuilt_path, &output)?;
 
     Ok(())
 }
-
 
 pub(crate) fn guess_content_type(part_name: &str) -> &'static str {
     if part_name.ends_with(".xml") {
@@ -903,4 +829,3 @@ pub(crate) fn guess_content_type(part_name: &str) -> &'static str {
         "application/octet-stream"
     }
 }
-

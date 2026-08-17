@@ -455,6 +455,7 @@ fn is_likely_file_path(arg: &str) -> bool {
 }
 
 /// Validate that a path is not empty and has a supported file extension.
+#[allow(dead_code)]
 fn validate_path(path: &str) -> Result<()> {
     // Check if path is empty
     if path.is_empty() {
@@ -668,9 +669,11 @@ mod tests {
 
     #[test]
     fn test_remove_excel_entries_preserves_other() {
-        let lines = ["*.xml diff=xml-diff",
+        let lines = [
+            "*.xml diff=xml-diff",
             "*.xlsx diff=excel-diff",
-            "*.json diff=json-diff"];
+            "*.json diff=json-diff",
+        ];
         let remaining: Vec<&str> = lines
             .iter()
             .filter(|line| !line.contains(GITATTR_PATTERN))
@@ -725,8 +728,7 @@ mod tests {
             // So this test may not fail in all environments
             let result = get_git_diff_file_paths();
             // If successful, it means there are args; we just verify the function works
-            if result.is_ok() {
-                let (old, new) = result.unwrap();
+            if let Ok((old, new)) = result {
                 assert!(!old.is_empty());
                 assert!(!new.is_empty());
             }

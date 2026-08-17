@@ -37,12 +37,8 @@ fn formula_cell(value: &str, formula: &str) -> CellData {
 
 fn create_xlsx(path: &str, sheets_data: &[(&str, &[Vec<CellData>])]) {
     let mut wb = rust_xlsxwriter::Workbook::new();
-    for (i, (name, rows)) in sheets_data.iter().enumerate() {
-        let ws = if i == 0 {
-            wb.add_worksheet()
-        } else {
-            wb.add_worksheet()
-        };
+    for (name, rows) in sheets_data.iter() {
+        let ws = wb.add_worksheet();
         ws.set_name(name.to_string()).expect("set sheet name");
         for (ri, row) in rows.iter().enumerate() {
             for (ci, cell) in row.iter().enumerate() {

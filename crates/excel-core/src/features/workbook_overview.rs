@@ -104,22 +104,23 @@ pub fn get_column_summary(path: &str, sheet: &str, col: &str) -> Result<ColumnSu
 
     for (row_idx, row) in data.rows.iter().enumerate() {
         if let Some(cell) = row.get(col_idx as usize)
-            && cell.value.is_some() {
-                non_empty += 1;
-                if first_value.is_none() {
-                    first_value = cell.value.clone();
-                }
-                if row_idx < sample_end {
-                    match cell.data_type {
-                        crate::types::CellDataType::String => string_count += 1,
-                        crate::types::CellDataType::Float | crate::types::CellDataType::Int => {
-                            number_count += 1
-                        }
-                        crate::types::CellDataType::DateTime => date_count += 1,
-                        _ => {}
+            && cell.value.is_some()
+        {
+            non_empty += 1;
+            if first_value.is_none() {
+                first_value = cell.value.clone();
+            }
+            if row_idx < sample_end {
+                match cell.data_type {
+                    crate::types::CellDataType::String => string_count += 1,
+                    crate::types::CellDataType::Float | crate::types::CellDataType::Int => {
+                        number_count += 1
                     }
+                    crate::types::CellDataType::DateTime => date_count += 1,
+                    _ => {}
                 }
             }
+        }
     }
 
     let total_typed = (sample_end.min(non_empty)).max(1);

@@ -1,8 +1,6 @@
+use crate::types::{CellData, CellDataType};
 use std::fs::File;
 use zip::{ZipArchive, ZipWriter};
-use crate::types::{
-    CellData, CellDataType,
-};
 
 use super::*;
 
@@ -29,8 +27,16 @@ fn patch_inserts_new_cell_and_preserves_existing() {
         "Z1 not inserted: {}",
         s
     );
-    assert!(s.contains("r=\"B1\"") && s.contains("<v>2</v>"), "B1 lost: {}", s);
-    assert!(s.contains("r=\"A2\"") && s.contains("<v>3</v>"), "A2 lost: {}", s);
+    assert!(
+        s.contains("r=\"B1\"") && s.contains("<v>2</v>"),
+        "B1 lost: {}",
+        s
+    );
+    assert!(
+        s.contains("r=\"A2\"") && s.contains("<v>3</v>"),
+        "A2 lost: {}",
+        s
+    );
     let p_a = s.find("r=\"A1\"").unwrap();
     let p_b = s.find("r=\"B1\"").unwrap();
     let p_z = s.find("r=\"Z1\"").unwrap();
@@ -52,7 +58,10 @@ fn patch_edits_existing_cell_keeps_style() {
     let out = patch_sheet_xml(xml, &edits).unwrap();
     let s = String::from_utf8_lossy(&out);
     assert!(
-        s.contains("r=\"C3\"") && s.contains("s=\"7\"") && s.contains("t=\"inlineStr\"") && s.contains("<t>hi</t>"),
+        s.contains("r=\"C3\"")
+            && s.contains("s=\"7\"")
+            && s.contains("t=\"inlineStr\"")
+            && s.contains("<t>hi</t>"),
         "style lost after edit: {}",
         s
     );
@@ -267,8 +276,8 @@ fn read_zip_map(path: &str) -> std::collections::HashMap<String, Vec<u8>> {
 
 #[test]
 fn e2e_preserves_non_target_parts_and_rich_features() {
-    use std::collections::HashMap;
     use crate::types::{CellData, CellDataType, SecurityParams};
+    use std::collections::HashMap;
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("fixture.xlsx");
@@ -307,33 +316,64 @@ fn e2e_preserves_non_target_parts_and_rich_features() {
         let a = after
             .get(name)
             .unwrap_or_else(|| panic!("non-target part missing: {}", name));
-        assert_eq!(a, content, "non-target part content changed (lost source feature): {}", name);
+        assert_eq!(
+            a, content,
+            "non-target part content changed (lost source feature): {}",
+            name
+        );
     }
 
     // 2) All rich-feature markers survive (styles / comments / drawing / chart).
     let styles = String::from_utf8_lossy(after.get("xl/styles.xml").unwrap());
-    assert!(styles.contains("DISTINCT_STYLE_9999"), "styles.xml not preserved");
+    assert!(
+        styles.contains("DISTINCT_STYLE_9999"),
+        "styles.xml not preserved"
+    );
     let comments = String::from_utf8_lossy(after.get("xl/comments1.xml").unwrap());
-    assert!(comments.contains("DISTINCT_COMMENT_A1"), "comments1.xml not preserved");
+    assert!(
+        comments.contains("DISTINCT_COMMENT_A1"),
+        "comments1.xml not preserved"
+    );
     let drawing = String::from_utf8_lossy(after.get("xl/drawings/drawing1.xml").unwrap());
-    assert!(drawing.contains("DISTINCT_DRAWING"), "drawing1.xml not preserved");
+    assert!(
+        drawing.contains("DISTINCT_DRAWING"),
+        "drawing1.xml not preserved"
+    );
     let chart = String::from_utf8_lossy(after.get("xl/charts/chart1.xml").unwrap());
-    assert!(chart.contains("DISTINCT_CHART_TITLE"), "chart1.xml not preserved");
+    assert!(
+        chart.contains("DISTINCT_CHART_TITLE"),
+        "chart1.xml not preserved"
+    );
 
     // 3) Target sheet: styled cells, merges, data validation and frozen panes are all
     // preserved, and the new cell has been written.
     let sheet = String::from_utf8_lossy(after.get(target).unwrap());
-    assert!(sheet.contains("s=\"3\"") && sheet.contains("t=\"s\"") && sheet.contains("<v>0</v>"),
-        "A1 style/shared-string reference lost: {}", sheet);
-    assert!(sheet.contains("mergeCells") && sheet.contains("C1:E1"), "merged cells lost");
-    assert!(sheet.contains("dataValidation") && sheet.contains("F1:F10"), "data validation lost");
+    assert!(
+        sheet.contains("s=\"3\"") && sheet.contains("t=\"s\"") && sheet.contains("<v>0</v>"),
+        "A1 style/shared-string reference lost: {}",
+        sheet
+    );
+    assert!(
+        sheet.contains("mergeCells") && sheet.contains("C1:E1"),
+        "merged cells lost"
+    );
+    assert!(
+        sheet.contains("dataValidation") && sheet.contains("F1:F10"),
+        "data validation lost"
+    );
     assert!(sheet.contains("state=\"frozen\""), "frozen panes lost");
     assert!(
-        sheet.contains("r=\"Z10\"") && sheet.contains("t=\"inlineStr\"") && sheet.contains("<t>x</t>"),
-        "Z10 new cell not written: {}", sheet
+        sheet.contains("r=\"Z10\"")
+            && sheet.contains("t=\"inlineStr\"")
+            && sheet.contains("<t>x</t>"),
+        "Z10 new cell not written: {}",
+        sheet
     );
     // Old values 100 / 200 are still present (not cleared).
-    assert!(sheet.contains("<v>100</v>") && sheet.contains("<v>200</v>"), "original values lost");
+    assert!(
+        sheet.contains("<v>100</v>") && sheet.contains("<v>200</v>"),
+        "original values lost"
+    );
     // Row order is valid: r=1 before r=2, r=2 before r=10.
     let p1 = sheet.find("r=\"1\"").unwrap();
     let p2 = sheet.find("r=\"2\"").unwrap();
@@ -346,8 +386,8 @@ fn e2e_preserves_non_target_parts_and_rich_features() {
 // persisted (regression locked in).
 #[test]
 fn e2e_preserves_with_absolute_rel_target() {
-    use std::collections::HashMap;
     use crate::types::{CellData, CellDataType, SecurityParams};
+    use std::collections::HashMap;
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("fixture_abs.xlsx");
@@ -377,14 +417,23 @@ fn e2e_preserves_with_absolute_rel_target() {
     let sheet = String::from_utf8_lossy(after.get(target).unwrap());
     // The new cell was written successfully (proving resolve correctly normalized the leading slash).
     assert!(
-        sheet.contains("r=\"Z10\"") && sheet.contains("t=\"inlineStr\"") && sheet.contains("<t>x</t>"),
-        "Z10 not written with absolute-path Target: {}", sheet
+        sheet.contains("r=\"Z10\"")
+            && sheet.contains("t=\"inlineStr\"")
+            && sheet.contains("<t>x</t>"),
+        "Z10 not written with absolute-path Target: {}",
+        sheet
     );
     // Rich features and styled cells are all preserved.
-    assert!(sheet.contains("s=\"3\"") && sheet.contains("state=\"frozen\""),
-        "styles/frozen panes lost with absolute-path Target: {}", sheet);
-    assert!(String::from_utf8_lossy(after.get("xl/styles.xml").unwrap()).contains("DISTINCT_STYLE_9999"),
-        "styles.xml not preserved");
+    assert!(
+        sheet.contains("s=\"3\"") && sheet.contains("state=\"frozen\""),
+        "styles/frozen panes lost with absolute-path Target: {}",
+        sheet
+    );
+    assert!(
+        String::from_utf8_lossy(after.get("xl/styles.xml").unwrap())
+            .contains("DISTINCT_STYLE_9999"),
+        "styles.xml not preserved"
+    );
 }
 
 // T5.16: after writing a far cell (Z50), <dimension> must expand to cover it instead of
@@ -413,8 +462,13 @@ fn patch_updates_dimension_to_cover_far_cell() {
     write_cells_preserving(&path_str, &params, "Sales", &edits).unwrap();
     let after = read_zip_map(&path_str);
     let sheet = String::from_utf8_lossy(after.get("xl/worksheets/sheet1.xml").unwrap());
-    let start = sheet.find("<dimension").expect("dimension element expected");
-    let end = start + sheet[start..].find("/>").expect("dimension should be self-closed");
+    let start = sheet
+        .find("<dimension")
+        .expect("dimension element expected");
+    let end = start
+        + sheet[start..]
+            .find("/>")
+            .expect("dimension should be self-closed");
     let dim_tag = &sheet[start..=end];
     assert!(
         dim_tag.contains("Z50"),

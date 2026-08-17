@@ -1,8 +1,8 @@
+use crate::cli::args::*;
 use excel_core::excel_write;
 use excel_core::operations;
 use excel_core::types::*;
 use excel_core::utils::helpers;
-use crate::cli::args::*;
 
 pub(crate) fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
     match &args.command {
@@ -174,4 +174,3 @@ pub(crate) fn run_data(args: &DataArgs) -> Result<serde_json::Value> {
         }
     }
 }
-

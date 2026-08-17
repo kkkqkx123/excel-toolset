@@ -5,15 +5,10 @@ use std::sync::Arc;
 
 use excel_types::CellValue;
 
-use crate::engine::DataProvider;
+use crate::engine::FunctionImpl;
 use crate::evaluator::to_number;
 
-pub fn register(
-    registry: &mut HashMap<
-        String,
-        Arc<dyn Fn(&[CellValue], &dyn DataProvider) -> CellValue + Send + Sync>,
-    >,
-) {
+pub fn register(registry: &mut HashMap<String, FunctionImpl>) {
     registry.insert(
         "AVEDEV".into(),
         Arc::new(|args, _provider| stat_avedev(args)),
@@ -130,10 +125,12 @@ fn extract_numbers_from_range_args(args: &[CellValue]) -> Vec<f64> {
     }
     // Check for range marker: sentinel = -(cols + 1_000_000.0)
     if let Some(sentinel) = args.first().and_then(to_number)
-        && sentinel < -999_999.0 && sentinel > -2_000_000.0 {
-            // Range marker format: skip sentinel and row count
-            return args[2..].iter().filter_map(to_number).collect();
-        }
+        && sentinel < -999_999.0
+        && sentinel > -2_000_000.0
+    {
+        // Range marker format: skip sentinel and row count
+        return args[2..].iter().filter_map(to_number).collect();
+    }
     flatten_numbers(args)
 }
 
@@ -526,7 +523,6 @@ fn reg_incomplete_beta(a: f64, b: f64, x: f64) -> f64 {
     let bt = (gamma(a + b) / (gamma(a) * gamma(b))) * x.powf(a) * (1.0 - x).powf(b);
 
     // Continued fraction for the incomplete beta function
-    let mut fpm = 1.0;
     let mut fm = f64::MAX;
     let mut f = 1.0;
     let max_iter = 200;
@@ -549,8 +545,7 @@ fn reg_incomplete_beta(a: f64, b: f64, x: f64) -> f64 {
             break;
         }
         fm = 1.0 / d1;
-        fpm = fm;
-        f = fpm * d2;
+        f = fm * d2;
 
         if (f - fm).abs() < eps {
             break;
@@ -644,7 +639,7 @@ fn stat_t_test(args: &[CellValue]) -> CellValue {
         p_one_tail
     };
 
-    CellValue::Number(p_value.min(1.0).max(0.0))
+    CellValue::Number(p_value.clamp(0.0, 1.0))
 }
 
 // --- Correlation and Covariance ---
@@ -833,7 +828,7 @@ fn stat_chisq_test(args: &[CellValue]) -> CellValue {
 
     let df = (min_len - 1) as f64;
     let p_value = 1.0 - chisq_cdf(chi_sq, df);
-    CellValue::Number(p_value.max(0.0).min(1.0))
+    CellValue::Number(p_value.clamp(0.0, 1.0))
 }
 
 // --- LINEST ---

@@ -1,6 +1,5 @@
-use std::collections::HashMap;
 use crate::types::*;
-
+use std::collections::HashMap;
 
 /// Parse "SheetName!A1:E100" into ("SheetName", "A1:E100").
 pub(crate) fn parse_source_range(source: &str) -> Result<(String, String)> {
@@ -15,7 +14,6 @@ pub(crate) fn parse_source_range(source: &str) -> Result<(String, String)> {
         )))
     }
 }
-
 
 /// Build pivot table data by aggregating source rows.
 pub(crate) fn build_pivot_data(
@@ -47,7 +45,6 @@ pub(crate) fn build_pivot_data(
         build_grouped_pivot(config, &col_index, headers, data_rows, &all_data_fields)
     }
 }
-
 
 /// Build pivot with row fields and data fields only.
 pub(crate) fn build_simple_pivot(
@@ -191,9 +188,7 @@ pub(crate) fn build_simple_pivot(
         } else {
             // Outline/Tabular layout: one column per row field
             for (i, k) in key.iter().enumerate() {
-                if config.repeat_labels {
-                    data_row.push(k.clone());
-                } else if i == 0 || key[i - 1] != key[i] {
+                if config.repeat_labels || i == 0 || key[i - 1] != key[i] {
                     data_row.push(k.clone());
                 } else {
                     // Check if parent changed
@@ -202,9 +197,7 @@ pub(crate) fn build_simple_pivot(
                     } else {
                         key
                     };
-                    if i < prev_key.len() && prev_key[i] != key[i] {
-                        data_row.push(k.clone());
-                    } else if i == prev_key.len() {
+                    if (i < prev_key.len() && prev_key[i] != key[i]) || i == prev_key.len() {
                         data_row.push(k.clone());
                     } else {
                         data_row.push(String::new());
@@ -282,7 +275,6 @@ pub(crate) fn build_simple_pivot(
     Ok(result)
 }
 
-
 /// Insert subtotal rows into pivot data.
 pub(crate) fn insert_subtotals(
     data: Vec<Vec<String>>,
@@ -348,14 +340,15 @@ pub(crate) fn insert_subtotals(
     result
 }
 
-
 /// Compute subtotal values for a group (simplified: returns zeros placeholder).
-pub(crate) fn compute_subtotal_for_group(_config: &PivotTableConfig, _group_key: String) -> Vec<String> {
+pub(crate) fn compute_subtotal_for_group(
+    _config: &PivotTableConfig,
+    _group_key: String,
+) -> Vec<String> {
     // In a full implementation, this would aggregate the actual group data
     // For now, return placeholder
     Vec::new()
 }
-
 
 /// Check if any data field needs grand total for show_as calculation.
 pub(crate) fn needs_grand_total_for_show_as(data_fields: &[PivotDataField]) -> bool {
@@ -370,9 +363,11 @@ pub(crate) fn needs_grand_total_for_show_as(data_fields: &[PivotDataField]) -> b
     })
 }
 
-
 /// Compute grand totals for each data field.
-pub(crate) fn compute_grand_totals(data_fields: &[PivotDataField], data_rows: &[Vec<CellData>]) -> Vec<f64> {
+pub(crate) fn compute_grand_totals(
+    data_fields: &[PivotDataField],
+    data_rows: &[Vec<CellData>],
+) -> Vec<f64> {
     data_fields
         .iter()
         .map(|df| {
@@ -384,7 +379,6 @@ pub(crate) fn compute_grand_totals(data_fields: &[PivotDataField], data_rows: &[
         })
         .collect()
 }
-
 
 /// Compute row totals per group for PercentOfRowTotal.
 pub(crate) fn compute_row_totals(
@@ -408,8 +402,8 @@ pub(crate) fn compute_row_totals(
     totals
 }
 
-
 /// Apply show_as transformation to a value.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_show_as(
     value: f64,
     show_as: &Option<PivotShowAs>,
@@ -472,7 +466,6 @@ pub(crate) fn apply_show_as(
     }
 }
 
-
 /// Apply show_as on grand total value.
 pub(crate) fn apply_show_as_on_grand_total(
     value: f64,
@@ -487,7 +480,6 @@ pub(crate) fn apply_show_as_on_grand_total(
         _ => format!("{:.2}", value),
     }
 }
-
 
 /// Build pivot with column fields (cross-tabulation).
 pub(crate) fn build_grouped_pivot(
@@ -656,9 +648,12 @@ pub(crate) fn build_grouped_pivot(
     Ok(result)
 }
 
-
 /// Sort key vectors based on pivot sort configuration.
-pub(crate) fn sort_keys(keys: &mut [Vec<String>], config: &PivotTableConfig, _data_rows: &[Vec<CellData>]) {
+pub(crate) fn sort_keys(
+    keys: &mut [Vec<String>],
+    config: &PivotTableConfig,
+    _data_rows: &[Vec<CellData>],
+) {
     match &config.sort {
         Some(sort_config) => match sort_config.order {
             PivotSortOrder::Ascending => {
@@ -674,25 +669,26 @@ pub(crate) fn sort_keys(keys: &mut [Vec<String>], config: &PivotTableConfig, _da
     }
 }
 
-
 /// Get cell value as string.
-pub(crate) fn cell_value_to_string(row: &Vec<CellData>, col: u16) -> String {
+pub(crate) fn cell_value_to_string(row: &[CellData], col: u16) -> String {
     row.get(col as usize)
         .and_then(|c| c.value.clone())
         .unwrap_or_default()
 }
 
-
 /// Get cell value as f64 if possible.
-pub(crate) fn cell_value_to_f64(row: &Vec<CellData>, col: u16) -> Option<f64> {
+pub(crate) fn cell_value_to_f64(row: &[CellData], col: u16) -> Option<f64> {
     row.get(col as usize)
         .and_then(|c| c.value.as_ref())
         .and_then(|v| v.parse::<f64>().ok())
 }
 
-
 /// Compute aggregation over a set of rows.
-pub(crate) fn compute_aggregation(rows: &[&Vec<CellData>], col: u16, agg: &PivotAggregation) -> String {
+pub(crate) fn compute_aggregation(
+    rows: &[&Vec<CellData>],
+    col: u16,
+    agg: &PivotAggregation,
+) -> String {
     let values: Vec<f64> = rows
         .iter()
         .filter_map(|r| cell_value_to_f64(r, col))
@@ -700,7 +696,6 @@ pub(crate) fn compute_aggregation(rows: &[&Vec<CellData>], col: u16, agg: &Pivot
     let result = aggregate_values(&values, agg);
     format!("{:.2}", result)
 }
-
 
 /// Apply aggregation function to a slice of f64 values.
 pub(crate) fn aggregate_values(values: &[f64], agg: &PivotAggregation) -> f64 {
@@ -747,7 +742,6 @@ pub(crate) fn aggregate_values(values: &[f64], agg: &PivotAggregation) -> f64 {
     }
 }
 
-
 pub(crate) fn format_aggregation(agg: &PivotAggregation) -> &str {
     match agg {
         PivotAggregation::Sum => "Sum",
@@ -763,7 +757,6 @@ pub(crate) fn format_aggregation(agg: &PivotAggregation) -> &str {
         PivotAggregation::VarP => "VarP",
     }
 }
-
 
 /// Write a string value to a worksheet cell.
 pub(crate) fn write_cell_value_to_worksheet(
@@ -782,4 +775,3 @@ pub(crate) fn write_cell_value_to_worksheet(
 }
 
 // ── Calculated Field Expression Parser ──
-

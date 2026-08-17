@@ -16,24 +16,68 @@ pub fn tools() -> Vec<ToolDef> {
                 vec![
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Target sheet name", true)),
-                    ("orientation", string_prop("Page orientation: portrait or landscape", false)),
-                    ("paper_size", enum_prop("Paper size", &["a4", "a3", "letter", "legal", "executive", "a5", "b4", "b5"])),
-                    ("print_area", string_prop("Print area range, e.g. A1:G50", false)),
-                    ("print_title_rows", string_prop("Rows repeated at top of each page, e.g. 1:3", false)),
-                    ("print_title_cols", string_prop("Columns repeated at left of each page, e.g. A:B", false)),
+                    (
+                        "orientation",
+                        string_prop("Page orientation: portrait or landscape", false),
+                    ),
+                    (
+                        "paper_size",
+                        enum_prop(
+                            "Paper size",
+                            &["a4", "a3", "letter", "legal", "executive", "a5", "b4", "b5"],
+                        ),
+                    ),
+                    (
+                        "print_area",
+                        string_prop("Print area range, e.g. A1:G50", false),
+                    ),
+                    (
+                        "print_title_rows",
+                        string_prop("Rows repeated at top of each page, e.g. 1:3", false),
+                    ),
+                    (
+                        "print_title_cols",
+                        string_prop("Columns repeated at left of each page, e.g. A:B", false),
+                    ),
                     ("fit_to_pages_width", int_prop("Fit to pages width")),
                     ("fit_to_pages_height", int_prop("Fit to pages height")),
                     ("scale", int_prop("Print scale percentage (100 = 100%)")),
                     ("print_gridlines", bool_prop("Print gridlines", Some(false))),
-                    ("print_headings", bool_prop("Print row/column headings", Some(false))),
-                    ("center_horizontally", bool_prop("Center horizontally on page", Some(false))),
-                    ("center_vertically", bool_prop("Center vertically on page", Some(false))),
-                    ("margins_left", int_prop("Left margin (multiplied by 100 for precision, e.g. 70 = 0.7 inches)")),
-                    ("margins_right", int_prop("Right margin (multiplied by 100)")),
+                    (
+                        "print_headings",
+                        bool_prop("Print row/column headings", Some(false)),
+                    ),
+                    (
+                        "center_horizontally",
+                        bool_prop("Center horizontally on page", Some(false)),
+                    ),
+                    (
+                        "center_vertically",
+                        bool_prop("Center vertically on page", Some(false)),
+                    ),
+                    (
+                        "margins_left",
+                        int_prop(
+                            "Left margin (multiplied by 100 for precision, e.g. 70 = 0.7 inches)",
+                        ),
+                    ),
+                    (
+                        "margins_right",
+                        int_prop("Right margin (multiplied by 100)"),
+                    ),
                     ("margins_top", int_prop("Top margin (multiplied by 100)")),
-                    ("margins_bottom", int_prop("Bottom margin (multiplied by 100)")),
-                    ("margins_header", int_prop("Header margin (multiplied by 100)")),
-                    ("margins_footer", int_prop("Footer margin (multiplied by 100)")),
+                    (
+                        "margins_bottom",
+                        int_prop("Bottom margin (multiplied by 100)"),
+                    ),
+                    (
+                        "margins_header",
+                        int_prop("Header margin (multiplied by 100)"),
+                    ),
+                    (
+                        "margins_footer",
+                        int_prop("Footer margin (multiplied by 100)"),
+                    ),
                 ],
                 vec!["path", "sheet"],
             ),
@@ -45,8 +89,14 @@ pub fn tools() -> Vec<ToolDef> {
                 vec![
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Target sheet name", true)),
-                    ("horizontal_breaks", string_array_prop("Row indices for horizontal page breaks (0-indexed)")),
-                    ("vertical_breaks", string_array_prop("Column indices for vertical page breaks (0-indexed)")),
+                    (
+                        "horizontal_breaks",
+                        string_array_prop("Row indices for horizontal page breaks (0-indexed)"),
+                    ),
+                    (
+                        "vertical_breaks",
+                        string_array_prop("Column indices for vertical page breaks (0-indexed)"),
+                    ),
                 ],
                 vec!["path", "sheet"],
             ),
@@ -66,9 +116,18 @@ pub fn tools() -> Vec<ToolDef> {
 }
 
 pub fn register(handlers: &mut HashMap<String, ToolHandler>) {
-    handlers.insert("excel_page_setup_configure".into(), handle_page_setup_configure);
-    handlers.insert("excel_page_setup_page_breaks_set".into(), handle_page_setup_page_breaks_set);
-    handlers.insert("excel_page_setup_page_breaks_clear".into(), handle_page_setup_page_breaks_clear);
+    handlers.insert(
+        "excel_page_setup_configure".into(),
+        handle_page_setup_configure,
+    );
+    handlers.insert(
+        "excel_page_setup_page_breaks_set".into(),
+        handle_page_setup_page_breaks_set,
+    );
+    handlers.insert(
+        "excel_page_setup_page_breaks_clear".into(),
+        handle_page_setup_page_breaks_clear,
+    );
 }
 
 fn handle_page_setup_configure(args: Value) -> String {

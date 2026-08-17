@@ -1,15 +1,12 @@
+use crate::types::{CellData, CellDataType, Result};
+use crate::utils::cell_ref::{index_to_col, parse_cell_ref};
+use quick_xml::Reader;
+use quick_xml::escape::escape;
+use quick_xml::events::Event;
 use std::collections::BTreeMap;
 use std::io::Cursor;
-use quick_xml::events::Event;
-use quick_xml::escape::escape;
-use quick_xml::Reader;
-use crate::types::{
-    CellData, CellDataType,
-    Result,
-};
-use crate::utils::cell_ref::{index_to_col, parse_cell_ref};
 
-
+#[allow(clippy::type_complexity)]
 pub(crate) fn sheetdata_spans(xml: &[u8]) -> Option<(&[u8], &[u8], &[u8], bool)> {
     let s = xml.windows(10).position(|w| &w[..10] == b"<sheetData")?;
     let mut gt = s;
@@ -36,12 +33,10 @@ pub(crate) fn sheetdata_spans(xml: &[u8]) -> Option<(&[u8], &[u8], &[u8], bool)>
     Some((before, inner, after, false))
 }
 
-
 #[derive(Default)]
 pub(crate) struct SheetModel {
     pub(crate) rows: BTreeMap<u32, Row>,
 }
-
 
 pub(crate) struct Row {
     /// The raw start tag, e.g. `<row r="1" spans="1:26">` (normalized to an open tag ending with `>`)`
@@ -49,12 +44,10 @@ pub(crate) struct Row {
     pub(crate) cells: BTreeMap<u16, Cell>,
 }
 
-
 pub(crate) struct Cell {
     /// Byte-for-byte original of `<c ...>...</c>` or `<c .../>` (replaced as a whole when editing)
     pub(crate) raw: Vec<u8>,
 }
-
 
 pub(crate) fn event_markup(event: &Event) -> Vec<u8> {
     // `Event` implements `Deref<Target = [u8]>`, giving the tag inner content (without brackets).
@@ -93,7 +86,6 @@ pub(crate) fn event_markup(event: &Event) -> Vec<u8> {
     }
 }
 
-
 pub(crate) fn parse_sheetdata(inner: &[u8]) -> SheetModel {
     let mut model = SheetModel::default();
     let mut reader = Reader::from_reader(Cursor::new(inner));
@@ -104,11 +96,7 @@ pub(crate) fn parse_sheetdata(inner: &[u8]) -> SheetModel {
     let mut in_cell: bool = false;
     let mut cell_buf: Vec<u8> = Vec::new();
 
-    loop {
-        let event = match reader.read_event_into(&mut buf) {
-            Ok(e) => e,
-            Err(_) => break,
-        };
+    while let Ok(event) = reader.read_event_into(&mut buf) {
         let raw = event_markup(&event);
         let is_empty = matches!(event, Event::Empty(_));
 
@@ -125,7 +113,13 @@ pub(crate) fn parse_sheetdata(inner: &[u8]) -> SheetModel {
                         .and_then(|s| s.parse::<u32>().ok())
                         .map(|n| n.saturating_sub(1))
                         .unwrap_or(0);
-                    cur_row = Some((rk, Row { open_tag: open, cells: BTreeMap::new() }));
+                    cur_row = Some((
+                        rk,
+                        Row {
+                            open_tag: open,
+                            cells: BTreeMap::new(),
+                        },
+                    ));
                 } else if raw.starts_with(b"<c") {
                     let col = extract_col(&raw);
                     cur_col = col;
@@ -133,7 +127,12 @@ pub(crate) fn parse_sheetdata(inner: &[u8]) -> SheetModel {
                     cell_buf.extend_from_slice(&raw);
                     if is_empty {
                         if let Some((_, row)) = &mut cur_row {
-                            row.cells.insert(col, Cell { raw: cell_buf.clone() });
+                            row.cells.insert(
+                                col,
+                                Cell {
+                                    raw: cell_buf.clone(),
+                                },
+                            );
                         }
                     } else {
                         in_cell = true;
@@ -151,7 +150,12 @@ pub(crate) fn parse_sheetdata(inner: &[u8]) -> SheetModel {
                 } else if raw.starts_with(b"</c") {
                     cell_buf.extend_from_slice(&raw);
                     if let Some((_, row)) = &mut cur_row {
-                        row.cells.insert(cur_col, Cell { raw: cell_buf.clone() });
+                        row.cells.insert(
+                            cur_col,
+                            Cell {
+                                raw: cell_buf.clone(),
+                            },
+                        );
                     }
                     in_cell = false;
                     cell_buf.clear();
@@ -176,7 +180,6 @@ pub(crate) fn parse_sheetdata(inner: &[u8]) -> SheetModel {
 
     model
 }
-
 
 pub(crate) fn apply_edits(mut model: SheetModel, edits: &[(u32, u16, CellData)]) -> SheetModel {
     for (row, col, cd) in edits {
@@ -219,7 +222,6 @@ pub(crate) fn apply_edits(mut model: SheetModel, edits: &[(u32, u16, CellData)])
     model
 }
 
-
 pub(crate) fn serialize_sheet(model: &SheetModel) -> String {
     let mut out = String::new();
     for row in model.rows.values() {
@@ -231,7 +233,6 @@ pub(crate) fn serialize_sheet(model: &SheetModel) -> String {
     }
     out
 }
-
 
 pub(crate) fn dimension_ref(model: &SheetModel) -> String {
     if model.rows.is_empty() {
@@ -264,25 +265,26 @@ pub(crate) fn dimension_ref(model: &SheetModel) -> String {
     )
 }
 
-
 pub(crate) fn replace_dimension(before: &mut Vec<u8>, refstr: &str) {
     if let Some(start) = before.windows(10).position(|w| &w[..10] == b"<dimension")
-        && let Some(rel) = before[start..].windows(5).position(|w| &w[..5] == b"ref=\"") {
-            let abs = start + rel + 5;
-            if let Some(end) = before[abs..].iter().position(|&b| b == b'"') {
-                let end = abs + end;
-                let new = refstr.as_bytes();
-                before.splice(abs..end, new.iter().cloned());
-                return;
-            }
+        && let Some(rel) = before[start..]
+            .windows(5)
+            .position(|w| &w[..5] == b"ref=\"")
+    {
+        let abs = start + rel + 5;
+        if let Some(end) = before[abs..].iter().position(|&b| b == b'"') {
+            let end = abs + end;
+            let new = refstr.as_bytes();
+            before.splice(abs..end, new.iter().cloned());
+            return;
         }
+    }
     // No dimension element: insert before <sheetData (follows schema order).
     if let Some(pos) = before.windows(10).position(|w| &w[..10] == b"<sheetData") {
         let ins = format!("<dimension ref=\"{}\"/>", refstr);
         before.splice(pos..pos, ins.into_bytes());
     }
 }
-
 
 pub(crate) fn patch_sheet_xml(xml: &[u8], edits: &[(u32, u16, CellData)]) -> Result<Vec<u8>> {
     let (before, inner, after, self_closed) = match sheetdata_spans(xml) {
@@ -317,7 +319,6 @@ pub(crate) fn patch_sheet_xml(xml: &[u8], edits: &[(u32, u16, CellData)]) -> Res
 // ───────────────────────────────────────────────────────────────────────────
 // Cell rebuilding (uses inline strings to avoid touching sharedStrings.xml)
 // ───────────────────────────────────────────────────────────────────────────
-
 
 pub(crate) fn cell_xml(cd: &CellData) -> (Option<&'static str>, String) {
     // Resolve "formula / value": the formula field takes priority; otherwise a value starting
@@ -369,7 +370,6 @@ pub(crate) fn cell_xml(cd: &CellData) -> (Option<&'static str>, String) {
     }
 }
 
-
 pub(crate) fn rebuild_cell(rref: &str, style: Option<&str>, cd: &CellData) -> String {
     let (t, inner) = cell_xml(cd);
     let mut s = String::new();
@@ -400,7 +400,6 @@ pub(crate) fn rebuild_cell(rref: &str, style: Option<&str>, cd: &CellData) -> St
 // Tiny utilities
 // ───────────────────────────────────────────────────────────────────────────
 
-
 pub(crate) fn extract_attr(raw: &[u8], key: &[u8]) -> Option<String> {
     let mut i = 0;
     while i + key.len() + 1 < raw.len() {
@@ -419,7 +418,6 @@ pub(crate) fn extract_attr(raw: &[u8], key: &[u8]) -> Option<String> {
     None
 }
 
-
 pub(crate) fn extract_col(raw: &[u8]) -> u16 {
     extract_attr(raw, b"r")
         .and_then(|r| parse_cell_ref(&r).ok())
@@ -430,4 +428,3 @@ pub(crate) fn extract_col(raw: &[u8]) -> u16 {
 // ───────────────────────────────────────────────────────────────────────────
 // Phase 3 — generic fallback: preserve_all_parts_transfer
 // ───────────────────────────────────────────────────────────────────────────
-

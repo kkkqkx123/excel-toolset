@@ -111,7 +111,8 @@ fn main() {
     println!("Before sort:");
     for (i, row) in sheet.rows.iter().enumerate() {
         let none_str = "None".to_string();
-        let name = row.first()
+        let name = row
+            .first()
             .and_then(|c| c.value.as_ref())
             .unwrap_or(&none_str);
         let age = row
@@ -136,7 +137,8 @@ fn main() {
     println!("After sort:");
     for (i, row) in sorted_sheet.rows.iter().enumerate() {
         let none_str = "None".to_string();
-        let name = row.first()
+        let name = row
+            .first()
             .and_then(|c| c.value.as_ref())
             .unwrap_or(&none_str);
         let age = row

@@ -9,18 +9,13 @@ pub mod math;
 pub mod statistical;
 pub mod text;
 
-use crate::engine::DataProvider;
+use crate::engine::FunctionImpl;
 use excel_types::CellValue;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 /// Create the default function registry with all built-in functions.
-pub fn create_registry()
--> HashMap<String, Arc<dyn Fn(&[CellValue], &dyn DataProvider) -> CellValue + Send + Sync>> {
-    let mut registry: HashMap<
-        String,
-        Arc<dyn Fn(&[CellValue], &dyn DataProvider) -> CellValue + Send + Sync>,
-    > = HashMap::new();
+pub fn create_registry() -> HashMap<String, FunctionImpl> {
+    let mut registry: HashMap<String, FunctionImpl> = HashMap::new();
 
     math::register(&mut registry);
     text::register(&mut registry);
@@ -56,17 +51,18 @@ fn range_data_iter(args: &[CellValue]) -> impl Iterator<Item = &CellValue> {
     let mut i = 0;
     while i < args.len() {
         if let CellValue::Number(n) = &args[i]
-            && *n < RANGE_MARKER_THRESHOLD {
-                let cols = (-(*n + RANGE_MARKER_OFFSET)) as usize;
-                if let Some(CellValue::Number(rows)) = args.get(i + 1) {
-                    let rows = *rows as usize;
-                    let total = cols * rows;
-                    let end = (i + 2 + total).min(args.len());
-                    blocks.extend(args[i + 2..end].iter());
-                    i = end;
-                    continue;
-                }
+            && *n < RANGE_MARKER_THRESHOLD
+        {
+            let cols = (-(*n + RANGE_MARKER_OFFSET)) as usize;
+            if let Some(CellValue::Number(rows)) = args.get(i + 1) {
+                let rows = *rows as usize;
+                let total = cols * rows;
+                let end = (i + 2 + total).min(args.len());
+                blocks.extend(args[i + 2..end].iter());
+                i = end;
+                continue;
             }
+        }
         blocks.push(&args[i]);
         i += 1;
     }

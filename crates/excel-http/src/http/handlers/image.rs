@@ -1,9 +1,9 @@
 use axum::Json;
 use serde::Deserialize;
 
+use crate::http::response::ApiJson;
 use excel_core::excel_write;
 use excel_core::types::*;
-use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct ImageInsertReq {
@@ -99,10 +99,9 @@ pub async fn shape_insert(Json(req): Json<ShapeInsertReq>) -> ApiJson<WriteResul
         file_path: req.path.clone(),
     };
 
-    let shape_type: ShapeType =
-        serde_json::from_str(&format!("\"{}\"", req.shape_type))
-            .map_err(|e| AppError::Serialize(format!("Invalid shape type: {}", e)))
-            .unwrap_or(ShapeType::Rectangle);
+    let shape_type: ShapeType = serde_json::from_str(&format!("\"{}\"", req.shape_type))
+        .map_err(|e| AppError::Serialize(format!("Invalid shape type: {}", e)))
+        .unwrap_or(ShapeType::Rectangle);
 
     let config = ShapeConfig {
         sheet: req.sheet,

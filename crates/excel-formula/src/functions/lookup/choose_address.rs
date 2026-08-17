@@ -1,5 +1,5 @@
-use excel_types::CellValue;
 use crate::evaluator::{cell_value_to_string, to_number};
+use excel_types::CellValue;
 
 use super::*;
 
@@ -23,7 +23,6 @@ pub(crate) fn lookup_choose(args: &[CellValue]) -> CellValue {
 // ---------------------------------------------------------------------------
 // ADDRESS(row_num, column_num, [abs_num], [a1], [sheet_text])
 // ---------------------------------------------------------------------------
-
 
 pub(crate) fn lookup_address(args: &[CellValue]) -> CellValue {
     let row = args.first().and_then(to_number).unwrap_or(1.0) as u32;
@@ -56,4 +55,3 @@ pub(crate) fn lookup_address(args: &[CellValue]) -> CellValue {
 
     CellValue::String(result)
 }
-

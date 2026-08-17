@@ -7,15 +7,10 @@ use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike};
 
 use excel_types::CellValue;
 
-use crate::engine::DataProvider;
+use crate::engine::FunctionImpl;
 use crate::evaluator::to_number;
 
-pub fn register(
-    registry: &mut HashMap<
-        String,
-        Arc<dyn Fn(&[CellValue], &dyn DataProvider) -> CellValue + Send + Sync>,
-    >,
-) {
+pub fn register(registry: &mut HashMap<String, FunctionImpl>) {
     registry.insert(
         "TODAY".into(),
         Arc::new(|_args, _provider| datetime_today()),

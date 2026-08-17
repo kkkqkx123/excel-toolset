@@ -95,6 +95,7 @@ fn normalize_range(r1: u32, c1: u16, r2: u32, c2: u16) -> (u32, u16, u32, u16) {
 }
 
 /// Check if two ranges overlap.
+#[allow(clippy::too_many_arguments)]
 fn ranges_overlap(
     a_r1: u32,
     a_c1: u16,
@@ -187,12 +188,13 @@ pub fn create_table(
         for t in &existing_tables {
             if t.sheet.eq_ignore_ascii_case(&target_sheet)
                 && let Ok((er1, ec1, er2, ec2)) = crate::utils::cell_ref::parse_range(&t.range)
-                    && ranges_overlap(r1, c1, r2, c2, er1, ec1, er2, ec2) {
-                        return Err(AppError::InvalidInput(format!(
-                            "Table range '{}' overlaps with existing table '{}' at '{}' on sheet '{}'",
-                            normalized_range, t.name, t.range, target_sheet
-                        )));
-                    }
+                && ranges_overlap(r1, c1, r2, c2, er1, ec1, er2, ec2)
+            {
+                return Err(AppError::InvalidInput(format!(
+                    "Table range '{}' overlaps with existing table '{}' at '{}' on sheet '{}'",
+                    normalized_range, t.name, t.range, target_sheet
+                )));
+            }
         }
     }
 
@@ -332,9 +334,10 @@ pub fn list_tables(path: &str) -> Result<Vec<TableInfo>> {
         if name.starts_with("xl/tables/table") && name.ends_with(".xml") {
             let mut xml_str = String::new();
             if entry.read_to_string(&mut xml_str).is_ok()
-                && let Some(info) = parse_table_xml(&xml_str) {
-                    tables.push(info);
-                }
+                && let Some(info) = parse_table_xml(&xml_str)
+            {
+                tables.push(info);
+            }
         }
     }
 
@@ -362,20 +365,22 @@ pub fn list_tables(path: &str) -> Result<Vec<TableInfo>> {
 
                 // Find table references in this sheet's rels
                 for line in rels_str.lines() {
-                    if line.contains("table") && line.contains("Target=")
-                        && let Some(target) = extract_xml_attr(line, "Target") {
-                            // Match table target to the tables we found
-                            let table_file = target.strip_prefix("../tables/").unwrap_or(&target);
-                            for table in &mut tables {
-                                // Set the sheet name based on relationship
-                                if table.sheet.is_empty() {
-                                    // We need to map sheet numbers to names
-                                    // This requires reading workbook.xml for sheet names
-                                    // For simplicity, leave sheet empty and fill later
-                                }
+                    if line.contains("table")
+                        && line.contains("Target=")
+                        && let Some(target) = extract_xml_attr(line, "Target")
+                    {
+                        // Match table target to the tables we found
+                        let table_file = target.strip_prefix("../tables/").unwrap_or(&target);
+                        for table in &mut tables {
+                            // Set the sheet name based on relationship
+                            if table.sheet.is_empty() {
+                                // We need to map sheet numbers to names
+                                // This requires reading workbook.xml for sheet names
+                                // For simplicity, leave sheet empty and fill later
                             }
-                            let _ = (sheet_num, table_file);
                         }
+                        let _ = (sheet_num, table_file);
+                    }
                 }
             }
         }
@@ -553,9 +558,10 @@ fn extract_xml_attr(line: &str, attr_name: &str) -> Option<String> {
 fn extract_xml_attr_on_tag(xml: &str, tag: &str, attr_name: &str) -> Option<String> {
     for line in xml.lines() {
         if line.contains(tag)
-            && let Some(val) = extract_xml_attr(line, attr_name) {
-                return Some(val);
-            }
+            && let Some(val) = extract_xml_attr(line, attr_name)
+        {
+            return Some(val);
+        }
     }
     None
 }

@@ -1,9 +1,9 @@
 use axum::Json;
 use serde::Deserialize;
 
+use crate::http::response::ApiJson;
 use excel_core::features::comments;
 use excel_core::types::*;
-use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct GetCommentReq {
@@ -41,9 +41,7 @@ pub struct DeleteCommentReq {
     pub dry_run: bool,
 }
 
-pub async fn get_comment(
-    Json(req): Json<GetCommentReq>,
-) -> ApiJson<Option<comments::Comment>> {
+pub async fn get_comment(Json(req): Json<GetCommentReq>) -> ApiJson<Option<comments::Comment>> {
     match comments::get_comment(&req.path, &req.sheet, &req.cell) {
         Ok(comment) => ApiJson(ApiResponse::ok(Some(comment))),
         Err(e) => ApiJson(ApiResponse::err(e)),

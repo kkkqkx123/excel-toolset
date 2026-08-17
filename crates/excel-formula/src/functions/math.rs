@@ -5,15 +5,10 @@ use std::sync::Arc;
 
 use excel_types::CellValue;
 
-use crate::engine::DataProvider;
+use crate::engine::FunctionImpl;
 use crate::evaluator::to_number;
 
-pub fn register(
-    registry: &mut HashMap<
-        String,
-        Arc<dyn Fn(&[CellValue], &dyn DataProvider) -> CellValue + Send + Sync>,
-    >,
-) {
+pub fn register(registry: &mut HashMap<String, FunctionImpl>) {
     // Basic math
     registry.insert("ABS".into(), Arc::new(|args, _provider| math_abs(args)));
     registry.insert("SUM".into(), Arc::new(|args, _provider| math_sum(args)));
@@ -461,8 +456,8 @@ fn math_sumifs(args: &[CellValue]) -> CellValue {
                 let n_rows = n_rows as usize;
                 let total = n_cols * n_rows;
                 let range_end = i + 2 + total;
-                for j in (i + 2)..range_end.min(args_len) {
-                    sum_values.push(args[j].clone());
+                for v in &args[(i + 2)..range_end.min(args_len)] {
+                    sum_values.push(v.clone());
                 }
                 i = range_end;
             } else {
@@ -488,8 +483,8 @@ fn math_sumifs(args: &[CellValue]) -> CellValue {
                     let total = n_cols * n_rows;
                     let range_end = range_start + 2 + total;
                     let mut range_values: Vec<CellValue> = Vec::new();
-                    for j in (range_start + 2)..range_end.min(args_len) {
-                        range_values.push(args[j].clone());
+                    for v in &args[(range_start + 2)..range_end.min(args_len)] {
+                        range_values.push(v.clone());
                     }
                     if range_end < args_len {
                         pairs.push((range_values, args[range_end].clone()));
@@ -528,10 +523,9 @@ fn math_sumifs(args: &[CellValue]) -> CellValue {
                 break;
             }
         }
-        if all_match
-            && let Some(val) = sum_values.get(idx) {
-                sum += to_number(val).unwrap_or(0.0);
-            }
+        if all_match && let Some(val) = sum_values.get(idx) {
+            sum += to_number(val).unwrap_or(0.0);
+        }
     }
 
     CellValue::Number(sum)
@@ -582,8 +576,8 @@ fn math_countifs(args: &[CellValue]) -> CellValue {
 
                     // Extract the range values
                     let mut range_values: Vec<CellValue> = Vec::new();
-                    for j in (range_start + 2)..range_end.min(args_len) {
-                        range_values.push(args[j].clone());
+                    for v in &args[(range_start + 2)..range_end.min(args_len)] {
+                        range_values.push(v.clone());
                     }
 
                     // The criteria is the value right after the range data
@@ -796,19 +790,21 @@ fn extract_range_values(args: &[CellValue]) -> Vec<CellValue> {
         return args.to_vec();
     }
     if let Some(sentinel) = args.first().and_then(to_number)
-        && sentinel < -999_999.0 && sentinel > -2_000_000.0 {
-            // Range marker format: [sentinel, rows, data...]
-            // Skip sentinel and row count, return only the data
-            if let Some(n_rows) = args.get(1).and_then(to_number) {
-                let n_cols = (-(sentinel + 1_000_000.0)) as usize;
-                let total = n_cols * (n_rows as usize);
-                let end = (2 + total).min(args.len() - 1); // -1 for the criteria arg at the end
-                if end > 2 {
-                    return args[2..end].to_vec();
-                }
+        && sentinel < -999_999.0
+        && sentinel > -2_000_000.0
+    {
+        // Range marker format: [sentinel, rows, data...]
+        // Skip sentinel and row count, return only the data
+        if let Some(n_rows) = args.get(1).and_then(to_number) {
+            let n_cols = (-(sentinel + 1_000_000.0)) as usize;
+            let total = n_cols * (n_rows as usize);
+            let end = (2 + total).min(args.len() - 1); // -1 for the criteria arg at the end
+            if end > 2 {
+                return args[2..end].to_vec();
             }
-            return args[2..].to_vec();
         }
+        return args[2..].to_vec();
+    }
     // Non-marker: return all args except the last one (criteria)
     if args.len() > 1 {
         args[..args.len() - 1].to_vec()

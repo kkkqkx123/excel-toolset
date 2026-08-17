@@ -12,9 +12,6 @@
 //!
 //! Compiled only when the `zip` feature is enabled (on by default with `full`).
 
-
-
-
 // ───────────────────────────────────────────────────────────────────────────
 // Public entry points
 // ───────────────────────────────────────────────────────────────────────────
@@ -23,24 +20,23 @@
 /// keeping every other zip part byte-for-byte.
 ///
 /// Each element of `edits` is `(0-based row index, 0-based column index, new cell data)`.
-
 // ── 子模块：单元格/视图/工作表 公共入口 + zip/sheet_model/features/sheet_mgmt 内部实现 ──
 mod cells;
-mod views;
-mod sheets;
-mod zip_io;
-mod sheet_model;
 mod features;
 mod sheet_mgmt;
+mod sheet_model;
+mod sheets;
+mod views;
+mod zip_io;
 
 // 对外公开 API 路径保持稳定：excel_write::patch::<entry>
 pub use cells::*;
-pub use views::*;
 pub use sheets::*;
+pub use views::*;
 pub use zip_io::preserve_all_parts_transfer;
 
 // 内部实现项对子模块可见
-use self::{zip_io::*, sheet_model::*, features::*, sheet_mgmt::*};
+use self::{features::*, sheet_mgmt::*, sheet_model::*, zip_io::*};
 
 #[cfg(test)]
 mod tests;

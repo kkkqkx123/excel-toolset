@@ -1,9 +1,9 @@
 use axum::Json;
 use serde::Deserialize;
 
+use crate::http::response::ApiJson;
 use excel_core::features::search::{self, MatchType, SearchQuery, SearchType};
 use excel_core::types::*;
-use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct SearchWorkbookReq {
@@ -57,9 +57,7 @@ fn parse_match_type(s: &str) -> MatchType {
     }
 }
 
-pub async fn search_workbook(
-    Json(req): Json<SearchWorkbookReq>,
-) -> ApiJson<search::SearchResults> {
+pub async fn search_workbook(Json(req): Json<SearchWorkbookReq>) -> ApiJson<search::SearchResults> {
     let query = SearchQuery {
         pattern: req.pattern,
         search_type: parse_search_type(&req.search_type),
@@ -74,9 +72,7 @@ pub async fn search_workbook(
     }
 }
 
-pub async fn search_sheet(
-    Json(req): Json<SearchSheetReq>,
-) -> ApiJson<search::SearchResults> {
+pub async fn search_sheet(Json(req): Json<SearchSheetReq>) -> ApiJson<search::SearchResults> {
     let query = SearchQuery {
         pattern: req.pattern,
         search_type: parse_search_type(&req.search_type),

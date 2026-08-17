@@ -1,6 +1,6 @@
+use crate::cli::args::*;
 use excel_core::excel_write;
 use excel_core::types::*;
-use crate::cli::args::*;
 
 pub(crate) fn run_image(args: &ImageArgs) -> Result<serde_json::Value> {
     match &args.command {
@@ -9,9 +9,8 @@ pub(crate) fn run_image(args: &ImageArgs) -> Result<serde_json::Value> {
             config,
             dry_run,
         } => {
-            let image_config: ImageConfig = serde_json::from_str(config).map_err(|e| {
-                AppError::Serialize(format!("Invalid image config JSON: {}", e))
-            })?;
+            let image_config: ImageConfig = serde_json::from_str(config)
+                .map_err(|e| AppError::Serialize(format!("Invalid image config JSON: {}", e)))?;
             let params = SecurityParams {
                 dry_run: *dry_run,
                 create_backup: true,
@@ -31,8 +30,7 @@ pub(crate) fn run_image(args: &ImageArgs) -> Result<serde_json::Value> {
                 create_backup: true,
                 file_path: path.clone(),
             };
-            let result =
-                excel_write::remove_image(path, &params, sheet, anchor_cell)?;
+            let result = excel_write::remove_image(path, &params, sheet, anchor_cell)?;
             Ok(serde_json::to_value(result).map_err(|e| AppError::Serialize(e.to_string()))?)
         }
         ImageSub::ShapeInsert {
@@ -40,9 +38,8 @@ pub(crate) fn run_image(args: &ImageArgs) -> Result<serde_json::Value> {
             config,
             dry_run,
         } => {
-            let shape_config: ShapeConfig = serde_json::from_str(config).map_err(|e| {
-                AppError::Serialize(format!("Invalid shape config JSON: {}", e))
-            })?;
+            let shape_config: ShapeConfig = serde_json::from_str(config)
+                .map_err(|e| AppError::Serialize(format!("Invalid shape config JSON: {}", e)))?;
             let params = SecurityParams {
                 dry_run: *dry_run,
                 create_backup: true,

@@ -6,6 +6,7 @@ use serde_json::Value;
 /// Incoming JSON-RPC request from the MCP client.
 #[derive(Debug, Deserialize)]
 pub struct JsonRpcRequest {
+    #[allow(dead_code)]
     pub jsonrpc: String,
     #[serde(default)]
     pub id: Option<Value>,
@@ -82,9 +83,5 @@ impl JsonRpcResponse {
 
     pub fn method_not_found(id: Option<Value>) -> Self {
         Self::error(id, -32601, "Method not found".into())
-    }
-
-    pub fn internal_error(id: Option<Value>, msg: String) -> Self {
-        Self::error(id, -32603, format!("Internal error: {msg}"))
     }
 }

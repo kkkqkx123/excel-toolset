@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use excel_types::CellValue;
 
-use crate::engine::DataProvider;
+use crate::engine::{DataProvider, FunctionImpl};
 use crate::types::*;
 
 #[derive(Debug, Clone)]
@@ -37,10 +37,7 @@ pub type EvalResult<T> = std::result::Result<T, EvalError>;
 /// Recursive evaluator for formula AST nodes.
 pub struct Evaluator<'a, P: DataProvider> {
     provider: Arc<P>,
-    function_registry: &'a HashMap<
-        String,
-        Arc<dyn Fn(&[CellValue], &dyn DataProvider) -> CellValue + Send + Sync>,
-    >,
+    function_registry: &'a HashMap<String, FunctionImpl>,
     eval_stack: &'a Mutex<Vec<String>>,
     /// Current sheet context for resolving unqualified references.
     current_sheet: String,
@@ -49,10 +46,7 @@ pub struct Evaluator<'a, P: DataProvider> {
 impl<'a, P: DataProvider> Evaluator<'a, P> {
     pub fn new(
         provider: Arc<P>,
-        function_registry: &'a HashMap<
-            String,
-            Arc<dyn Fn(&[CellValue], &dyn DataProvider) -> CellValue + Send + Sync>,
-        >,
+        function_registry: &'a HashMap<String, FunctionImpl>,
         eval_stack: &'a Mutex<Vec<String>>,
     ) -> Self {
         Self {
@@ -92,9 +86,10 @@ impl<'a, P: DataProvider> Evaluator<'a, P> {
             AstNode::Array(rows) => {
                 // Return first element for scalar evaluation
                 if let Some(first_row) = rows.first()
-                    && let Some(first_cell) = first_row.first() {
-                        return self.eval_node(first_cell);
-                    }
+                    && let Some(first_cell) = first_row.first()
+                {
+                    return self.eval_node(first_cell);
+                }
                 Ok(CellValue::Empty)
             }
         }

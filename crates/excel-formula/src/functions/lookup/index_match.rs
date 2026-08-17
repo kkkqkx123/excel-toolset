@@ -1,6 +1,6 @@
-use excel_types::CellValue;
 use crate::engine::DataProvider;
 use crate::evaluator::to_number;
+use excel_types::CellValue;
 
 use super::*;
 
@@ -71,7 +71,6 @@ pub(crate) fn lookup_index(args: &[CellValue], _provider: &dyn DataProvider) -> 
 // MATCH(lookup_value, lookup_array, [match_type])
 // ---------------------------------------------------------------------------
 
-
 pub(crate) fn lookup_match(args: &[CellValue], _provider: &dyn DataProvider) -> CellValue {
     if args.len() < 2 {
         return CellValue::Error("#VALUE!".into());
@@ -130,4 +129,3 @@ pub(crate) fn lookup_match(args: &[CellValue], _provider: &dyn DataProvider) -> 
 // ---------------------------------------------------------------------------
 // OFFSET(reference, rows, cols, [height], [width])
 // ---------------------------------------------------------------------------
-

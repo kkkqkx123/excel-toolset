@@ -20,9 +20,7 @@ async fn main() {
     }
     match &root {
         Some(r) => println!("File access restricted to: {}", r.display()),
-        None => println!(
-            "File access is UNRESTRICTED (set EXCEL_HTTP_ROOT to sandbox it)"
-        ),
+        None => println!("File access is UNRESTRICTED (set EXCEL_HTTP_ROOT to sandbox it)"),
     }
     println!(
         "Authentication: {}",

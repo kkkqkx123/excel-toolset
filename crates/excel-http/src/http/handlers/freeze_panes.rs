@@ -1,9 +1,9 @@
 use axum::Json;
 use serde::Deserialize;
 
+use crate::http::response::ApiJson;
 use excel_core::excel_write;
 use excel_core::types::*;
-use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct FreezePanesSetReq {
@@ -21,9 +21,7 @@ pub struct FreezePanesClearReq {
     pub sheet: String,
 }
 
-pub async fn freeze_panes_set(
-    Json(req): Json<FreezePanesSetReq>,
-) -> ApiJson<WriteResult> {
+pub async fn freeze_panes_set(Json(req): Json<FreezePanesSetReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: false,
         create_backup: true,
@@ -40,9 +38,7 @@ pub async fn freeze_panes_set(
     }
 }
 
-pub async fn freeze_panes_clear(
-    Json(req): Json<FreezePanesClearReq>,
-) -> ApiJson<WriteResult> {
+pub async fn freeze_panes_clear(Json(req): Json<FreezePanesClearReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: false,
         create_backup: true,

@@ -30,6 +30,7 @@ impl FormulaTracker {
         tracker
     }
 
+    #[allow(dead_code)]
     pub fn is_passive_change(
         &self,
         _cell_ref: &str,
@@ -94,6 +95,7 @@ impl FormulaTracker {
         false
     }
 
+    #[allow(dead_code)]
     pub fn get_dependency_chain(&self, cell_ref: &str) -> Option<String> {
         if !self.dependencies.contains_key(cell_ref) {
             return None;
@@ -108,6 +110,7 @@ impl FormulaTracker {
         }
     }
 
+    #[allow(dead_code)]
     fn build_chain_recursive(
         &self,
         cell_ref: &str,
@@ -225,6 +228,7 @@ pub fn strip_all_sheet_prefixes(formula: &str) -> String {
     result
 }
 
+#[allow(dead_code)]
 pub fn try_match_cell(chars: &[char], pos: usize) -> Option<String> {
     try_match_cell_with_len(chars, pos).map(|(s, _)| s)
 }
@@ -368,15 +372,6 @@ fn col_str_to_index(col_str: &str) -> Option<usize> {
 
     Some(index - 1)
 }
-
-
-#[cfg(test)]
-
-#[cfg(test)]
-
-#[cfg(test)]
-
-#[cfg(test)]
 
 #[cfg(test)]
 mod tests {

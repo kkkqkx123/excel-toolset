@@ -1,6 +1,5 @@
 use crate::types::*;
 
-
 /// Token types for the calculated field expression parser.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Token {
@@ -14,7 +13,6 @@ pub(crate) enum Token {
     RParen,
 }
 
-
 /// AST node for a calculated field expression.
 #[derive(Debug, Clone)]
 pub(crate) enum Expr {
@@ -23,7 +21,6 @@ pub(crate) enum Expr {
     Binary(Box<Expr>, BinOp, Box<Expr>),
 }
 
-
 #[derive(Debug, Clone)]
 pub(crate) enum BinOp {
     Add,
@@ -31,7 +28,6 @@ pub(crate) enum BinOp {
     Mul,
     Div,
 }
-
 
 /// Tokenize a formula string like "=Revenue - Cost" or "Price * (Qty + 1)".
 pub(crate) fn tokenize(formula: &str) -> Result<Vec<Token>> {
@@ -107,7 +103,6 @@ pub(crate) fn tokenize(formula: &str) -> Result<Vec<Token>> {
     Ok(tokens)
 }
 
-
 /// Get operator precedence for precedence-climbing parser.
 pub(crate) fn precedence(token: &Token) -> u8 {
     match token {
@@ -116,7 +111,6 @@ pub(crate) fn precedence(token: &Token) -> u8 {
         _ => 0,
     }
 }
-
 
 /// Parse expression with precedence climbing.
 pub(crate) fn parse_expr(tokens: &[Token], pos: usize, min_prec: u8) -> Result<(Expr, usize)> {
@@ -142,7 +136,6 @@ pub(crate) fn parse_expr(tokens: &[Token], pos: usize, min_prec: u8) -> Result<(
 
     Ok((left, pos))
 }
-
 
 /// Parse a prefix expression (number, field name, parenthesized, or unary minus).
 pub(crate) fn parse_prefix(tokens: &[Token], pos: usize) -> Result<(Expr, usize)> {
@@ -178,7 +171,6 @@ pub(crate) fn parse_prefix(tokens: &[Token], pos: usize) -> Result<(Expr, usize)
     }
 }
 
-
 /// Parse a complete formula string into an AST.
 pub(crate) fn parse_expression(formula: &str) -> Result<Expr> {
     let tokens = tokenize(formula)?;
@@ -194,7 +186,6 @@ pub(crate) fn parse_expression(formula: &str) -> Result<Expr> {
     }
     Ok(expr)
 }
-
 
 /// Evaluate a parsed expression against a single data row.
 pub(crate) fn evaluate_expr(expr: &Expr, headers: &[String], row: &[CellData]) -> Result<f64> {
@@ -232,14 +223,12 @@ pub(crate) fn evaluate_expr(expr: &Expr, headers: &[String], row: &[CellData]) -
     }
 }
 
-
 /// Get cell value as f64 by usize index.
 pub(crate) fn cell_value_to_f64_idx(row: &[CellData], col: usize) -> Option<f64> {
     row.get(col)
         .and_then(|c| c.value.as_ref())
         .and_then(|v| v.parse::<f64>().ok())
 }
-
 
 /// Process calculated fields: parse formulas, evaluate per row, and append results
 /// as new columns to headers and data_rows.
@@ -280,4 +269,3 @@ pub(crate) fn process_calculated_fields(
 
     Ok(calc_cols)
 }
-

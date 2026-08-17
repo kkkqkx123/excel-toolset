@@ -1,6 +1,5 @@
 use crate::types::*;
 
-
 /// Apply date grouping to source data.
 /// Returns adjusted headers and new data rows with grouped date values.
 pub(crate) fn apply_date_grouping(
@@ -50,7 +49,6 @@ pub(crate) fn apply_date_grouping(
     (new_headers, new_rows)
 }
 
-
 /// Group a date value string by year/quarter/month/day.
 pub(crate) fn group_date_value(value: &str, grouping: &DateGrouping) -> Option<String> {
     // Parse YYYY-MM-DD or YYYY/MM/DD
@@ -90,4 +88,3 @@ pub(crate) fn group_date_value(value: &str, grouping: &DateGrouping) -> Option<S
         Some(result_parts.join("-"))
     }
 }
-

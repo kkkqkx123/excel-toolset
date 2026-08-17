@@ -60,6 +60,7 @@ fn assert_golden(test_name: &str, actual_plain: &str, actual_json: &str) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn cell_diff(
     row: u32,
     col: u16,

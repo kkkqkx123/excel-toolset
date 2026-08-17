@@ -568,9 +568,10 @@ pub fn execute_batch_operations_with_strategy(
         Err(e) => {
             // If AllOrNothing with build failure, rollback
             if matches!(strategy, BatchExecutionStrategy::AllOrNothing)
-                && let Some(ref info) = backup_info {
-                    let _ = rollback(info, path);
-                }
+                && let Some(ref info) = backup_info
+            {
+                let _ = rollback(info, path);
+            }
             return Err(e);
         }
     };

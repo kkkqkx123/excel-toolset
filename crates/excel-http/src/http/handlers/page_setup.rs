@@ -1,9 +1,9 @@
 use axum::Json;
 use serde::Deserialize;
 
+use crate::http::response::ApiJson;
 use excel_core::excel_write;
 use excel_core::types::*;
-use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct PageSetupConfigureReq {
@@ -53,9 +53,7 @@ pub struct PageBreakClearReq {
     pub sheet: String,
 }
 
-pub async fn page_setup_configure(
-    Json(req): Json<PageSetupConfigureReq>,
-) -> ApiJson<WriteResult> {
+pub async fn page_setup_configure(Json(req): Json<PageSetupConfigureReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: false,
         create_backup: true,
@@ -63,18 +61,21 @@ pub async fn page_setup_configure(
     };
 
     let fit_to_pages = match (req.fit_to_pages_width, req.fit_to_pages_height) {
-        (Some(w), Some(h)) => Some(FitToPages { width: w, height: h }),
+        (Some(w), Some(h)) => Some(FitToPages {
+            width: w,
+            height: h,
+        }),
         _ => None,
     };
 
     let config = PageSetupConfig {
         sheet: req.sheet,
-        paper_size: req.paper_size.and_then(|s| {
-            serde_json::from_str(&format!("\"{}\"", s)).ok()
-        }),
-        orientation: req.orientation.and_then(|s| {
-            serde_json::from_str(&format!("\"{}\"", s)).ok()
-        }),
+        paper_size: req
+            .paper_size
+            .and_then(|s| serde_json::from_str(&format!("\"{}\"", s)).ok()),
+        orientation: req
+            .orientation
+            .and_then(|s| serde_json::from_str(&format!("\"{}\"", s)).ok()),
         margins: req.margins,
         print_area: req.print_area,
         print_title_rows: req.print_title_rows,
@@ -93,9 +94,7 @@ pub async fn page_setup_configure(
     }
 }
 
-pub async fn page_breaks_set(
-    Json(req): Json<PageBreakSetReq>,
-) -> ApiJson<WriteResult> {
+pub async fn page_breaks_set(Json(req): Json<PageBreakSetReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: false,
         create_backup: true,
@@ -112,9 +111,7 @@ pub async fn page_breaks_set(
     }
 }
 
-pub async fn page_breaks_clear(
-    Json(req): Json<PageBreakClearReq>,
-) -> ApiJson<WriteResult> {
+pub async fn page_breaks_clear(Json(req): Json<PageBreakClearReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: false,
         create_backup: true,

@@ -1,3 +1,4 @@
+use crate::cli::args::*;
 use excel_core::types::*;
 use excel_diff::diff_files;
 use excel_diff::diff_range;
@@ -6,7 +7,6 @@ use excel_diff::get_git_diff_file_paths;
 use excel_diff::git_driver;
 use excel_diff::semantic::{self, Verbosity};
 use excel_diff::summarize;
-use crate::cli::args::*;
 
 pub(crate) fn run_diff(args: &DiffArgs, format: &str) -> Result<serde_json::Value> {
     match &args.command {
@@ -153,7 +153,11 @@ pub(crate) fn run_diff(args: &DiffArgs, format: &str) -> Result<serde_json::Valu
         }
         DiffSub::InstallGitDriver { global, patterns } => {
             git_driver::install_git_driver(*global, patterns)?;
-            let scope = if *global { "global" } else { "current repository" };
+            let scope = if *global {
+                "global"
+            } else {
+                "current repository"
+            };
             Ok(serde_json::json!({
                 "success": true,
                 "message": format!("Git diff driver installed ({}). Match patterns: {}",
@@ -168,7 +172,11 @@ pub(crate) fn run_diff(args: &DiffArgs, format: &str) -> Result<serde_json::Valu
         }
         DiffSub::UninstallGitDriver { global } => {
             git_driver::uninstall_git_driver(*global)?;
-            let scope = if *global { "global" } else { "current repository" };
+            let scope = if *global {
+                "global"
+            } else {
+                "current repository"
+            };
             Ok(serde_json::json!({
                 "success": true,
                 "message": format!("Git diff driver uninstalled from {}", scope)
@@ -176,4 +184,3 @@ pub(crate) fn run_diff(args: &DiffArgs, format: &str) -> Result<serde_json::Valu
         }
     }
 }
-
