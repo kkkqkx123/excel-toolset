@@ -4,8 +4,7 @@ use crate::types::*;
 use crate::utils::cell_ref;
 
 use super::core::{
-    cell_value_to_data, modify_file, modify_file_with_wb, write_cell_data,
-    write_cell_with_format,
+    cell_value_to_data, modify_file, modify_file_with_wb, write_cell_data, write_cell_with_format,
 };
 use super::format::{build_format, map_chart_type};
 
@@ -87,12 +86,7 @@ pub fn write_cell(
     #[cfg(feature = "zip")]
     {
         // Preserving write: only the target cell is modified; every other feature of the source file is kept byte-for-byte.
-        crate::excel_write::patch::write_cells_preserving(
-            path,
-            params,
-            sheet,
-            &[(row, col, cell)],
-        )
+        crate::excel_write::patch::write_cells_preserving(path, params, sheet, &[(row, col, cell)])
     }
     #[cfg(not(feature = "zip"))]
     modify_file(path, params, |old_data| {
@@ -155,9 +149,7 @@ pub fn clear_range(
 
     #[cfg(feature = "zip")]
     {
-        super::patch::clear_range_preserving(
-            path, params, sheet, r_start, r_end, c_start, c_end,
-        )
+        super::patch::clear_range_preserving(path, params, sheet, r_start, r_end, c_start, c_end)
     }
 
     #[cfg(not(feature = "zip"))]
@@ -700,6 +692,7 @@ pub fn insert_shape(
     crate::features::image::insert_shape(path, config, params)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn insert_textbox(
     path: &str,
     params: &SecurityParams,
@@ -714,8 +707,17 @@ pub fn insert_textbox(
     alt_text: Option<&str>,
 ) -> Result<WriteResult> {
     crate::features::image::insert_textbox(
-        path, sheet, anchor_cell, _text, width, height, _font_size, _font_color, fill_color,
-        alt_text, params,
+        path,
+        sheet,
+        anchor_cell,
+        _text,
+        width,
+        height,
+        _font_size,
+        _font_color,
+        fill_color,
+        alt_text,
+        params,
     )
 }
 
@@ -724,8 +726,8 @@ pub fn insert_textbox(
 #[allow(clippy::approx_constant)]
 mod tests {
     use super::*;
-    use crate::types::{CellData, CellDataType};
     use crate::excel_write::ensure_dimensions;
+    use crate::types::{CellData, CellDataType};
     use std::collections::HashMap;
 
     fn make_cell(value: &str) -> CellData {

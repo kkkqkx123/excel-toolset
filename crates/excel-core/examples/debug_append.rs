@@ -39,7 +39,8 @@ fn main() {
     println!("Initial data:");
     for (i, row) in sheet.rows.iter().enumerate() {
         let none_str = "None".to_string();
-        let val = row.first()
+        let val = row
+            .first()
             .and_then(|c| c.value.as_ref())
             .unwrap_or(&none_str);
         println!("  Row {}: {}", i, val);
@@ -80,7 +81,8 @@ fn main() {
     println!("Updated data:");
     for (i, row) in updated_sheet.rows.iter().enumerate() {
         let none_str = "None".to_string();
-        let val = row.first()
+        let val = row
+            .first()
             .and_then(|c| c.value.as_ref())
             .unwrap_or(&none_str);
         println!("  Row {}: {}", i, val);

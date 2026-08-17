@@ -1,10 +1,10 @@
 use axum::Json;
 use serde::Deserialize;
 
+use crate::http::response::ApiJson;
 use excel_core::excel_read;
 use excel_core::excel_write;
 use excel_core::types::*;
-use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct SheetNameReq {
@@ -74,9 +74,7 @@ pub async fn sheet_rename(Json(req): Json<RenameSheetReq>) -> ApiJson<WriteResul
     }
 }
 
-pub async fn sheet_set_visibility(
-    Json(req): Json<SheetVisibilityReq>,
-) -> ApiJson<WriteResult> {
+pub async fn sheet_set_visibility(Json(req): Json<SheetVisibilityReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: false,
         create_backup: true,

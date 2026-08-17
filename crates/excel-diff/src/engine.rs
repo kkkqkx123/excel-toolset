@@ -39,10 +39,8 @@ pub fn compute_cell_diffs(old_data: &SheetData, new_data: &SheetData) -> Vec<Cel
         };
 
         for abs_col in first_col..last_col {
-            let old_cell =
-                old_row.and_then(|r| abs_col.checked_sub(old_c0).and_then(|i| r.get(i)));
-            let new_cell =
-                new_row.and_then(|r| abs_col.checked_sub(new_c0).and_then(|i| r.get(i)));
+            let old_cell = old_row.and_then(|r| abs_col.checked_sub(old_c0).and_then(|i| r.get(i)));
+            let new_cell = new_row.and_then(|r| abs_col.checked_sub(new_c0).and_then(|i| r.get(i)));
 
             if old_cell.is_none() && new_cell.is_none() {
                 continue;

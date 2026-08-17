@@ -1,6 +1,6 @@
+use crate::cli::args::*;
 use excel_core::features::vba_util;
 use excel_core::types::*;
-use crate::cli::args::*;
 
 pub(crate) fn run_vba(args: &VbaArgs) -> Result<serde_json::Value> {
     match &args.command {
@@ -35,4 +35,3 @@ pub(crate) fn run_vba(args: &VbaArgs) -> Result<serde_json::Value> {
         }
     }
 }
-

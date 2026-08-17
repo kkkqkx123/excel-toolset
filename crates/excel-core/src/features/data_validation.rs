@@ -187,12 +187,10 @@ fn normalize_validation_formula(config: &DataValidationConfig) -> (Option<String
         DataValidationType::Custom => {
             // Strip leading '=' for custom formulas
             let f1 = config.formula1.clone().map(|f| {
-                let trimmed = f.trim();
-                if trimmed.starts_with('=') {
-                    trimmed[1..].to_string()
-                } else {
-                    f
-                }
+                f.trim()
+                    .strip_prefix('=')
+                    .map(|s| s.to_string())
+                    .unwrap_or(f)
             });
             (f1, config.formula2.clone())
         }

@@ -194,21 +194,61 @@ pub fn set_formula_with_eval(
         #[cfg(feature = "zip")]
         {
             match &eval_result {
-                Some(CellValue::Number(n)) => crate::excel_write::patch::set_formula_with_value_preserving(
-                    path, params, sheet, row, col, formula_clean, &format!("{}", n), CellDataType::Float,
-                ),
-                Some(CellValue::String(s)) => crate::excel_write::patch::set_formula_with_value_preserving(
-                    path, params, sheet, row, col, formula_clean, s, CellDataType::String,
-                ),
-                Some(CellValue::Bool(b)) => crate::excel_write::patch::set_formula_with_value_preserving(
-                    path, params, sheet, row, col, formula_clean,
-                    if *b { "TRUE" } else { "FALSE" }, CellDataType::Bool,
-                ),
-                Some(CellValue::Error(e)) => crate::excel_write::patch::set_formula_with_value_preserving(
-                    path, params, sheet, row, col, formula_clean, e, CellDataType::Error,
-                ),
+                Some(CellValue::Number(n)) => {
+                    crate::excel_write::patch::set_formula_with_value_preserving(
+                        path,
+                        params,
+                        sheet,
+                        row,
+                        col,
+                        formula_clean,
+                        &format!("{}", n),
+                        CellDataType::Float,
+                    )
+                }
+                Some(CellValue::String(s)) => {
+                    crate::excel_write::patch::set_formula_with_value_preserving(
+                        path,
+                        params,
+                        sheet,
+                        row,
+                        col,
+                        formula_clean,
+                        s,
+                        CellDataType::String,
+                    )
+                }
+                Some(CellValue::Bool(b)) => {
+                    crate::excel_write::patch::set_formula_with_value_preserving(
+                        path,
+                        params,
+                        sheet,
+                        row,
+                        col,
+                        formula_clean,
+                        if *b { "TRUE" } else { "FALSE" },
+                        CellDataType::Bool,
+                    )
+                }
+                Some(CellValue::Error(e)) => {
+                    crate::excel_write::patch::set_formula_with_value_preserving(
+                        path,
+                        params,
+                        sheet,
+                        row,
+                        col,
+                        formula_clean,
+                        e,
+                        CellDataType::Error,
+                    )
+                }
                 _ => crate::excel_write::patch::set_formula_preserving(
-                    path, params, sheet, row, col, formula_clean,
+                    path,
+                    params,
+                    sheet,
+                    row,
+                    col,
+                    formula_clean,
                 ),
             }
         }

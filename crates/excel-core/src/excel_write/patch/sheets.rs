@@ -1,12 +1,8 @@
+use crate::security::{compute_file_hash, create_backup};
+use crate::types::{AppError, Result, SecurityParams, WriteResult};
 use std::collections::HashMap;
 use std::fs::File;
 use zip::ZipArchive;
-use crate::security::{compute_file_hash, create_backup};
-use crate::types::{
-    AppError,
-    Result, SecurityParams,
-    WriteResult,
-};
 
 use super::*;
 
@@ -89,7 +85,6 @@ pub fn add_sheet_preserving(
     })
 }
 
-
 /// Preserving sheet delete: removes the corresponding entries from workbook.xml,
 /// [Content_Types].xml and workbook.xml.rels, skips the sheet's XML entry,
 /// and keeps every other zip part byte-for-byte.
@@ -129,7 +124,9 @@ pub fn delete_sheet_preserving(
     // Check whether any sheet remains after deletion
     let sheet_count = wb_str.matches("<sheet ").count();
     if sheet_count <= 1 {
-        return Err(AppError::Custom("Cannot delete all sheets from a workbook".to_string()));
+        return Err(AppError::Custom(
+            "Cannot delete all sheets from a workbook".to_string(),
+        ));
     }
 
     // Find the sheet's part path via its rid
@@ -173,7 +170,6 @@ pub fn delete_sheet_preserving(
         diff: None,
     })
 }
-
 
 /// Preserving sheet rename: modifies the name attribute of the corresponding sheet
 /// in workbook.xml, keeping every other zip part byte-for-byte.
@@ -231,4 +227,3 @@ pub fn rename_sheet_preserving(
 // ───────────────────────────────────────────────────────────────────────────
 // R2.2 internal helpers
 // ───────────────────────────────────────────────────────────────────────────
-

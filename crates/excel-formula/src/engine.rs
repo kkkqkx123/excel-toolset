@@ -11,6 +11,9 @@ use crate::parser;
 use crate::spill;
 use crate::types::AstNode;
 
+/// A boxed function implementation stored in the formula function registry.
+pub type FunctionImpl = Arc<dyn Fn(&[CellValue], &dyn DataProvider) -> CellValue + Send + Sync>;
+
 /// Trait for providing cell data to the formula engine.
 ///
 /// Implement this trait to connect the engine to a data source
@@ -155,8 +158,7 @@ pub struct FormulaEngine<P: DataProvider> {
     provider: Arc<P>,
     /// Function registry: function name -> implementation.
     /// Each function receives evaluated arguments and the data provider for range context.
-    function_registry:
-        HashMap<String, Arc<dyn Fn(&[CellValue], &dyn DataProvider) -> CellValue + Send + Sync>>,
+    function_registry: HashMap<String, FunctionImpl>,
     /// Stack for circular reference detection (sheet!cell strings)
     eval_stack: std::sync::Mutex<Vec<String>>,
 }
@@ -197,10 +199,11 @@ impl<P: DataProvider + 'static> FormulaEngine<P> {
 
         // Check if this is a dynamic array spill function
         if let AstNode::Function { ref name, .. } = ast
-            && spill::is_spill_function(name) {
-                let spill_result = spill::try_spill(sheet, &ast, &mut evaluator)?;
-                return Ok(FormulaResult::Spill(spill_result));
-            }
+            && spill::is_spill_function(name)
+        {
+            let spill_result = spill::try_spill(sheet, &ast, &mut evaluator)?;
+            return Ok(FormulaResult::Spill(spill_result));
+        }
 
         Ok(FormulaResult::Single(cell_value))
     }
@@ -229,7 +232,13 @@ mod tmp_debug_tests {
         }
         let p = InMemoryDataProvider::new().with_sheet("S", cells);
         let e = FormulaEngine::new(p);
-        for f in ["=SUM(C2:C6)", "=AVERAGE(C2:C6)", "=COUNT(C2:C6)", "=MIN(C2:C6)", "=MAX(C2:C6)"] {
+        for f in [
+            "=SUM(C2:C6)",
+            "=AVERAGE(C2:C6)",
+            "=COUNT(C2:C6)",
+            "=MIN(C2:C6)",
+            "=MAX(C2:C6)",
+        ] {
             println!("{f} => {:?}", e.evaluate("S", "A1", f));
         }
     }

@@ -110,6 +110,7 @@ impl Parser {
         self.pos += n;
     }
 
+    #[allow(dead_code)]
     fn consume(&mut self) -> Option<u8> {
         let ch = self.peek()?;
         self.advance();

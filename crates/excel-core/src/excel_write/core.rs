@@ -532,15 +532,15 @@ pub fn build_workbook_with_ops(
                         if let Ok((r_start, r_end, c_start, c_end)) =
                             cell_ref::parse_range_normalized(range_str)
                             && ri as u32 >= r_start
-                                && ri as u32 <= r_end
-                                && ci as u16 >= c_start
-                                && ci as u16 <= c_end
-                            {
-                                let fmt = build_format(style);
-                                write_cell_with_format(ws, ri as u32, ci as u16, cell, &fmt)?;
-                                applied_format = true;
-                                break;
-                            }
+                            && ri as u32 <= r_end
+                            && ci as u16 >= c_start
+                            && ci as u16 <= c_end
+                        {
+                            let fmt = build_format(style);
+                            write_cell_with_format(ws, ri as u32, ci as u16, cell, &fmt)?;
+                            applied_format = true;
+                            break;
+                        }
                     }
                     if !applied_format {
                         write_cell_data(ws, ri as u32, ci as u16, cell)?;

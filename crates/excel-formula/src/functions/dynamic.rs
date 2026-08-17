@@ -5,20 +5,18 @@ use std::sync::Arc;
 
 use excel_types::CellValue;
 
-use crate::engine::DataProvider;
+use crate::engine::FunctionImpl;
 use crate::evaluator::to_number;
 
-pub fn register(
-    registry: &mut HashMap<
-        String,
-        Arc<dyn Fn(&[CellValue], &dyn DataProvider) -> CellValue + Send + Sync>,
-    >,
-) {
+pub fn register(registry: &mut HashMap<String, FunctionImpl>) {
     registry.insert(
         "FILTER".into(),
         Arc::new(|args, _provider| dynamic_filter(args)),
     );
-    registry.insert("SORT".into(), Arc::new(|args, _provider| dynamic_sort(args)));
+    registry.insert(
+        "SORT".into(),
+        Arc::new(|args, _provider| dynamic_sort(args)),
+    );
     registry.insert(
         "SORTBY".into(),
         Arc::new(|args, _provider| dynamic_sortby(args)),
@@ -45,7 +43,10 @@ pub fn register(
         "REDUCE".into(),
         Arc::new(|args, _provider| dynamic_reduce(args)),
     );
-    registry.insert("SCAN".into(), Arc::new(|args, _provider| dynamic_scan(args)));
+    registry.insert(
+        "SCAN".into(),
+        Arc::new(|args, _provider| dynamic_scan(args)),
+    );
     registry.insert(
         "BYROW".into(),
         Arc::new(|args, _provider| dynamic_byrow(args)),
@@ -94,15 +95,6 @@ fn has_range_marker(args: &[CellValue]) -> bool {
         sentinel < -999_999.0 && sentinel > -2_000_000.0
     } else {
         false
-    }
-}
-
-/// Collect numbers from inline range data (after the sentinel and row count markers).
-fn collect_range_numbers(args: &[CellValue]) -> Vec<f64> {
-    if has_range_marker(args) && args.len() > 2 {
-        args[2..].iter().filter_map(to_number).collect()
-    } else {
-        args.iter().filter_map(to_number).collect()
     }
 }
 
@@ -170,10 +162,9 @@ fn dynamic_unique(args: &[CellValue]) -> CellValue {
         return CellValue::Error("#VALUE!".into());
     }
 
-    let exactly_once = args.get(2).is_some_and(|v| match v {
-        CellValue::Bool(true) => true,
-        _ => false,
-    });
+    let exactly_once = args
+        .get(2)
+        .is_some_and(|v| matches!(v, CellValue::Bool(true)));
 
     // Extract values from inline range if present
     let values: Vec<CellValue> = if let Some((_, _, data)) = try_extract_2d(args) {
@@ -266,15 +257,17 @@ fn dynamic_let(args: &[CellValue]) -> CellValue {
 
     // Simple case: LET(name, value, calculation) where calculation is just the name
     if args.len() == 3
-        && let CellValue::String(calc_name) = &last {
-            let clean_name = calc_name.trim();
-            if let CellValue::String(name1) = &args[0]
-                && name1.trim() == clean_name {
-                    return args[1].clone();
-                }
-            // Otherwise return calc_name as-is (unknown reference)
-            return CellValue::String(calc_name.clone());
+        && let CellValue::String(calc_name) = &last
+    {
+        let clean_name = calc_name.trim();
+        if let CellValue::String(name1) = &args[0]
+            && name1.trim() == clean_name
+        {
+            return args[1].clone();
         }
+        // Otherwise return calc_name as-is (unknown reference)
+        return CellValue::String(calc_name.clone());
+    }
 
     // For LET(name, value, expression) where expression is a literal value
     last
@@ -457,13 +450,13 @@ fn dynamic_bycol(args: &[CellValue]) -> CellValue {
     }
 
     // Extract 2D data from range markers
-    if let Some((n_cols, n_rows, data)) = try_extract_2d(args) {
+    if let Some((n_cols, _n_rows, data)) = try_extract_2d(args) {
         // Apply lambda to each column - simplified: sum each column
         let mut total = 0.0;
         for c in 0..n_cols {
             let mut col_sum = 0.0;
-            for r in 0..n_rows {
-                if let Some(num) = data[r].get(c).and_then(to_number) {
+            for row in &data {
+                if let Some(num) = row.get(c).and_then(to_number) {
                     col_sum += num;
                 }
             }

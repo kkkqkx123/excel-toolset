@@ -296,7 +296,10 @@ mod tests {
             parse_cell_value("00123"),
             CellValue::String("00123".to_string())
         );
-        assert_eq!(parse_cell_value("007"), CellValue::String("007".to_string()));
+        assert_eq!(
+            parse_cell_value("007"),
+            CellValue::String("007".to_string())
+        );
         // Ordinary numbers (without leading zeros) are still parsed as numeric values.
         assert_eq!(parse_cell_value("123"), CellValue::Number(123.0));
         assert_eq!(parse_cell_value("0"), CellValue::Number(0.0));

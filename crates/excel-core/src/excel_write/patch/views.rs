@@ -1,11 +1,10 @@
-use std::fs::File;
-use zip::ZipArchive;
 use crate::security::{compute_file_hash, create_backup};
 use crate::types::{
-    AppError, DataValidationConfig, PageSetupConfig,
-    Result, SecurityParams, SheetProtectionConfig, SheetVisibility,
-    WriteResult,
+    AppError, DataValidationConfig, PageSetupConfig, Result, SecurityParams, SheetProtectionConfig,
+    SheetVisibility, WriteResult,
 };
+use std::fs::File;
+use zip::ZipArchive;
 
 use super::*;
 
@@ -46,7 +45,13 @@ pub fn set_freeze_panes_preserving(
 
     repackage_zip(&mut archive, path, &part, &new_sheet_xml)?;
     let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
-    append_history(path, "set_freeze_panes", &old_hash, &new_hash, params.dry_run);
+    append_history(
+        path,
+        "set_freeze_panes",
+        &old_hash,
+        &new_hash,
+        params.dry_run,
+    );
 
     Ok(WriteResult {
         success: true,
@@ -58,7 +63,6 @@ pub fn set_freeze_panes_preserving(
     })
 }
 
-
 /// Preserving clear freeze panes.
 pub fn clear_freeze_panes_preserving(
     path: &str,
@@ -67,7 +71,6 @@ pub fn clear_freeze_panes_preserving(
 ) -> Result<WriteResult> {
     set_freeze_panes_preserving(path, params, sheet, 0, 0)
 }
-
 
 /// Preserving auto filter set.
 pub fn set_auto_filter_preserving(
@@ -96,7 +99,13 @@ pub fn set_auto_filter_preserving(
     let new_sheet_xml = patch_auto_filter_str(&sheet_xml, Some(range_ref))?;
     repackage_zip(&mut archive, path, &part, &new_sheet_xml)?;
     let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
-    append_history(path, "set_auto_filter", &old_hash, &new_hash, params.dry_run);
+    append_history(
+        path,
+        "set_auto_filter",
+        &old_hash,
+        &new_hash,
+        params.dry_run,
+    );
 
     Ok(WriteResult {
         success: true,
@@ -107,7 +116,6 @@ pub fn set_auto_filter_preserving(
         diff: None,
     })
 }
-
 
 /// Preserving auto filter removal.
 pub fn remove_auto_filter_preserving(
@@ -135,7 +143,13 @@ pub fn remove_auto_filter_preserving(
     let new_sheet_xml = patch_auto_filter_str(&sheet_xml, None)?;
     repackage_zip(&mut archive, path, &part, &new_sheet_xml)?;
     let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
-    append_history(path, "remove_auto_filter", &old_hash, &new_hash, params.dry_run);
+    append_history(
+        path,
+        "remove_auto_filter",
+        &old_hash,
+        &new_hash,
+        params.dry_run,
+    );
 
     Ok(WriteResult {
         success: true,
@@ -146,7 +160,6 @@ pub fn remove_auto_filter_preserving(
         diff: None,
     })
 }
-
 
 /// Preserving data validation add.
 pub fn add_data_validation_preserving(
@@ -177,7 +190,13 @@ pub fn add_data_validation_preserving(
 
     repackage_zip(&mut archive, path, &part, &new_sheet_xml)?;
     let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
-    append_history(path, "add_data_validation", &old_hash, &new_hash, params.dry_run);
+    append_history(
+        path,
+        "add_data_validation",
+        &old_hash,
+        &new_hash,
+        params.dry_run,
+    );
 
     Ok(WriteResult {
         success: true,
@@ -188,7 +207,6 @@ pub fn add_data_validation_preserving(
         diff: None,
     })
 }
-
 
 /// Preserving sheet protection set.
 pub fn protect_sheet_preserving(
@@ -231,7 +249,6 @@ pub fn protect_sheet_preserving(
     })
 }
 
-
 /// Preserving sheet protection removal.
 pub fn unprotect_sheet_preserving(
     path: &str,
@@ -258,7 +275,13 @@ pub fn unprotect_sheet_preserving(
     let new_sheet_xml = patch_sheet_protection_str(&sheet_xml, None)?;
     repackage_zip(&mut archive, path, &part, &new_sheet_xml)?;
     let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
-    append_history(path, "unprotect_sheet", &old_hash, &new_hash, params.dry_run);
+    append_history(
+        path,
+        "unprotect_sheet",
+        &old_hash,
+        &new_hash,
+        params.dry_run,
+    );
 
     Ok(WriteResult {
         success: true,
@@ -270,7 +293,6 @@ pub fn unprotect_sheet_preserving(
     })
 }
 
-
 /// Preserving page setup — not implemented yet, deferred to Phase 3.
 pub fn configure_page_setup_preserving(
     _path: &str,
@@ -279,10 +301,9 @@ pub fn configure_page_setup_preserving(
     _config: &PageSetupConfig,
 ) -> Result<WriteResult> {
     Err(AppError::Custom(
-        "configure_page_setup_preserving not implemented yet - use full transfer fallback".into()
+        "configure_page_setup_preserving not implemented yet - use full transfer fallback".into(),
     ))
 }
-
 
 /// Preserving sheet visibility set: modifies the `state` attribute of the corresponding
 /// sheet in workbook.xml.
@@ -320,7 +341,13 @@ pub fn set_sheet_visibility_preserving(
 
     repackage_zip(&mut archive, path, wb_part, &new_wb_xml)?;
     let new_hash = compute_file_hash(path).map_err(AppError::Io)?;
-    append_history(path, "set_sheet_visibility", &old_hash, &new_hash, params.dry_run);
+    append_history(
+        path,
+        "set_sheet_visibility",
+        &old_hash,
+        &new_hash,
+        params.dry_run,
+    );
 
     Ok(WriteResult {
         success: true,
@@ -331,4 +358,3 @@ pub fn set_sheet_visibility_preserving(
         diff: None,
     })
 }
-

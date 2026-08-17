@@ -1,6 +1,6 @@
 // runners/mod.rs：命令调度中枢。各子命令实现见同级子文件。
-use excel_core::types::*;
 use super::args::*;
+use excel_core::types::*;
 
 pub fn execute(cli: &Cli) -> Result<()> {
     let result = run_command(cli);
@@ -56,7 +56,6 @@ pub fn execute(cli: &Cli) -> Result<()> {
 
 // ── Sparkline ──
 
-
 pub(crate) fn run_command(cli: &Cli) -> Result<serde_json::Value> {
     match &cli.command {
         Commands::File(args) => run_file(args),
@@ -90,65 +89,43 @@ pub(crate) fn run_command(cli: &Cli) -> Result<serde_json::Value> {
     }
 }
 
-
-
 // ── 子命令实现（每命令一个文件）──
-mod sparkline;
-mod file;
-mod sheet;
-mod cell;
-mod range;
-mod data;
-mod formula;
-mod format;
-mod chart;
-mod vba;
-mod batch;
-mod diff;
-mod rollback;
-mod comments;
-mod named_range;
-mod search;
-mod conditional_format;
-mod table;
-mod data_validation;
-mod pivot_table;
-mod slicer;
-mod overview;
-mod history;
-mod freeze_pane;
 mod auto_filter;
-mod protection;
-mod page_setup;
+mod batch;
+mod cell;
+mod chart;
+mod comments;
+mod conditional_format;
+mod data;
+mod data_validation;
+mod diff;
+mod file;
+mod format;
+mod formula;
+mod freeze_pane;
+mod history;
 mod image;
+mod named_range;
+mod overview;
+mod page_setup;
+mod pivot_table;
+mod protection;
+mod range;
+mod rollback;
+mod search;
+mod sheet;
+mod slicer;
+mod sparkline;
+mod table;
+mod vba;
 
 use self::{
-    sparkline::run_sparkline,
-    file::run_file,
-    sheet::run_sheet,
-    cell::run_cell,
-    range::run_range,
-    data::run_data,
-    formula::run_formula,
-    format::run_format,
-    chart::run_chart,
-    vba::run_vba,
-    batch::run_batch,
-    diff::run_diff,
-    rollback::run_rollback,
-    comments::run_comments,
-    named_range::run_named_range,
-    search::run_search,
-    conditional_format::run_conditional_format,
-    table::run_table,
-    data_validation::run_data_validation,
-    pivot_table::run_pivot_table,
-    slicer::run_slicer,
-    overview::run_overview,
-    history::run_history,
-    freeze_pane::run_freeze_pane,
-    auto_filter::run_auto_filter,
-    protection::run_protection,
-    page_setup::run_page_setup,
-    image::run_image,
+    auto_filter::run_auto_filter, batch::run_batch, cell::run_cell, chart::run_chart,
+    comments::run_comments, conditional_format::run_conditional_format, data::run_data,
+    data_validation::run_data_validation, diff::run_diff, file::run_file, format::run_format,
+    formula::run_formula, freeze_pane::run_freeze_pane, history::run_history, image::run_image,
+    named_range::run_named_range, overview::run_overview, page_setup::run_page_setup,
+    pivot_table::run_pivot_table, protection::run_protection, range::run_range,
+    rollback::run_rollback, search::run_search, sheet::run_sheet, slicer::run_slicer,
+    sparkline::run_sparkline, table::run_table, vba::run_vba,
 };

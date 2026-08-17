@@ -1,9 +1,9 @@
 use axum::Json;
 use serde::Deserialize;
 
+use crate::http::response::ApiJson;
 use excel_core::excel_write;
 use excel_core::types::*;
-use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct DataValidationAddReq {
@@ -23,9 +23,7 @@ pub struct DataValidationRemoveReq {
     pub dry_run: bool,
 }
 
-pub async fn data_validation_add(
-    Json(req): Json<DataValidationAddReq>,
-) -> ApiJson<WriteResult> {
+pub async fn data_validation_add(Json(req): Json<DataValidationAddReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,

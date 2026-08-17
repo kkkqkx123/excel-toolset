@@ -5,15 +5,10 @@ use std::sync::Arc;
 
 use excel_types::CellValue;
 
-use crate::engine::DataProvider;
+use crate::engine::FunctionImpl;
 use crate::evaluator::{cell_value_to_string, to_number};
 
-pub fn register(
-    registry: &mut HashMap<
-        String,
-        Arc<dyn Fn(&[CellValue], &dyn DataProvider) -> CellValue + Send + Sync>,
-    >,
-) {
+pub fn register(registry: &mut HashMap<String, FunctionImpl>) {
     registry.insert("LEN".into(), Arc::new(|args, _provider| text_len(args)));
     registry.insert("LEFT".into(), Arc::new(|args, _provider| text_left(args)));
     registry.insert("RIGHT".into(), Arc::new(|args, _provider| text_right(args)));

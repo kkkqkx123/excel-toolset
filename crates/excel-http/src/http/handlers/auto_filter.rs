@@ -1,9 +1,9 @@
 use axum::Json;
 use serde::Deserialize;
 
+use crate::http::response::ApiJson;
 use excel_core::excel_write;
 use excel_core::types::*;
-use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct AutoFilterSetReq {
@@ -34,9 +34,7 @@ pub async fn auto_filter_set(Json(req): Json<AutoFilterSetReq>) -> ApiJson<Write
     }
 }
 
-pub async fn auto_filter_remove(
-    Json(req): Json<AutoFilterSheetReq>,
-) -> ApiJson<WriteResult> {
+pub async fn auto_filter_remove(Json(req): Json<AutoFilterSheetReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: false,
         create_backup: true,
@@ -48,9 +46,7 @@ pub async fn auto_filter_remove(
     }
 }
 
-pub async fn auto_filter_get(
-    Json(req): Json<AutoFilterSheetReq>,
-) -> ApiJson<AutoFilterInfo> {
+pub async fn auto_filter_get(Json(req): Json<AutoFilterSheetReq>) -> ApiJson<AutoFilterInfo> {
     match excel_write::get_auto_filter(&req.path, &req.sheet) {
         Ok(data) => ApiJson(ApiResponse::ok(Some(data))),
         Err(e) => ApiJson(ApiResponse::err(e)),

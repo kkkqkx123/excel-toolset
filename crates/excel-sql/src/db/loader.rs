@@ -295,7 +295,7 @@ mod tests {
     }
 
     #[test]
-    fn test_create_table_with_header_empty_cell_defaults_to_cN() {
+    fn test_create_table_with_header_empty_cell_defaults_to_c_n() {
         let conn = create_conn().unwrap();
         let header = vec![
             make_cell(Some("Name"), CellDataType::String),

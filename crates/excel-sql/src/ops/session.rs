@@ -116,11 +116,7 @@ impl QuerySession {
                 .map_err(|e| AppError::Read(e.to_string()))?;
             let rows: Vec<Vec<excel_types::CellData>> = range
                 .rows()
-                .map(|row| {
-                    row.iter()
-                        .map(calamine_data_to_cell_data)
-                        .collect()
-                })
+                .map(|row| row.iter().map(calamine_data_to_cell_data).collect())
                 .collect();
             let data = SheetData {
                 name: name.clone(),

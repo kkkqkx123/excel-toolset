@@ -11,7 +11,6 @@ pub(crate) fn lookup_row(_args: &[CellValue]) -> CellValue {
 // COLUMN([reference])
 // ---------------------------------------------------------------------------
 
-
 pub(crate) fn lookup_column(_args: &[CellValue]) -> CellValue {
     // Without cell coordinate context, return 1.
     CellValue::Number(1.0)
@@ -20,7 +19,6 @@ pub(crate) fn lookup_column(_args: &[CellValue]) -> CellValue {
 // ---------------------------------------------------------------------------
 // ROWS(array)
 // ---------------------------------------------------------------------------
-
 
 pub(crate) fn lookup_rows(args: &[CellValue]) -> CellValue {
     if let Some((_cols, rows, _end)) = consume_range_marker(args, 0) {
@@ -38,7 +36,6 @@ pub(crate) fn lookup_rows(args: &[CellValue]) -> CellValue {
 // COLUMNS(array)
 // ---------------------------------------------------------------------------
 
-
 pub(crate) fn lookup_columns(args: &[CellValue]) -> CellValue {
     if let Some((cols, _rows, _end)) = consume_range_marker(args, 0) {
         return CellValue::Number(cols as f64);
@@ -50,4 +47,3 @@ pub(crate) fn lookup_columns(args: &[CellValue]) -> CellValue {
 // ---------------------------------------------------------------------------
 // CHOOSE(index_num, value1, [value2], ...)
 // ---------------------------------------------------------------------------
-

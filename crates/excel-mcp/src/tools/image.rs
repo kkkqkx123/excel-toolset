@@ -16,11 +16,26 @@ pub fn tools() -> Vec<ToolDef> {
                 vec![
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Target sheet name", true)),
-                    ("image_path", string_prop("Path to the image file on disk", true)),
-                    ("anchor_cell", string_prop("Anchor cell for image placement, e.g. B2", true)),
-                    ("x_scale", int_prop("Horizontal scale factor (multiplied by 100, e.g. 100 = 1.0x)")),
-                    ("y_scale", int_prop("Vertical scale factor (multiplied by 100, e.g. 100 = 1.0x)")),
-                    ("alt_text", string_prop("Alternative text for accessibility", false)),
+                    (
+                        "image_path",
+                        string_prop("Path to the image file on disk", true),
+                    ),
+                    (
+                        "anchor_cell",
+                        string_prop("Anchor cell for image placement, e.g. B2", true),
+                    ),
+                    (
+                        "x_scale",
+                        int_prop("Horizontal scale factor (multiplied by 100, e.g. 100 = 1.0x)"),
+                    ),
+                    (
+                        "y_scale",
+                        int_prop("Vertical scale factor (multiplied by 100, e.g. 100 = 1.0x)"),
+                    ),
+                    (
+                        "alt_text",
+                        string_prop("Alternative text for accessibility", false),
+                    ),
                 ],
                 vec!["path", "sheet", "image_path", "anchor_cell"],
             ),
@@ -32,7 +47,10 @@ pub fn tools() -> Vec<ToolDef> {
                 vec![
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Target sheet name", true)),
-                    ("anchor_cell", string_prop("Anchor cell where the image was placed, e.g. B2", true)),
+                    (
+                        "anchor_cell",
+                        string_prop("Anchor cell where the image was placed, e.g. B2", true),
+                    ),
                 ],
                 vec!["path", "sheet", "anchor_cell"],
             ),
@@ -44,15 +62,46 @@ pub fn tools() -> Vec<ToolDef> {
                 vec![
                     ("path", string_prop("Path to the .xlsx file", true)),
                     ("sheet", string_prop("Target sheet name", true)),
-                    ("shape_type", enum_prop("Shape type", &["rectangle", "rounded_rectangle", "ellipse", "line", "text_box"])),
-                    ("anchor_cell", string_prop("Anchor cell for shape placement, e.g. B2", true)),
-                    ("width", int_prop("Width in pixels",)),
-                    ("height", int_prop("Height in pixels",)),
-                    ("fill_color", string_prop("Fill color as hex string, e.g. FF0000", false)),
-                    ("line_color", string_prop("Line/border color as hex string, e.g. 000000", false)),
-                    ("alt_text", string_prop("Alternative text for accessibility", false)),
+                    (
+                        "shape_type",
+                        enum_prop(
+                            "Shape type",
+                            &[
+                                "rectangle",
+                                "rounded_rectangle",
+                                "ellipse",
+                                "line",
+                                "text_box",
+                            ],
+                        ),
+                    ),
+                    (
+                        "anchor_cell",
+                        string_prop("Anchor cell for shape placement, e.g. B2", true),
+                    ),
+                    ("width", int_prop("Width in pixels")),
+                    ("height", int_prop("Height in pixels")),
+                    (
+                        "fill_color",
+                        string_prop("Fill color as hex string, e.g. FF0000", false),
+                    ),
+                    (
+                        "line_color",
+                        string_prop("Line/border color as hex string, e.g. 000000", false),
+                    ),
+                    (
+                        "alt_text",
+                        string_prop("Alternative text for accessibility", false),
+                    ),
                 ],
-                vec!["path", "sheet", "shape_type", "anchor_cell", "width", "height"],
+                vec![
+                    "path",
+                    "sheet",
+                    "shape_type",
+                    "anchor_cell",
+                    "width",
+                    "height",
+                ],
             ),
         },
     ]
@@ -119,8 +168,8 @@ fn handle_shape_insert(args: Value) -> String {
     let height = get_u32(&args, "height").unwrap_or(100);
     let params = security_params(&path, false);
 
-    let shape_type: ShapeType = serde_json::from_str(&format!("\"{}\"", shape_type_str))
-        .unwrap_or(ShapeType::Rectangle);
+    let shape_type: ShapeType =
+        serde_json::from_str(&format!("\"{}\"", shape_type_str)).unwrap_or(ShapeType::Rectangle);
 
     let config = ShapeConfig {
         sheet,

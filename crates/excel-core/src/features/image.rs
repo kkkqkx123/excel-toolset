@@ -33,8 +33,8 @@ pub fn insert_image(
     let backup_info = security::create_backup_if_needed(params)
         .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
-    let old_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
+    let old_hash =
+        security::compute_file_hash(path).map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
     let (anchor_row, anchor_col) = crate::utils::cell_ref::parse_cell_ref(&config.anchor_cell)?;
 
@@ -43,9 +43,7 @@ pub fn insert_image(
             .worksheet_from_name(&config.sheet)
             .map_err(|_e| AppError::SheetNotFound(config.sheet.clone()))?;
 
-        let mut image =
-            rust_xlsxwriter::Image::new(&config.image_path)
-                .map_err(AppError::Xlsx)?;
+        let mut image = rust_xlsxwriter::Image::new(&config.image_path).map_err(AppError::Xlsx)?;
 
         if let Some(ref scale) = config.scale {
             image = image
@@ -63,8 +61,8 @@ pub fn insert_image(
         Ok(())
     })?;
 
-    let new_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
+    let new_hash =
+        security::compute_file_hash(path).map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
     Ok(WriteResult {
         success: true,
@@ -99,37 +97,34 @@ pub fn remove_image(
 
     #[cfg(not(feature = "zip"))]
     {
-    if params.dry_run {
-        return Ok(WriteResult::dry_run_success());
-    }
+        if params.dry_run {
+            return Ok(WriteResult::dry_run_success());
+        }
 
-    let backup_info = security::create_backup_if_needed(params)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        let backup_info = security::create_backup_if_needed(params)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
 
-    let old_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        let old_hash = security::compute_file_hash(path)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
 
-    crate::excel_write::modify_file_with_wb(path, params, |_old_data, wb| {
-        // Images are not re-inserted during rebuild, so they are effectively removed.
-        wb.worksheet_from_name(sheet)
-            .map_err(|_e| AppError::SheetNotFound(sheet.to_string()))?;
-        Ok(())
-    })?;
+        crate::excel_write::modify_file_with_wb(path, params, |_old_data, wb| {
+            // Images are not re-inserted during rebuild, so they are effectively removed.
+            wb.worksheet_from_name(sheet)
+                .map_err(|_e| AppError::SheetNotFound(sheet.to_string()))?;
+            Ok(())
+        })?;
 
-    let new_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        let new_hash = security::compute_file_hash(path)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
 
-    Ok(WriteResult {
-        success: true,
-        message: format!(
-            "Removed images from sheet '{}' at {}",
-            sheet, anchor_cell
-        ),
-        backup_info,
-        old_hash,
-        new_hash,
-        diff: None,
-    })
+        Ok(WriteResult {
+            success: true,
+            message: format!("Removed images from sheet '{}' at {}", sheet, anchor_cell),
+            backup_info,
+            old_hash,
+            new_hash,
+            diff: None,
+        })
     }
 }
 
@@ -193,6 +188,7 @@ pub fn insert_shape(
 ///
 /// Uses the pre-rendered image approach: renders text onto a colored
 /// rectangle background and inserts it as an image.
+#[allow(clippy::too_many_arguments)]
 pub fn insert_textbox(
     path: &str,
     sheet: &str,
@@ -256,15 +252,12 @@ fn parse_hex_color(hex: &str) -> Result<(u8, u8, u8)> {
             hex
         )));
     }
-    let r = u8::from_str_radix(&hex[0..2], 16).map_err(|_| {
-        AppError::InvalidInput(format!("Invalid hex color: {}", hex))
-    })?;
-    let g = u8::from_str_radix(&hex[2..4], 16).map_err(|_| {
-        AppError::InvalidInput(format!("Invalid hex color: {}", hex))
-    })?;
-    let b = u8::from_str_radix(&hex[4..6], 16).map_err(|_| {
-        AppError::InvalidInput(format!("Invalid hex color: {}", hex))
-    })?;
+    let r = u8::from_str_radix(&hex[0..2], 16)
+        .map_err(|_| AppError::InvalidInput(format!("Invalid hex color: {}", hex)))?;
+    let g = u8::from_str_radix(&hex[2..4], 16)
+        .map_err(|_| AppError::InvalidInput(format!("Invalid hex color: {}", hex)))?;
+    let b = u8::from_str_radix(&hex[4..6], 16)
+        .map_err(|_| AppError::InvalidInput(format!("Invalid hex color: {}", hex)))?;
     Ok((r, g, b))
 }
 
@@ -306,11 +299,11 @@ fn generate_simple_rectangle_png(
     use std::io::Write;
     let mut compressed = Vec::new();
     {
-        let mut encoder = flate2::write::DeflateEncoder::new(
-            &mut compressed,
-            flate2::Compression::default(),
-        );
-        encoder.write_all(&raw).expect("deflate write should succeed");
+        let mut encoder =
+            flate2::write::DeflateEncoder::new(&mut compressed, flate2::Compression::default());
+        encoder
+            .write_all(&raw)
+            .expect("deflate write should succeed");
         encoder.finish().expect("deflate finish should succeed");
     }
 

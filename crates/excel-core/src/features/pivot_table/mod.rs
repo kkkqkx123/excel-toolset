@@ -10,13 +10,11 @@
 //! a real pivot part existed. Every successful result now says so explicitly in
 //! `WriteResult::message`.
 
-
 use crate::excel_read;
 use crate::security;
 use crate::types::*;
 
 /// Aggregate data by row/column fields and create a pivot table.
-
 pub fn create_pivot_table(
     path: &str,
     config: &PivotTableConfig,
@@ -100,14 +98,12 @@ pub fn create_pivot_table(
     Ok(result)
 }
 
-
-
 // ── 子模块：聚合 / 日期分组 / 计算字段表达式引擎 ──
 mod aggregate;
-mod grouping;
 mod calc_field;
+mod grouping;
 
-use self::{aggregate::*, grouping::*, calc_field::*};
+use self::{aggregate::*, calc_field::*, grouping::*};
 
 #[cfg(test)]
 mod tests;

@@ -39,7 +39,6 @@ pub struct PageSetupConfig {
     pub center_vertically: bool,
 }
 
-
 /// Paper size enumeration.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]

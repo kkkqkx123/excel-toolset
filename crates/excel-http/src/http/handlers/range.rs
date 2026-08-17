@@ -1,11 +1,11 @@
 use axum::Json;
 use serde::Deserialize;
 
+use crate::http::response::ApiJson;
 use excel_core::excel_read;
 use excel_core::excel_write;
 use excel_core::types::*;
 use excel_core::utils::helpers;
-use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct RangeReadReq {
@@ -102,9 +102,7 @@ pub async fn range_clear(Json(req): Json<RangeClearReq>) -> ApiJson<WriteResult>
     }
 }
 
-pub async fn range_write_from_csv(
-    Json(req): Json<RangeWriteCsvReq>,
-) -> ApiJson<WriteResult> {
+pub async fn range_write_from_csv(Json(req): Json<RangeWriteCsvReq>) -> ApiJson<WriteResult> {
     let params = SecurityParams {
         dry_run: req.dry_run,
         create_backup: true,

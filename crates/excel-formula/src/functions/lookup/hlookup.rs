@@ -1,6 +1,6 @@
-use excel_types::CellValue;
 use crate::engine::DataProvider;
 use crate::evaluator::to_number;
+use excel_types::CellValue;
 
 use super::*;
 
@@ -88,4 +88,3 @@ pub(crate) fn lookup_hlookup(args: &[CellValue], _provider: &dyn DataProvider) -
 // ---------------------------------------------------------------------------
 // INDEX(array, row_num, [col_num])
 // ---------------------------------------------------------------------------
-

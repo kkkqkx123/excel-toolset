@@ -23,8 +23,8 @@ pub fn configure_page_setup(
     let backup_info = security::create_backup_if_needed(params)
         .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
-    let old_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
+    let old_hash =
+        security::compute_file_hash(path).map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
     crate::excel_write::modify_file_with_wb(path, params, |_old_data, wb| {
         let ws = wb
@@ -63,8 +63,7 @@ pub fn configure_page_setup(
         // Apply print area
         if let Some(ref range) = config.print_area {
             let (r1, c1, r2, c2) = crate::utils::cell_ref::parse_range(range)?;
-            ws.set_print_area(r1, c1, r2, c2)
-                .map_err(AppError::Xlsx)?;
+            ws.set_print_area(r1, c1, r2, c2).map_err(AppError::Xlsx)?;
         }
 
         // Apply print title rows
@@ -94,8 +93,7 @@ pub fn configure_page_setup(
             if parts.len() == 2 {
                 let first = crate::utils::cell_ref::col_to_index(parts[0])?;
                 let last = crate::utils::cell_ref::col_to_index(parts[1])?;
-                ws.set_repeat_columns(first, last)
-                    .map_err(AppError::Xlsx)?;
+                ws.set_repeat_columns(first, last).map_err(AppError::Xlsx)?;
             } else {
                 return Err(AppError::InvalidInput(format!(
                     "Print title columns must be in format 'A:B', got: {}",
@@ -132,15 +130,12 @@ pub fn configure_page_setup(
         Ok(())
     })?;
 
-    let new_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
+    let new_hash =
+        security::compute_file_hash(path).map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
     Ok(WriteResult {
         success: true,
-        message: format!(
-            "Configured page setup on sheet '{}'",
-            config.sheet
-        ),
+        message: format!("Configured page setup on sheet '{}'", config.sheet),
         backup_info,
         old_hash,
         new_hash,
@@ -161,8 +156,8 @@ pub fn set_page_breaks(
     let backup_info = security::create_backup_if_needed(params)
         .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
-    let old_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
+    let old_hash =
+        security::compute_file_hash(path).map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
     crate::excel_write::modify_file_with_wb(path, params, |_old_data, wb| {
         let ws = wb
@@ -180,8 +175,8 @@ pub fn set_page_breaks(
         Ok(())
     })?;
 
-    let new_hash = security::compute_file_hash(path)
-        .map_err(|e| AppError::Io(std::io::Error::other(e)))?;
+    let new_hash =
+        security::compute_file_hash(path).map_err(|e| AppError::Io(std::io::Error::other(e)))?;
 
     Ok(WriteResult {
         success: true,
@@ -199,11 +194,7 @@ pub fn set_page_breaks(
 }
 
 /// Clear all page breaks from a worksheet.
-pub fn clear_page_breaks(
-    path: &str,
-    sheet: &str,
-    params: &SecurityParams,
-) -> Result<WriteResult> {
+pub fn clear_page_breaks(path: &str, sheet: &str, params: &SecurityParams) -> Result<WriteResult> {
     let config = PageBreakConfig {
         sheet: sheet.to_string(),
         horizontal_breaks: Vec::new(),

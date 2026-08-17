@@ -5,14 +5,9 @@ use std::sync::Arc;
 
 use excel_types::CellValue;
 
-use crate::engine::DataProvider;
+use crate::engine::FunctionImpl;
 
-pub fn register(
-    registry: &mut HashMap<
-        String,
-        Arc<dyn Fn(&[CellValue], &dyn DataProvider) -> CellValue + Send + Sync>,
-    >,
-) {
+pub fn register(registry: &mut HashMap<String, FunctionImpl>) {
     registry.insert("IF".into(), Arc::new(|args, _provider| logical_if(args)));
     registry.insert("AND".into(), Arc::new(|args, _provider| logical_and(args)));
     registry.insert("OR".into(), Arc::new(|args, _provider| logical_or(args)));
@@ -21,7 +16,10 @@ pub fn register(
         "IFERROR".into(),
         Arc::new(|args, _provider| logical_iferror(args)),
     );
-    registry.insert("IFNA".into(), Arc::new(|args, _provider| logical_ifna(args)));
+    registry.insert(
+        "IFNA".into(),
+        Arc::new(|args, _provider| logical_ifna(args)),
+    );
     registry.insert(
         "ISBLANK".into(),
         Arc::new(|args, _provider| logical_isblank(args)),
@@ -42,7 +40,10 @@ pub fn register(
         "ISLOGICAL".into(),
         Arc::new(|args, _provider| logical_islogical(args)),
     );
-    registry.insert("ISNA".into(), Arc::new(|args, _provider| logical_isna(args)));
+    registry.insert(
+        "ISNA".into(),
+        Arc::new(|args, _provider| logical_isna(args)),
+    );
     registry.insert(
         "TRUE".into(),
         Arc::new(|_args, _provider| CellValue::Bool(true)),
@@ -197,10 +198,9 @@ fn logical_ifs(args: &[CellValue]) -> CellValue {
     }
 
     for i in (0..args.len()).step_by(2) {
-        if i + 1 < args.len()
-            && to_bool(&args[i]) {
-                return args[i + 1].clone();
-            }
+        if i + 1 < args.len() && to_bool(&args[i]) {
+            return args[i + 1].clone();
+        }
     }
 
     CellValue::Error("#N/A".into())

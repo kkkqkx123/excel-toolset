@@ -1,11 +1,11 @@
 use axum::Json;
 use serde::Deserialize;
 
+use crate::http::response::ApiJson;
 use excel_core::excel_write;
 use excel_core::features::sparkline;
 use excel_core::types::*;
 use excel_core::utils::cell_ref;
-use crate::http::response::ApiJson;
 
 #[derive(Deserialize)]
 pub struct SparklineAddReq {
@@ -62,9 +62,7 @@ pub async fn sparkline_add(Json(req): Json<SparklineAddReq>) -> ApiJson<WriteRes
     }
 }
 
-pub async fn sparkline_remove(
-    Json(req): Json<SparklineRemoveReq>,
-) -> ApiJson<WriteResult> {
+pub async fn sparkline_remove(Json(req): Json<SparklineRemoveReq>) -> ApiJson<WriteResult> {
     let (target_row, target_col) = match cell_ref::parse_cell_ref(&req.target_cell) {
         Ok(v) => v,
         Err(e) => return ApiJson(ApiResponse::err(e)),

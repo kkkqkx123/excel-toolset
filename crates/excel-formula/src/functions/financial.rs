@@ -5,15 +5,10 @@ use std::sync::Arc;
 
 use excel_types::CellValue;
 
-use crate::engine::DataProvider;
+use crate::engine::FunctionImpl;
 use crate::evaluator::to_number;
 
-pub fn register(
-    registry: &mut HashMap<
-        String,
-        Arc<dyn Fn(&[CellValue], &dyn DataProvider) -> CellValue + Send + Sync>,
-    >,
-) {
+pub fn register(registry: &mut HashMap<String, FunctionImpl>) {
     registry.insert("PMT".into(), Arc::new(|args, _provider| fin_pmt(args)));
     registry.insert("IPMT".into(), Arc::new(|args, _provider| fin_ipmt(args)));
     registry.insert("PPMT".into(), Arc::new(|args, _provider| fin_ppmt(args)));
@@ -28,7 +23,10 @@ pub fn register(
     registry.insert("SLN".into(), Arc::new(|args, _provider| fin_sln(args)));
     registry.insert("DB".into(), Arc::new(|args, _provider| fin_db(args)));
     registry.insert("DDB".into(), Arc::new(|args, _provider| fin_ddb(args)));
-    registry.insert("EFFECT".into(), Arc::new(|args, _provider| fin_effect(args)));
+    registry.insert(
+        "EFFECT".into(),
+        Arc::new(|args, _provider| fin_effect(args)),
+    );
     registry.insert(
         "NOMINAL".into(),
         Arc::new(|args, _provider| fin_nominal(args)),
@@ -365,13 +363,11 @@ fn fin_ddb(args: &[CellValue]) -> CellValue {
     }
 
     let mut book_value = cost;
-    let mut total_dep = 0.0;
 
     for p in 1..=(period as usize) {
         let dep = (book_value * factor / life)
             .min(book_value - salvage)
             .max(0.0);
-        total_dep += dep;
         book_value -= dep;
 
         if (p as f64 - period).abs() < 1e-10 {
@@ -416,14 +412,7 @@ fn excel_date_to_ymd(serial: f64) -> (i32, u32, u32) {
         return (1900, 1, 1);
     }
 
-    let mut days = serial as i32;
-
-    // Handle the Lotus 1-2-3 1900 leap year bug: day 60 should be Feb 29, 1900
-    if days > 60 {
-        days -= 1; // Compensate for the non-existent Feb 29, 1900
-    }
-
-    // Use a known baseline: 1900-01-01 = day 1 in Excel (after bug compensation, it's day 0)
+    // Use a known baseline: 1900-01-01 = day 1 in Excel
     // 1970-01-01 = day 25569 in Excel
     let excel_epoch = 1; // Excel serial number for 1900-01-01
 
@@ -794,8 +783,8 @@ fn date_to_excel_serial(year: i32, month: u32, day: u32) -> f64 {
     } else {
         [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
     };
-    for m in 0..(month as usize - 1) {
-        days += month_days[m];
+    for &md in month_days.iter().take((month as usize) - 1) {
+        days += md;
     }
     (days + day as i32 + 1) as f64 // +1 because Excel serial 1 = Jan 1, 1900
 }

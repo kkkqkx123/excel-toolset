@@ -164,15 +164,15 @@ pub fn is_sheet_protected(path: &str, sheet: &str) -> Result<bool> {
                         }
                     }
                     if current_sheet_name.as_deref() == Some(sheet)
-                        && let Some(start) = line.find("sheetId=\"") {
-                            let rest = &line[start + 9..];
-                            if let Some(end) = rest.find('"') {
-                                let sheet_id: String = rest[..end].to_string();
-                                sheet_filename =
-                                    Some(format!("xl/worksheets/sheet{}.xml", sheet_id));
-                                break;
-                            }
+                        && let Some(start) = line.find("sheetId=\"")
+                    {
+                        let rest = &line[start + 9..];
+                        if let Some(end) = rest.find('"') {
+                            let sheet_id: String = rest[..end].to_string();
+                            sheet_filename = Some(format!("xl/worksheets/sheet{}.xml", sheet_id));
+                            break;
                         }
+                    }
                 }
             }
         }

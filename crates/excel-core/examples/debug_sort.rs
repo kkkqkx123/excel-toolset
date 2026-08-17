@@ -38,7 +38,8 @@ fn main() {
     println!("Initial data:");
     let none_str = "None".to_string();
     for (i, row) in sheet.rows.iter().enumerate() {
-        let name = row.first()
+        let name = row
+            .first()
             .and_then(|c| c.value.as_ref())
             .unwrap_or(&none_str);
         let age = row
@@ -70,7 +71,8 @@ fn main() {
     let sorted_sheet = read_sheet_all(path, "Sheet1").unwrap();
     println!("Sorted data:");
     for (i, row) in sorted_sheet.rows.iter().enumerate() {
-        let name = row.first()
+        let name = row
+            .first()
             .and_then(|c| c.value.as_ref())
             .unwrap_or(&none_str);
         let age = row

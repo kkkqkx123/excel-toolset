@@ -1,6 +1,6 @@
+use crate::cli::args::*;
 use excel_core::features::search;
 use excel_core::types::*;
-use crate::cli::args::*;
 
 pub(crate) fn run_search(args: &SearchArgs) -> Result<serde_json::Value> {
     match &args.command {
@@ -33,7 +33,6 @@ pub(crate) fn run_search(args: &SearchArgs) -> Result<serde_json::Value> {
     }
 }
 
-
 fn build_search_query(
     pattern: &str,
     match_type: &str,
@@ -61,4 +60,3 @@ fn build_search_query(
 }
 
 // ── Conditional Format ──
-

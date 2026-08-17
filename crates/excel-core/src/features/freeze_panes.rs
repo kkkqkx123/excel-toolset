@@ -17,7 +17,11 @@ pub fn set_freeze_panes(
     #[cfg(feature = "zip")]
     {
         crate::excel_write::patch::set_freeze_panes_preserving(
-            path, params, &config.sheet, config.rows, config.cols,
+            path,
+            params,
+            &config.sheet,
+            config.rows,
+            config.cols,
         )
     }
 

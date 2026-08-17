@@ -78,6 +78,7 @@ fn cli_run(args: &[&str]) -> serde_json::Value {
     })
 }
 
+#[allow(dead_code)]
 fn assert_ok(json: &serde_json::Value) {
     if let Some(s) = json.get("success").and_then(|v| v.as_bool()) {
         assert!(s, "Command failed: {}", json);

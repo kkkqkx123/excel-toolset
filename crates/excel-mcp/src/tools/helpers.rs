@@ -31,7 +31,6 @@ pub fn string_prop(description: &str, required: bool) -> Value {
     if required {
         s
     } else {
-        
         // Non-required properties don't need special marking in JSON Schema;
         // they're only required if listed in the "required" array.
         s
@@ -68,18 +67,12 @@ pub fn enum_prop(description: &str, values: &[&str]) -> Value {
 }
 
 /// Build an array property schema with object items.
-pub fn array_prop(description: &str, required: bool) -> Value {
-    let s = json!({
+pub fn array_prop(description: &str, _required: bool) -> Value {
+    json!({
         "type": "array",
         "description": description,
         "items": { "type": "object" }
-    });
-    if required {
-        s
-    } else {
-        
-        s
-    }
+    })
 }
 
 /// Build an array of strings property schema.
