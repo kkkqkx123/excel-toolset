@@ -184,8 +184,44 @@ fn collect_rows(mut rows: duckdb::Rows<'_>) -> Result<QueryResult, AppError> {
     })
 }
 
+/// Reject multiple statements and write/DDL verbs so the user-supplied query
+/// string cannot perform mutations or attach external files. SQL queries are
+/// read-only by design (see `docs/excel-sql的作用.md`); this makes that
+/// guarantee real instead of merely documented.
+fn ensure_readonly(sql: &str) -> Result<(), AppError> {
+    let trimmed = sql.trim();
+    let body = trimmed
+        .strip_suffix(';')
+        .map(str::trim)
+        .unwrap_or(trimmed);
+    if body.contains(';') {
+        return Err(AppError::DuckDb(
+            "Only a single SQL statement is allowed; multiple statements were rejected.".into(),
+        ));
+    }
+    let upper = body.to_uppercase();
+    // A CTE (`WITH ... SELECT`) is still read-only and is allowed.
+    let forbidden = [
+        "INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER", "ATTACH", "DETACH", "COPY",
+        "PRAGMA", "VACUUM", "TRUNCATE",
+    ];
+    for kw in forbidden {
+        if upper.starts_with(kw)
+            || upper.contains(&format!(" {} ", kw))
+            || upper.contains(&format!("({} ", kw))
+        {
+            return Err(AppError::DuckDb(format!(
+                "Statement '{kw}' is not allowed; SQL queries are read-only."
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// Execute a SQL query and return the results
 pub fn query(db: &duckdb::Connection, sql: &str) -> Result<QueryResult, AppError> {
+    ensure_readonly(sql)?;
+
     let mut stmt = db
         .prepare(sql)
         .map_err(|e| AppError::DuckDb(e.to_string()))?;
@@ -204,6 +240,8 @@ pub fn query_with_params(
     sql: &str,
     params: &[duckdb::types::Value],
 ) -> Result<QueryResult, AppError> {
+    ensure_readonly(sql)?;
+
     let mut stmt = db
         .prepare(sql)
         .map_err(|e| AppError::DuckDb(e.to_string()))?;
@@ -263,7 +301,7 @@ mod tests {
                 make_cell(Some("b"), CellDataType::String),
             ],
         ];
-        crate::db::loader::batch_insert_rows(conn, "t", &rows).unwrap();
+        crate::db::loader::batch_insert_rows(conn, "t", &rows, &[CellDataType::Int, CellDataType::String]).unwrap();
     }
 
     #[test]
@@ -378,5 +416,20 @@ mod tests {
             duckdb_to_cell(&Value::Array(vec![])).data_type,
             CellDataType::String
         );
+    }
+
+    #[test]
+    fn test_query_rejects_write_and_multi_statement() {
+        let conn = create_conn().unwrap();
+        seed_db(&conn);
+        // DML/DDL verbs rejected
+        assert!(query(&conn, "DROP TABLE t").is_err());
+        assert!(query(&conn, "DELETE FROM \"t\"").is_err());
+        assert!(query(&conn, "CREATE TABLE x (c0 INTEGER)").is_err());
+        assert!(query(&conn, "UPDATE \"t\" SET c0 = 0").is_err());
+        // multiple statements rejected
+        assert!(query(&conn, "SELECT * FROM \"t\"; SELECT 1").is_err());
+        // a single trailing semicolon is allowed
+        assert!(query(&conn, "SELECT * FROM \"t\";").is_ok());
     }
 }

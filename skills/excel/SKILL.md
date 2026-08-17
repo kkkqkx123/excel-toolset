@@ -76,8 +76,9 @@ excel-cli cell write data.xlsx Sheet1 A1 "New Value"
 # Read existing data
 excel-cli range read report.xlsx Sheet1 A1:D100 --mode compact
 
-# Analyze (e.g. with SQL)
-excel-cli data sql report.xlsx Sheet1 "SELECT c0, SUM(c3) FROM \"Sheet1\" GROUP BY c0"
+# Analyze (e.g. with SQL). With --no-header the columns are c0, c1, ...;
+# by default (header row present) columns are the header texts.
+excel-cli data sql report.xlsx Sheet1 --no-header "SELECT c0, SUM(c3) FROM \"Sheet1\" GROUP BY c0"
 
 # Write results
 excel-cli sheet add report.xlsx Summary
@@ -126,10 +127,20 @@ excel-cli freeze-pane set "report.xlsx" "Monthly Report" --rows 1
 
 ## SQL Query Notes
 
-SQL queries require the `sql` feature flag at build time (`--features sql`). The current worksheet is mapped to a table named **after the sheet** (e.g. `Sheet1`), referenced as `"Sheet1"`. Columns are **zero-indexed positional names** `c0, c1, c2, ...` (`c0` = first column A), not Excel letter names.
+SQL queries require the `sql` feature flag at build time (`--features sql`). The current worksheet is mapped to a table named **after the sheet** (e.g. `Sheet1`), referenced quoted as `"Sheet1"` (sheet names may contain spaces/special characters). There is **no table named `t`**.
 
-Supported clauses: SELECT, WHERE, ORDER BY, GROUP BY, LIMIT. Supported aggregates: COUNT, SUM, AVG, MIN, MAX.
+**Column naming:**
+- **By default (header row present)**, columns are the **header-row texts** (e.g. `"Amount"`), not positional names.
+- **Only with `--no-header`** are columns **zero-indexed positional names** `c0, c1, c2, ...` (`c0` = column A). Excel letter names like `A`, `B` are **never** used.
+
+Quote identifiers that collide with SQL keywords or contain spaces: `SELECT "Order", SUM("Qty") FROM "Sales"`.
+
+Supported clauses: SELECT, WHERE, ORDER BY, GROUP BY, LIMIT. Supported aggregates: COUNT, SUM, AVG, MIN, MAX. Queries are read-only (multi-statement and `INSERT/UPDATE/DELETE/CREATE/...` are rejected).
 
 ```bash
-excel-cli data sql sales.xlsx Sheet1 "SELECT c0, SUM(c2) FROM \"Sheet1\" GROUP BY c0 ORDER BY SUM(c2) DESC LIMIT 10"
+# Default: columns are the header texts
+excel-cli data sql sales.xlsx Sales "SELECT \"Region\", SUM(\"Revenue\") FROM \"Sales\" GROUP BY \"Region\""
+
+# With --no-header: columns are c0, c1, ...
+excel-cli data sql sales.xlsx Sales --no-header "SELECT c0, SUM(c2) FROM \"Sales\" GROUP BY c0 ORDER BY SUM(c2) DESC LIMIT 10"
 ```

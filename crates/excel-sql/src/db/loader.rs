@@ -1,7 +1,7 @@
 use excel_types::{AppError, CellData, CellDataType, SheetData};
 
 use crate::converter::{
-    cell_to_duckdb_type, cell_to_duckdb_value, collect_row_types, infer_column_types,
+    cell_to_duckdb_type, cell_to_duckdb_value_typed, collect_row_types, infer_column_types,
 };
 use crate::utils::sanitize_column_name;
 
@@ -38,16 +38,31 @@ pub fn create_table_with_header(
     if col_types.is_empty() {
         return Ok(());
     }
+    // Track used column names so duplicate headers (or two different headers
+    // that sanitize to the same name, e.g. "A-B" and "A.B" -> "A_B") don't
+    // produce an invalid `CREATE TABLE` with duplicate columns.
+    let mut used: std::collections::HashSet<String> = std::collections::HashSet::new();
     let col_defs: Vec<String> = col_types
         .iter()
         .enumerate()
         .map(|(i, dt)| {
-            let col_name = header
+            let mut col_name = header
                 .get(i)
                 .and_then(|c| c.value.as_deref())
                 .filter(|v| !v.is_empty())
                 .map(sanitize_column_name)
                 .unwrap_or_else(|| format!("c{}", i));
+            if !used.insert(col_name.clone()) {
+                let mut n = 2;
+                loop {
+                    let candidate = format!("{}_{}", col_name, n);
+                    if used.insert(candidate.clone()) {
+                        col_name = candidate;
+                        break;
+                    }
+                    n += 1;
+                }
+            }
             format!(
                 "\"{}\" {}",
                 col_name.replace('"', "\"\""),
@@ -70,6 +85,7 @@ pub fn batch_insert_rows(
     db: &duckdb::Connection,
     name: &str,
     rows: &[Vec<CellData>],
+    col_types: &[CellDataType],
 ) -> Result<(), AppError> {
     if rows.is_empty() {
         return Ok(());
@@ -92,17 +108,12 @@ pub fn batch_insert_rows(
         .prepare(&sql)
         .map_err(|e| AppError::DuckDb(e.to_string()))?;
 
-    for (row_idx, row) in rows.iter().enumerate() {
+    for (_row_idx, row) in rows.iter().enumerate() {
         let mut params: Vec<duckdb::types::Value> = Vec::with_capacity(max_cols);
         for i in 0..max_cols {
-            let v = match row.get(i).map(cell_to_duckdb_value) {
-                Some(Ok(v)) => v,
-                Some(Err(msg)) => {
-                    return Err(AppError::DuckDb(format!(
-                        "Row {} col {}: {}",
-                        row_idx, i, msg
-                    )));
-                }
+            let target = col_types.get(i).cloned().unwrap_or(CellDataType::String);
+            let v = match row.get(i) {
+                Some(cell) => cell_to_duckdb_value_typed(cell, target),
                 None => duckdb::types::Value::Null,
             };
             params.push(v);
@@ -118,6 +129,7 @@ pub fn batch_insert_rows_with_id(
     db: &duckdb::Connection,
     name: &str,
     rows: &[Vec<CellData>],
+    col_types: &[CellDataType],
 ) -> Result<(), AppError> {
     if rows.is_empty() {
         return Ok(());
@@ -145,11 +157,9 @@ pub fn batch_insert_rows_with_id(
     for (idx, row) in rows.iter().enumerate() {
         let mut params: Vec<duckdb::types::Value> = vec![duckdb::types::Value::BigInt(idx as i64)];
         for i in 0..max_cols {
-            let v = match row.get(i).map(cell_to_duckdb_value) {
-                Some(Ok(v)) => v,
-                Some(Err(msg)) => {
-                    return Err(AppError::DuckDb(format!("Row {} col {}: {}", idx, i, msg)));
-                }
+            let target = col_types.get(i).cloned().unwrap_or(CellDataType::String);
+            let v = match row.get(i) {
+                Some(cell) => cell_to_duckdb_value_typed(cell, target),
                 None => duckdb::types::Value::Null,
             };
             params.push(v);
@@ -186,10 +196,10 @@ pub fn load_sheet_to_db(
         let header = &data.rows[0];
         create_table_with_header(db, name, &col_types, header)?;
         let data_rows = &data.rows[1..];
-        batch_insert_rows(db, name, data_rows)?;
+        batch_insert_rows(db, name, data_rows, &col_types)?;
     } else {
         create_table(db, name, &col_types)?;
-        batch_insert_rows(db, name, &data.rows)?;
+        batch_insert_rows(db, name, &data.rows, &col_types)?;
     }
 
     Ok(())
@@ -236,7 +246,7 @@ pub fn load_sheet_with_row_id(
     db.execute_batch(&create_sql)
         .map_err(|e| AppError::DuckDb(e.to_string()))?;
 
-    batch_insert_rows_with_id(db, name, rows_to_load)?;
+    batch_insert_rows_with_id(db, name, rows_to_load, &col_types)?;
 
     Ok(())
 }
@@ -327,7 +337,7 @@ mod tests {
                 make_cell(Some("b"), CellDataType::String),
             ],
         ];
-        batch_insert_rows(&conn, "t", &rows).unwrap();
+        batch_insert_rows(&conn, "t", &rows, &[CellDataType::Int, CellDataType::String]).unwrap();
         assert_eq!(table_row_count(&conn, "t").unwrap(), 2);
     }
 
@@ -335,7 +345,7 @@ mod tests {
     fn test_batch_insert_rows_empty_yields_ok() {
         let conn = create_conn().unwrap();
         create_table(&conn, "t", &[CellDataType::Int]).unwrap();
-        batch_insert_rows(&conn, "t", &[]).unwrap();
+        batch_insert_rows(&conn, "t", &[], &[]).unwrap();
         assert_eq!(table_row_count(&conn, "t").unwrap(), 0);
     }
 
@@ -348,7 +358,7 @@ mod tests {
             vec![make_cell(Some("x"), CellDataType::String)],
             vec![make_cell(Some("y"), CellDataType::String)],
         ];
-        batch_insert_rows_with_id(&conn, "t", &rows).unwrap();
+        batch_insert_rows_with_id(&conn, "t", &rows, &[CellDataType::String]).unwrap();
         assert_eq!(table_row_count(&conn, "t").unwrap(), 2);
     }
 
@@ -418,5 +428,71 @@ mod tests {
         };
         load_sheet_with_row_id(&conn, "s", &data, false).unwrap();
         assert_eq!(table_row_count(&conn, "s").unwrap(), 2);
+    }
+
+    #[test]
+    fn test_create_table_with_header_duplicate_names_deduped() {
+        let conn = create_conn().unwrap();
+        let header = vec![
+            make_cell(Some("Sales"), CellDataType::String),
+            make_cell(Some("Sales"), CellDataType::String),
+            make_cell(Some("Region"), CellDataType::Int),
+        ];
+        create_table_with_header(
+            &conn,
+            "t",
+            &[CellDataType::Int, CellDataType::Int, CellDataType::String],
+            &header,
+        )
+        .unwrap();
+        let schema = get_table_schema(&conn, "t").unwrap();
+        assert_eq!(schema[0].name, "Sales");
+        assert_eq!(schema[1].name, "Sales_2");
+        assert_eq!(schema[2].name, "Region");
+    }
+
+    #[test]
+    fn test_create_table_with_header_colliding_sanitize_deduped() {
+        let conn = create_conn().unwrap();
+        // "A-B" and "A.B" both sanitize to "A_B"; they must not collide.
+        let header = vec![
+            make_cell(Some("A-B"), CellDataType::String),
+            make_cell(Some("A.B"), CellDataType::String),
+        ];
+        create_table_with_header(
+            &conn,
+            "t",
+            &[CellDataType::Int, CellDataType::Int],
+            &header,
+        )
+        .unwrap();
+        let schema = get_table_schema(&conn, "t").unwrap();
+        assert_eq!(schema[0].name, "A_B");
+        assert_eq!(schema[1].name, "A_B_2");
+    }
+
+    #[test]
+    fn test_load_sheet_to_db_dirty_numeric_column_coerced() {
+        // A mostly-numeric column with a stray "N/A" must stay INTEGER and
+        // coerce the dirty cell to NULL (so SUM still works).
+        let conn = create_conn().unwrap();
+        let data = SheetData {
+            name: "nums".to_string(),
+            rows: vec![
+                vec![make_cell(Some("Amount"), CellDataType::String)],
+                vec![make_cell(Some("10"), CellDataType::Int)],
+                vec![make_cell(Some("N/A"), CellDataType::String)],
+                vec![make_cell(Some("20"), CellDataType::Int)],
+            ],
+            ..Default::default()
+        };
+        load_sheet_to_db(&conn, "nums", &data, true).unwrap();
+        let schema = get_table_schema(&conn, "nums").unwrap();
+        assert_eq!(schema[0].name, "Amount");
+        assert_eq!(schema[0].data_type, "INTEGER");
+        let result = crate::db::query::query(&conn, "SELECT SUM(\"Amount\") FROM \"nums\"")
+            .unwrap();
+        // 10 + 20, the "N/A" became NULL
+        assert_eq!(result.rows[0][0].value.as_deref(), Some("30"));
     }
 }

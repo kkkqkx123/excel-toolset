@@ -53,6 +53,43 @@ pub fn cell_to_duckdb_value(cell: &CellData) -> Result<duckdb::types::Value, Str
     }
 }
 
+/// Convert a cell to a DuckDB value, coercing to `NULL` when the value does
+/// not fit the *target* column type.
+///
+/// This backs schema inference robustness: when a column is inferred as
+/// numeric but contains a few stray non-numeric cells (e.g. `"N/A"`), the
+/// column keeps its numeric type and the dirty cells become `NULL` instead of
+/// poisoning the whole column to `VARCHAR` (which would break `SUM`/`>`).
+pub fn cell_to_duckdb_value_typed(
+    cell: &CellData,
+    target: CellDataType,
+) -> duckdb::types::Value {
+    use CellDataType::*;
+    match target {
+        Int | Float => match cell.value.as_deref() {
+            None => duckdb::types::Value::Null,
+            Some(v) => {
+                let parsed = if target == Int {
+                    v.parse::<i64>().ok().map(duckdb::types::Value::BigInt)
+                } else {
+                    v.parse::<f64>().ok().map(duckdb::types::Value::Double)
+                };
+                parsed.unwrap_or(duckdb::types::Value::Null)
+            }
+        },
+        Bool => cell_to_duckdb_value(cell).unwrap_or(duckdb::types::Value::Null),
+        DateTime => match cell.value.as_deref() {
+            None => duckdb::types::Value::Null,
+            Some(v) => duckdb::types::Value::Text(v.to_string()),
+        },
+        // String / Error / Empty -> preserve text or NULL
+        _ => match cell.value.as_deref() {
+            None => duckdb::types::Value::Null,
+            Some(v) => duckdb::types::Value::Text(v.to_string()),
+        },
+    }
+}
+
 pub fn collect_row_types(data: &[Vec<CellData>]) -> Vec<Vec<CellDataType>> {
     data.iter()
         .map(|row| row.iter().map(|c| c.data_type.clone()).collect())

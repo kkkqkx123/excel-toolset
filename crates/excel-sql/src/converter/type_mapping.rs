@@ -58,21 +58,41 @@ pub fn infer_column_types(data: &[Vec<CellDataType>]) -> Vec<CellDataType> {
     let mut col_types = vec![CellDataType::Empty; max_cols];
 
     for (col, col_type) in col_types.iter_mut().enumerate() {
+        // Count non-empty cells by kind, and track the highest numeric type
+        // seen. A single stray text cell must NOT downgrade a mostly-numeric
+        // column to VARCHAR (that used to break SUM()/> on otherwise-numeric
+        // data); instead we pick the majority kind and let the insert step
+        // coerce the minority dirty cells to NULL.
+        let mut numeric = 0u32;
+        let mut text = 0u32;
+        let mut boolean = 0u32;
+        let mut datetime = 0u32;
+        let mut best_numeric: CellDataType = CellDataType::Int;
+
         for row in data {
-            if let Some(cell_type) = row.get(col) {
-                if *cell_type == CellDataType::Empty {
-                    continue;
+            match row.get(col) {
+                None | Some(CellDataType::Empty) => {}
+                Some(CellDataType::Int) | Some(CellDataType::Float) => {
+                    numeric += 1;
+                    let ct = row.get(col).unwrap_or(&CellDataType::Empty);
+                    best_numeric = combine_types(&best_numeric, ct);
                 }
-
-                *col_type = combine_types(col_type, cell_type);
-
-                if matches!(*col_type, CellDataType::String | CellDataType::DateTime) {
-                    break;
-                }
+                Some(CellDataType::Bool) => boolean += 1,
+                Some(CellDataType::DateTime) => datetime += 1,
+                Some(_) => text += 1, // String / Error
             }
         }
 
-        if *col_type == CellDataType::Empty {
+        let total = numeric + text + boolean + datetime;
+        if total == 0 {
+            *col_type = CellDataType::String;
+        } else if numeric >= boolean && numeric >= datetime && numeric >= text {
+            *col_type = best_numeric;
+        } else if boolean >= datetime && boolean >= text {
+            *col_type = CellDataType::Bool;
+        } else if datetime >= text {
+            *col_type = CellDataType::DateTime;
+        } else {
             *col_type = CellDataType::String;
         }
     }

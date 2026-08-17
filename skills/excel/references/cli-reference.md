@@ -312,23 +312,25 @@ Requires `--features sql` at build time.
 excel-cli data sql <path> <sheet> <query> [--session] [--cache]
 ```
 
-The current worksheet is mapped to a table named **after the sheet** (e.g. `Sheet1`), and must be referenced as `"Sheet1"` (quoted, since sheet names may contain spaces or special characters). Columns are **zero-indexed positional names** `c0, c1, c2, ...` where `c0` is the first column (A) — **not** Excel letter names.
+The current worksheet is mapped to a table named **after the sheet** (e.g. `Sheet1`), and must be referenced as `"Sheet1"` (quoted, since sheet names may contain spaces or special characters). There is **no table named `t`**.
+
+**Column naming:** by default (header row present) columns are the **header-row texts** (e.g. `"Amount"`); only with `--no-header` are they **zero-indexed positional names** `c0, c1, c2, ...` where `c0` is the first column (A). Excel letter names (`A`, `B`, ...) are **never** used. Quote identifiers that collide with SQL keywords or contain spaces.
 
 Supported clauses: SELECT, WHERE, ORDER BY, GROUP BY, LIMIT.
-Supported aggregates: COUNT, SUM, AVG, MIN, MAX.
+Supported aggregates: COUNT, SUM, AVG, MIN, MAX. Queries are read-only (multi-statement and `INSERT/UPDATE/DELETE/CREATE/...` are rejected).
 
 ```bash
-# Basic query
+# Basic query (default: columns are the header texts)
 excel-cli data sql data.xlsx Sheet1 "SELECT * FROM \"Sheet1\""
 
-# Filtered & sorted
-excel-cli data sql data.xlsx Sheet1 "SELECT c0, c1, c2 FROM \"Sheet1\" WHERE c1 > 100 ORDER BY c2 DESC"
+# Filtered & sorted — with --no-header so columns are c0, c1, c2
+excel-cli data sql data.xlsx Sheet1 --no-header "SELECT c0, c1, c2 FROM \"Sheet1\" WHERE c1 > 100 ORDER BY c2 DESC"
 
-# Aggregation
-excel-cli data sql data.xlsx Sheet1 "SELECT COUNT(*) as cnt, AVG(c2) as avg_val FROM \"Sheet1\""
+# Aggregation (header-based)
+excel-cli data sql data.xlsx Sheet1 "SELECT COUNT(*) AS cnt, AVG(\"Score\") AS avg_val FROM \"Sheet1\""
 
-# Grouped aggregation
-excel-cli data sql data.xlsx Sheet1 "SELECT c0, SUM(c2) as total FROM \"Sheet1\" GROUP BY c0"
+# Grouped aggregation — with --no-header
+excel-cli data sql data.xlsx Sheet1 --no-header "SELECT c0, SUM(c2) AS total FROM \"Sheet1\" GROUP BY c0"
 
 # Limit
 excel-cli data sql data.xlsx Sheet1 "SELECT * FROM \"Sheet1\" LIMIT 10"

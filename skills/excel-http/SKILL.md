@@ -20,10 +20,10 @@ Use the `excel-http` REST API server to work with Excel files programmatically o
 ## Server Startup
 
 ```bash
-cargo run --package excel-http --release
+cargo run --package excel-http --release --features sql
 ```
 
-The server listens on `127.0.0.1:3000` by default. Override the port with the `PORT` environment variable.
+The server listens on `127.0.0.1:3000` by default. Override the port with the `PORT` environment variable. **The `sql` feature is required for the `/api/data/sql*` endpoints** — without it those endpoints return `FeatureNotEnabled`.
 
 ## Response Format
 
@@ -115,10 +115,13 @@ curl -s -X POST http://localhost:3000/api/range/read \
   -H "Content-Type: application/json" \
   -d '{"path":"report.xlsx","sheet":"Sheet1","range":"A1:D100","mode":"compact"}'
 
-# SQL analysis
+# SQL analysis.
+# Table name = the worksheet name (quoted, e.g. "Monthly Report"); columns are
+# the header-row texts (or c0, c1, ... when has_header:false). Here the sheet
+# "Monthly Report" has headers Month / Revenue / Cost.
 curl -s -X POST http://localhost:3000/api/data/sql \
   -H "Content-Type: application/json" \
-  -d '{"path":"report.xlsx","sheet":"Sheet1","query":"SELECT A, SUM(D) FROM t GROUP BY A"}'
+  -d '{"path":"report.xlsx","sheet":"Monthly Report","query":"SELECT \"Month\", SUM(\"Revenue\") FROM \"Monthly Report\" GROUP BY \"Month\""}'
 
 # Create result sheet and write
 curl -s -X POST http://localhost:3000/api/sheet/add \
@@ -179,6 +182,15 @@ curl -s -X POST http://localhost:3000/api/freeze-panes/set \
   -H "Content-Type: application/json" \
   -d '{"path":"report.xlsx","sheet":"Monthly Report","rows":1,"cols":0}'
 ```
+
+## SQL Query Notes
+
+SQL runs over DuckDB. Naming rules (identical to the CLI skill):
+
+- **Table name = the worksheet name**, referenced quoted, e.g. `"Sheet1"` (sheet names may contain spaces/special characters). There is no table named `t`.
+- **Columns** default to the **header-row text** (e.g. `"Amount"`). Only when `has_header: false` are they zero-indexed `c0, c1, c2, ...` (`c0` = column A).
+- Quote identifiers that collide with SQL keywords or contain spaces: `SELECT "Order", SUM("Qty") FROM "Sales"`.
+- Supported clauses: `SELECT`, `WHERE`, `ORDER BY`, `GROUP BY`, `LIMIT`. Aggregates: `COUNT`, `SUM`, `AVG`, `MIN`, `MAX`. Queries are read-only (multi-statement and `INSERT/UPDATE/DELETE/CREATE/...` are rejected).
 
 ## SQL Session Management
 
